@@ -1146,8 +1146,8 @@ end
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
 	ALsetting = GetCVar("autoLootDefault")
-	if name == "FA_RaidTools_v3" then
-		_, _, addonVersion = GetAddOnInfo("FA_RaidTools_v3")
+	if name == "FARaidTools" then
+		_, _, addonVersion = GetAddOnInfo("FARaidTools")
 		if optionsTable ~= nil then -- if options loaded, then load into local variables
 			-- individual option checks
 			if optionsTable[1] ~= nil then
@@ -1200,6 +1200,7 @@ function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
 	if prefix == "FA_RT" then
 		if debugOn then print("Recieved message.") end
 		local msg = decompress(msg)
+		if debugOn then DevTools_Dump(msg) end
 		if msg then
 			if source == "RAID" then
 				if msg[1] == "who" then
