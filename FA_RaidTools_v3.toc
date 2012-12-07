@@ -1,0 +1,12 @@
+## Interface: 50001
+## Title: FA_RaidTools_v3
+## Notes: <Forgotten Aspects> loot mod, with some bonus raid utility stuff.
+## Version: v3.00
+## Notes: 300b
+## Author: Fearmønger / Pawkets
+## SavedVariables: optionsTable, history
+
+# Libraries
+embeds.xml
+
+main.lua
