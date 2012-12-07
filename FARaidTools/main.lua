@@ -38,12 +38,13 @@ local function compress(input)
 		print("RT: Serialization of data failed!")
 		return
 	end
-	local compressed, msg = libCompress:CompressHuffman(serialized)
+	--[[local compressed, msg = libCompress:CompressHuffman(serialized)
 	if not compressed then
 		print("RT: Compression of data failed!")
 		return
 	end
-	local encoded, msg = libEncode:Encode(compressed)
+	local encoded, msg = libEncode:Encode(compressed)--]]
+	local encoded, msg = libEncode:Encode(serialized)
 	if not encoded then
 		print("RT: Encoding of data failed!")
 		return
@@ -55,13 +56,14 @@ local function decompress(input)
 	-- Decode the compressed data
 	local one = libEncode:Decode(input)
 	--Decompress the decoded data
-	local two, message = libCompress:Decompress(one)
+	--[[local two, message = libCompress:Decompress(one)
 	if not two then
 		print("RT: Decompression of data failed: "..message)
 		return
 	end
 	-- Deserialize the decompressed data
-	local success, final = libSerialize:Deserialize(two)
+	local success, final = libSerialize:Deserialize(two)--]]
+	local success, final = libSerialize:Deserialize(one)
 	if not success then
 		print("RT: Deserialization of data failed: "..final)
 		return
