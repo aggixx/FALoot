@@ -35,7 +35,7 @@ local addonVersion
 local function compress(input)
 	local serialized, msg = libSerialize:Serialize(input)
 	if not serialized then
-		print("RT: Serialization of data failed!")
+		if debugOn then print("RT: Serialization of data failed!") end
 		return
 	end
 	--[[local compressed, msg = libCompress:CompressHuffman(serialized)
@@ -46,7 +46,7 @@ local function compress(input)
 	local encoded, msg = libEncode:Encode(compressed)--]]
 	local encoded, msg = libEncode:Encode(serialized)
 	if not encoded then
-		print("RT: Encoding of data failed!")
+		if debugOn then print("RT: Encoding of data failed!") end
 		return
 	end
 	return encoded, msg
@@ -65,7 +65,7 @@ local function decompress(input)
 	local success, final = libSerialize:Deserialize(two)--]]
 	local success, final = libSerialize:Deserialize(one)
 	if not success then
-		print("RT: Deserialization of data failed: "..final)
+		if debugOn then print("RT: Deserialization of data failed: "..final) end
 		return
 	end
 	return final
