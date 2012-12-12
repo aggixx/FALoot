@@ -484,8 +484,9 @@ local function generateIcons()
 						--table select stuff
 						iconSelect = id
 					end
-					if button == "RightButton" then -- right click: Ends the item for everyone in the raid. Requires RA or RL.
-						if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or not UnitInRaid("PLAYER") then
+					if button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
+						--remove command stuff
+						endPrompt = coroutine.create( function(self)
 							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
 							local total = 0
 							local id
@@ -497,23 +498,26 @@ local function generateIcons()
 									break
 								end
 							end
-							
-							--remove command stuff
-							endPrompt = coroutine.create( function(self)
-								local msg = stripItemData(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern))
-								StaticPopup_Show("FA_RTEND_CONFIRM")
-								coroutine.yield()
+							local msg = stripItemData(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern))
+							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+								StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..msg.." for all players in the raid?"
+							else
+								StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..msg.."?"
+							end
+							StaticPopup_Show("FA_RTEND_CONFIRM")
+							coroutine.yield()
+							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								SendAddonMessage("FA_RT", compress({"end", addonVersion, msg}), "RAID")
-								table_mainData[id]["cols"][2]["value"] = "Ended"
-								table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-								table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-								table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-								table_mainData[id]["cols"][2]["color"]["a"] = 1
-								FA_RTscrollingtable:SetData(table_mainData, false)
-								table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
-							end)
-							coroutine.resume(endPrompt)
-						end
+							end
+							table_mainData[id]["cols"][2]["value"] = "Ended"
+							table_mainData[id]["cols"][2]["color"]["r"] = 0.5
+							table_mainData[id]["cols"][2]["color"]["g"] = 0.5
+							table_mainData[id]["cols"][2]["color"]["b"] = 0.5
+							table_mainData[id]["cols"][2]["color"]["a"] = 1
+							FA_RTscrollingtable:SetData(table_mainData, false)
+							table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+						end)
+						coroutine.resume(endPrompt)
 					end
 				end)
 				if lasticon then -- if this isn't the first icon then anchor it to the previous icon
