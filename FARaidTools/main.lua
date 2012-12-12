@@ -1234,6 +1234,10 @@ function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
 							table.insert(hasBeenLooted, msg[3])
 						end
 					elseif msg[1] == "end" and msg[2] == addonVersion then
+						if debugOn then
+							print("Recieved end message from "..sender..":")
+							DevTools_Dump(msg[3])
+						end
 						local id
 						for i=1,#table_mainData do
 							local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
