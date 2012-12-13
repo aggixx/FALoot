@@ -6,4 +6,5 @@ INSTALL: Put the folder named "FARaidTools" into the Interface/Addons/ folder in
 TODO:
 - Add filter for enchanting stuff, etc
 - Add spec/class based gear filters on what shows up in the window
-- Make edit command raidwide like end command
+- Fix autoloot toggle, doesn't turn it back on correctly after you leave raid.
+- End doesn't work at all now.
