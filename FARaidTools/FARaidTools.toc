@@ -4,7 +4,7 @@
 ## Version: v3.00
 ## Notes: 300c
 ## Author: Fearmønger / Pawkets
-## SavedVariables: optionsTable, history
+## SavedVariables: table_options, history
 
 # Libraries
 embeds.xml

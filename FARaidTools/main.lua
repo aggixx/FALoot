@@ -16,7 +16,7 @@ local table_icons = {}
 local table_who = {}
 
 local debugOn = false
-local lastLootSetting = 0
+local lastLootSetting
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
 local tableMode = 0
@@ -26,9 +26,6 @@ local iconSelect
 local endPrompt
 local bidPrompt
 local promptBidValue
-local windowPosition
-local ALTsetting
-local ALsetting
 local addonVersion
 
 --helper functions
@@ -191,7 +188,6 @@ FA_RTframe:SetBackdrop({
 FA_RTframe:SetBackdropColor(0, 0, 0, 0.6)
 FA_RTframe:SetWidth(460)
 FA_RTframe:SetHeight(235)
-FA_RTframe:SetPoint("CENTER", 0, 100)
 FA_RTframe:SetMovable(true)
 FA_RTframe:SetScript("OnMouseDown", function(self, button)
 	if button == "LeftButton" then
@@ -1070,38 +1066,42 @@ local function ReportLoot()
 	end
 end
 
-local function setAutoLoot()
+local function getLootSettings()
+	lootSettings = {GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE")}
+	return lootSettings
+end
+
+local function setAutoLoot(suppress)
 	if GetLootMethod() == "freeforall" or debugOn then
 		if isGuildGroup() then
 			if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
-				if lastLootSetting == 0 then
+				if lastLootSetting ~= 1 then
+					getLootSettings()
 					lastLootSetting = 1
-					ALsetting = GetCVar("autoLootDefault")
-					ALTsetting = GetModifiedClick("AUTOLOOTTOGGLE")
 					SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
-					SetCVar( "autoLootDefault", 0 )
-					print("RT: Autoloot is now off.")
+					SetCVar("autoLootDefault", 0)
+					if not suppress then print("RT: Autoloot is now off.") end
 				end
 			end
 		else
-			if lastLootSetting == 1 then
+			if lastLootSetting ~= 0 then
 				lastLootSetting = 0
-				SetModifiedClick("AUTOLOOTTOGGLE", ALTsetting)
-				SetCVar( "autoLootDefault", ALsetting )
-				print("RT: Autoloot has been restored to your previous settings.")
+				SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
+				SetCVar("autoLootDefault", lootSettings[1])
+				if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
 			end
 		end
 	else
-		if lastLootSetting == 1 then
+		if lastLootSetting ~= 0 then
 			lastLootSetting = 0
-			SetModifiedClick("AUTOLOOTTOGGLE", ALTsetting)
-			SetCVar( "autoLootDefault", ALsetting )
-			print("RT: Autoloot has been restored to your previous settings.")
+			SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
+			SetCVar("autoLootDefault", lootSettings[1])
+			if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
 		end
 	end
 end
 
-local function setGeneralVis()
+local function setGeneralVis() -- currently not used
 	if (isGuildGroup() == true) then
 		if (IsResting() == false) then
 			ChatFrame_RemoveChannel(DEFAULT_CHAT_FRAME, "General")
@@ -1149,34 +1149,27 @@ end
 	
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
-	ALsetting = GetCVar("autoLootDefault")
 	if name == "FARaidTools" then
 		_, _, addonVersion = GetAddOnInfo("FARaidTools")
-		if optionsTable ~= nil then -- if options loaded, then load into local variables
-			-- individual option checks
-			if optionsTable[1] ~= nil then
-				windowPosition = optionsTable[1]
-			else
-				windowPosition = {0, 0, "CENTER"}
-			end
-			if optionsTable[2] ~= nil then
-				ALTsetting = optionsTable[2]
-			else
-				ALTsetting = "SHIFT"
-			end
+		if table_options then -- if options loaded, then load into local variables
+			lootSettings = table_options[1] or getLootSettings()
+			history = history or {}
 		else -- if not, set to default values
-			windowPosition = {0, 0, "CENTER"}
-			ALTsetting = "SHIFT"
+			getLootSettings()
+			history = {}
 		end
-		history = history or {}
 		FA_RTscrollingtable2:SetData(history, true)
 		RegisterAddonMessagePrefix("FA_RT")
 	end
 end
 function events:PLAYER_LOGOUT(...)
-	SetModifiedClick("AUTOLOOTTOGGLE", ALTsetting)
-	SetCVar( "autoLootDefault", ALsetting )
-	optionsTable = {{lootwindowpositionX, lootwindowpositionY, relativePoint}, gReportThreshold}
+	if lastLootSetting == 1 then
+		SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
+		SetCVar("autoLootDefault", lootSettings[1])
+	else
+		getLootSettings()
+	end
+	table_options = {lootSettings}
 end
 function events:GET_ITEM_INFO_RECEIVED(...)
 	local list_size = #table_itemQuery
@@ -1189,7 +1182,7 @@ function events:GET_ITEM_INFO_RECEIVED(...)
 	end
 end
 function events:PLAYER_ENTERING_WORLD(...)
-	setAutoLoot()
+	setAutoLoot(1)
 end
 function events:RAID_ROSTER_UPDATE(...)
 	setAutoLoot()
