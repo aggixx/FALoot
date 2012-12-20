@@ -549,7 +549,7 @@ local function slashparse(msg, editbox)
 			end
 		elseif msg[1]:lower() == "who" then
 			if #msg == 1 then
-				SendAddonMessage("FA_RT", compress({"who", "query"}), "RAID")
+				SendAddonMessage("FA_RT", compress({"who", "query"}), "GUILD")
 			else
 				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
 			end
@@ -1200,11 +1200,6 @@ function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
 		if debugOn then DevTools_Dump(msg) end
 		if msg then
 			if source == "RAID" then
-				if msg[1] == "who" then
-					if msg[2] == "query" then
-						SendAddonMessage("FA_RT", compress({"who", "response", addonVersion}), "WHISPER", sender)
-					end
-				end
 				if sender ~= UnitName("PLAYER") then -- requests sent from the player are handled internally so testing can be done while not in a raid group, so let's ignore any messages sent by the player.
 					if msg[1] == "report" and msg[2] == addonVersion then
 						local shouldAdd = true
@@ -1265,6 +1260,12 @@ function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
 						table.insert(table_who[msg[3]], sender)
 					end
 					table_who["time"] = GetTime()
+				end
+			elseif source == "GUILD" then
+				if msg[1] == "who" then
+					if msg[2] == "query" then
+						SendAddonMessage("FA_RT", compress({"who", "response", addonVersion}), "WHISPER", sender)
+					end
 				end
 			end
 		else
