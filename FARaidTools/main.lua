@@ -403,7 +403,7 @@ local function modeSet(num)
 	end
 end
 
-FA_RTbutton1:SetScript("OnMouseUp", function(self, button) -- This needs to be after modeSet otherwise we get errors.
+FA_RTbutton1:SetScript("OnMouseUp", function(self, button)
 	if tableMode == 1 then
 		modeSet(0)
 	elseif tableMode == 0 then
@@ -482,7 +482,7 @@ local function generateIcons()
 					end
 					if button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
 						--remove command stuff
-						endPrompt = coroutine.create( function(self)
+						endPrompt = coroutine.create( function()
 							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
 							local total = 0
 							local id
@@ -494,7 +494,7 @@ local function generateIcons()
 									break
 								end
 							end
-							local msg = stripItemData(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern))
+							local msg = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..msg.." for all players in the raid?"
 							else
