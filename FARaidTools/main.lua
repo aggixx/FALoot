@@ -5,7 +5,8 @@ local libCompress = LibStub:GetLibrary("LibCompress")
 local libEncode = libCompress:GetAddonEncodeTable()
 
 -- Declare local variables
-local hyperlinkPattern = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.+\124h\124r"
+local hyperlinkPattern = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
+--				"|cffa335ee|Hitem:71472:0:0:0:0:0:0:0:90:0:0|h[Flowform Choker]|h|r"
 
 local table_mainData = {}
 local table_bids = {}
@@ -88,8 +89,12 @@ local function str_split(delimiter, text)
 end
 
 local function stripItemData(itemLink)
-	local _, _, Color, Ltype, Id, Enchant, Gem1, Gem2, Gem3, Gem4, Suffix, Unique, LinkLvl, reforging, Name = string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
-	return "|"..Color.."|Hitem:"..Id..":"..Suffix.."|h["..Name.."]|h|r"
+	if itemLink then
+		local _, _, Color, Ltype, Id, Enchant, Gem1, Gem2, Gem3, Gem4, Suffix, Unique, LinkLvl, reforging, Name = string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+		return "|"..Color.."|Hitem:"..Id..":"..Suffix.."|h["..Name.."]|h|r"
+	elseif debugOn then
+		print("stripItemData was passed a nil value!")
+	end
 end
 
 local function isNameInGuild(name)
@@ -1113,8 +1118,7 @@ local function setGeneralVis() -- currently not used
 	end
 end
 
---local function parseChat(msg, author)
-function parseChat(msg, author)
+local function parseChat(msg, author)
 	if debugOn then print("parseChat("..msg..", "..tostring(author)..")") end
 	local rank = 0
 	if not debugOn then
@@ -1127,10 +1131,18 @@ function parseChat(msg, author)
 		end
 	end
 	if rank > 0 or debugOn then
-		local link = string.match(msg, hyperlinkPattern)
-		if link then
-			local note = string.gsub(msg, "x%d+", "")
-			local note = string.match(note, "]|h|r%s*(.+)")
+		local _, replaces = string.gsub(msg, hyperlinkPattern, "")
+		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
+			local link = string.match(msg, hyperlinkPattern)
+			if debugOn then print("link: "..link) end
+			msg = string.gsub(msg, hyperlinkPattern, "")
+			if debugOn then print("msg after links removed: "..msg) end
+			msg = link..msg
+			if debugOn then print("reassembled msg: "..msg) end
+			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
+			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
+			note = string.gsub(note, "%s+", " ") -- replace any double spaces with a single space
+			if debugOn then print("final note: "..note) end
 			local shouldadd = true
 			for i=1,#table_nameAssociations do
 				if table_nameAssociations[i][1] == link then shouldadd = false end
@@ -1145,6 +1157,10 @@ function parseChat(msg, author)
 			end
 		end
 	end
+end
+
+function FA_RTparseChat(msg, author)
+	parseChat(msg, author)
 end
 	
 local frame, events = CreateFrame("Frame"), {}
