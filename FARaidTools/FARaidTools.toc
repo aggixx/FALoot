@@ -3,7 +3,7 @@
 ## Notes: <Forgotten Aspects> loot mod, with some bonus raid utility stuff.
 ## Version: v3.00
 ## Notes: 300c
-## Author: Fearmønger / Pawkets
+## Author: Pawkets
 ## SavedVariables: table_options, history
 
 # Libraries

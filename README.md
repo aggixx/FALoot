@@ -11,3 +11,4 @@ TODO:
 - Retroactively pull item values from aspects chat and pass them to others in the raid.
 - Auto end an item when an item is declared DE in aspects chat.
 - Confirm: Autoloot toggle
+- Add the amount of DKP spent on the item to the LootAlert frame.

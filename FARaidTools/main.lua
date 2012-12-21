@@ -15,6 +15,7 @@ local table_expTimes = {}
 local table_nameAssociations = {}
 local table_icons = {}
 local table_who = {}
+local table_aliases = {}
 
 local debugOn = false
 local lastLootSetting
@@ -540,12 +541,10 @@ local function slashparse(msg, editbox)
 		local msg = str_split(" ", msg)
 		if msg[1]:lower() == "debug" then
 			if #msg == 2 then
-				if msg[2]:lower() == "true" or msg[2]:lower() == "false" then
-					if msg[2]:lower() == "false" then
-						debugOn = false
-					else
-						debugOn = true
-					end
+				if msg[2]:lower() == "true" then
+					debugOn = true
+				elseif msg[2]:lower() == "false" then
+					debugOn = false
 				else
 					print("Invalid syntax for /rt "..msg[1]:lower()..". Invalid value for parameter #2.")
 				end
@@ -557,6 +556,47 @@ local function slashparse(msg, editbox)
 				SendAddonMessage("FA_RT", compress({"who", "query"}), "GUILD")
 			else
 				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
+			end
+		elseif msg[1]:lower() == "alias" then
+			if msg[2]:lower() == "add" then
+				if #msg == 3 then
+					table.insert(table_aliases, msg[3]:lower())
+					print(msg[3].." added as an alias.")
+				else
+					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+				end
+			elseif msg[2]:lower() == "remove" then
+				if #msg == 3 then
+					local removed = false
+					for i=1,#table_aliases do
+						if table_aliases[i]:lower() == msg[3]:lower() then
+							table.remove(table_aliases, i)
+							print("Alias "..msg[3].." removed.")
+							removed = true
+							break
+						end
+					end
+					if not removed then
+						print(msg[3].." is not currently an alias.")
+					end
+				else
+					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+				end
+			elseif msg[2]:lower() == "list" then
+				if #msg == 2 then
+					local list = ""
+					for i=1,#table_aliases do
+						if i > 1 then
+							list = list..", "
+						end
+						list = list..table_aliases[i]
+					end
+					print("Current aliases are: "..list)
+				else
+					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+				end
+			else
+				print("Invalid subcommand for /rt "..msg[1]:lower()..".")
 			end
 		end
 	end
@@ -733,15 +773,33 @@ local function valueFormat(itemLink, value)
 		table_mainData[id]["cols"][2]["color"]["b"] = 0
 		table_mainData[id]["cols"][2]["color"]["a"] = 1
 	else
-		if table_mainData[id]["cols"][3]["value"] ~= "" then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..", "
+		-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
+		value = string.gsub(value, "%sand%s", ", ")
+		value = string.gsub(value, "%s?&%s?", ", ")
+		value = string.gsub(value, "%s?/%s?", ", ")
+		value = string.gsub(value, "%s?\+%s?", ", ")
+		
+		if table_mainData[id]["cols"][3]["value"] ~= "" then -- if the winner list is not empty we need to add a comma before adding the name
+			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..", " -- add a comma
 		end
 		if string.match(table_mainData[id]["cols"][2]["value"], "30") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (30+),").." (30+)"
+			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (30+),").." (30+)" -- add name followed by 30+
 		elseif string.match(table_mainData[id]["cols"][2]["value"], "20") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (20),").." (20)"
+			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (20),").." (20)" -- add name followed by 20
 		elseif string.match(table_mainData[id]["cols"][2]["value"], "10") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (10),").." (10)"
+			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (10),").." (10)" -- add name followed by 10
+		end
+		
+		if string.match(value:lower(), UnitName("player"):lower()) then -- if the player is one of the winners
+			if debugOn then print("The player won an item!") end
+			LootWonAlertFrame_ShowAlert(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+		else
+			for i=1,#table_aliases do
+				if string.match(value:lower(), table_aliases[i]) then
+					if debugOn then print("The player won an item!") end
+					LootWonAlertFrame_ShowAlert(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+				end
+			end
 		end
 	end
 	if table_mainData[id]["cols"][3]["value"] == "" then
@@ -1170,6 +1228,7 @@ function events:ADDON_LOADED(name)
 		if table_options then -- if options loaded, then load into local variables
 			lootSettings = table_options[1] or getLootSettings()
 			history = history or {}
+			table_aliases = table_options[2] or table_aliases
 		else -- if not, set to default values
 			getLootSettings()
 			history = {}
@@ -1185,7 +1244,7 @@ function events:PLAYER_LOGOUT(...)
 	else
 		getLootSettings()
 	end
-	table_options = {lootSettings}
+	table_options = {lootSettings, table_aliases}
 end
 function events:GET_ITEM_INFO_RECEIVED(...)
 	local list_size = #table_itemQuery
