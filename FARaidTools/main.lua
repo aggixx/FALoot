@@ -109,7 +109,7 @@ local function isNameInGuild(name)
 	end
 end
 
-local function isGuildGroup()
+local function isGuildGroup(threshold)
 	GuildRoster()
 	local groupType
 	if IsInRaid() then
@@ -117,22 +117,63 @@ local function isGuildGroup()
 	else
 		groupType = "party"
 	end
-	local raidsize = GetNumGroupMembers()
 	local numguildies = 0
 	local numOffline = 0
-	for i=1,raidsize do
-		local iname = GetRaidRosterInfo(i)
-		if isNameInGuild(iname) then
-			numguildies = numguildies + 1
-		end
-		if not UnitIsConnected(groupType..i) then
-			numOffline = numOffline + 1
+	for i=1,40 do
+		if UnitExists(groupType..i) then
+			local iname = GetRaidRosterInfo(i)
+			if isNameInGuild(iname) then
+				numguildies = numguildies + 1
+			end
+			if not UnitIsConnected(groupType..i) then
+				numOffline = numOffline + 1
+			end
 		end
 	end
-	if (numguildies/(raidsize-numOffline) > 0.60) then
+	if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
 		return true
 	else
 		return false
+	end
+end
+
+local function isMainRaid()
+	GuildRoster()
+	local groupType
+	if IsInRaid() then
+		groupType = "raid"
+	else
+		groupType = "party"
+	end
+	local aspects = 0
+	local drakes = 0
+	for i=1,40 do
+		if UnitExists(groupType..i) then
+			local name = GetRaidRosterInfo(i)
+			SetGuildRosterShowOffline(false)
+			local _, onlineguildies = GetNumGuildMembers()
+			for j=1,onlineguildies do
+				local _, rankName, rankIndex = GetGuildRosterInfo(j)
+				if string.match(rankName, "Aspect") then
+					aspects = aspects + 1
+				elseif  string.match(rankName, "Drake") then
+					drakes = drakes + 1
+				end
+			end
+		end
+	end
+	if aspects >= 2 and drakes >= 5 then
+		return true
+	else
+		return false
+	end
+end
+
+local function addonEnabled()
+	if isGuildGroup(0.60) and isMainRaid() and GetInstanceDifficulty() <= 4 and GetNumGroupMembers() >= 20 then
+		return 1
+	elseif debugOn then
+		return 1
 	end
 end
 
@@ -1081,25 +1122,47 @@ local function ReportLoot()
 	local _, isInInstance = IsInInstance()
 	if isInInstance == "raid" or debugOn then
 		for i=1,GetNumLootItems() do -- loop through all items in the window
-			local shouldAnnounce = true
+			local shouldAnnounce = true -- set announce to true, we'll change it to false if something doesn't meet our criteria
 			local mobID = GetLootSourceInfo(i) -- retrieve GUID of the mob that holds the item
 			local link = GetLootSlotLink(i) -- retrieve link of item
 			if link then
-				if mobID then -- check if the item exists and isn't gold
-					for i=1,#hasBeenLooted do -- check if the mob this item is on has been looted before
+				-- check if the item exists and isn't gold
+				if not mobID then
+					shouldAnnounce = false
+				end
+				
+				-- check if the mob this item is on has been looted before
+				if shouldAnnounce then
+					for i=1,#hasBeenLooted do 
 						if debugOn then print("Comparing "..hasBeenLooted[i].." to "..mobID) end
 						if hasBeenLooted[i] == mobID then
 							shouldAnnounce = false
 							break
 						end
 					end
-				else
-					shouldAnnounce = false
 				end
-				local _, _, quality = GetItemInfo(link)
-				if quality ~= 4 and not debugOn then -- TODO: Add customizable quality filters
-					shouldAnnounce = false
+				
+				-- check properties of item
+				if shouldAnnounce then
+					local _, _, quality, ilevel, _, class, subClass = GetItemInfo(link)
+					
+					-- check if the quality of the item is high enough
+					if quality ~= 4 and not debugOn then -- TODO: Add customizable quality filters
+						shouldAnnounce = false
+					end
+					
+					-- check if the item level of the item is high enough
+					local playerTotal = GetAverageItemLevel()
+					if playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
+						shouldAnnounce = false
+					end
+					
+					-- check if the class of the item is appropriate
+					if not (class == "Armor" or class == "Weapon") then
+						shouldAnnounce = false
+					end
 				end
+				
 				if shouldAnnounce then
 					cacheItem(link) -- add this item to the window
 					SendAddonMessage("FA_RT", compress({"report", addonVersion, mobID, link}), "RAID") -- send addon message to tell others to add this to their window
@@ -1136,7 +1199,7 @@ end
 
 local function setAutoLoot(suppress)
 	if GetLootMethod() == "freeforall" or debugOn then
-		if isGuildGroup() then
+		if addonEnabled() then
 			if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
 				if lastLootSetting ~= 1 then
 					getLootSettings()
@@ -1165,8 +1228,8 @@ local function setAutoLoot(suppress)
 end
 
 local function setGeneralVis() -- currently not used
-	if (isGuildGroup() == true) then
-		if (IsResting() == false) then
+	if addonEnabled() then
+		if IsResting() == false then
 			ChatFrame_RemoveChannel(DEFAULT_CHAT_FRAME, "General")
 		else
 			ChatFrame_AddChannel(DEFAULT_CHAT_FRAME, "General")
@@ -1263,7 +1326,7 @@ function events:RAID_ROSTER_UPDATE(...)
 	setAutoLoot()
 end
 function events:LOOT_OPENED(...)
-	if isGuildGroup() or debugOn then
+	if addonEnabled() then
 		ReportLoot()
 	end
 end
