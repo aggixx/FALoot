@@ -170,7 +170,7 @@ local function isMainRaid()
 end
 
 local function addonEnabled()
-	if isGuildGroup(0.60) and isMainRaid() and GetInstanceDifficulty() <= 4 and GetNumGroupMembers() >= 20 then
+	if isGuildGroup(0.60) and isMainRaid() and GetInstanceDifficulty() ~= 8 and GetNumGroupMembers() >= 20 then
 		return 1
 	elseif debugOn then
 		return 1
