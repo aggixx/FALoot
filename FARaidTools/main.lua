@@ -177,6 +177,42 @@ local function addonEnabled()
 	end
 end
 
+local function checkFilters(link, mobID)
+	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
+
+	-- check if the mob this item is on has been looted before
+	for i=1,#hasBeenLooted do 
+		if hasBeenLooted[i] == mobID then
+			if debugOn then print("Mob of "..link.." has already been looted.") end
+			return false
+		end
+	end
+	
+	-- check properties of item
+	local _, _, quality, ilevel, _, class, subClass = GetItemInfo(link)
+	
+	-- check if the quality of the item is high enough
+	if quality ~= 4 then -- TODO: Add customizable quality filters
+		if debugOn() then print("Quality of "..link.." is too low.") end
+		return false
+	end
+		
+	-- check if the item level of the item is high enough
+	local playerTotal = GetAverageItemLevel()
+	if playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
+		if debugOn() then print("Item Level of "..link.." is too low.") end
+		return false
+	end
+		
+	-- check if the class of the item is appropriate
+	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
+		if debugOn() then print("Type of "..link.." is invalid.") end
+		return false
+	end
+	
+	return true
+end
+
 local function StaticDataSave(data)
 	promptBidValue = data
 end
@@ -1122,52 +1158,12 @@ local function ReportLoot()
 	local _, isInInstance = IsInInstance()
 	if isInInstance == "raid" or debugOn then
 		for i=1,GetNumLootItems() do -- loop through all items in the window
-			local shouldAnnounce = true -- set announce to true, we'll change it to false if something doesn't meet our criteria
 			local mobID = GetLootSourceInfo(i) -- retrieve GUID of the mob that holds the item
 			local link = GetLootSlotLink(i) -- retrieve link of item
-			if link then
-				-- check if the item exists and isn't gold
-				if not mobID then
-					shouldAnnounce = false
-				end
-				
-				-- check if the mob this item is on has been looted before
-				if shouldAnnounce then
-					for i=1,#hasBeenLooted do 
-						if debugOn then print("Comparing "..hasBeenLooted[i].." to "..mobID) end
-						if hasBeenLooted[i] == mobID then
-							shouldAnnounce = false
-							break
-						end
-					end
-				end
-				
-				-- check properties of item
-				if shouldAnnounce then
-					local _, _, quality, ilevel, _, class, subClass = GetItemInfo(link)
-					
-					-- check if the quality of the item is high enough
-					if quality ~= 4 and not debugOn then -- TODO: Add customizable quality filters
-						shouldAnnounce = false
-					end
-					
-					-- check if the item level of the item is high enough
-					local playerTotal = GetAverageItemLevel()
-					if playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-						shouldAnnounce = false
-					end
-					
-					-- check if the class of the item is appropriate
-					if not (class == "Armor" or class == "Weapon") then
-						shouldAnnounce = false
-					end
-				end
-				
-				if shouldAnnounce then
-					cacheItem(link) -- add this item to the window
-					SendAddonMessage("FA_RT", compress({"report", addonVersion, mobID, link}), "RAID") -- send addon message to tell others to add this to their window
-					if debugOn then print("ReportLoot(): \"FA_RT\", \"report"..addonVersion..":"..mobID.."^^"..link.."\"") end
-				end
+			if link and mobID and checkFilters(link, mobID) then
+				cacheItem(link) -- add this item to the window
+				SendAddonMessage("FA_RT", compress({"report", addonVersion, mobID, link}), "RAID") -- send addon message to tell others to add this to their window
+				if debugOn then print("ReportLoot(): \"FA_RT\", \"report"..addonVersion..":"..mobID.."^^"..link.."\"") end
 			else
 				if debugOn then print("ReportLoot(): Link from slot #"..i.." is invalid.") end
 			end
@@ -1240,7 +1236,7 @@ local function setGeneralVis() -- currently not used
 end
 
 local function parseChat(msg, author)
-	if debugOn then print("parseChat("..msg..", "..tostring(author)..")") end
+	--if debugOn then print("parseChat("..msg..", "..tostring(author)..")") end
 	local rank = 0
 	if not debugOn then
 		for i=1,40 do
@@ -1340,14 +1336,7 @@ function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
 			if source == "RAID" then
 				if sender ~= UnitName("PLAYER") then -- requests sent from the player are handled internally so testing can be done while not in a raid group, so let's ignore any messages sent by the player.
 					if msg[1] == "report" and msg[2] == addonVersion then
-						local shouldAdd = true
-						for i=1,#hasBeenLooted do -- check if mobID has already been looted
-							if hasBeenLooted[i] == msg[3] then
-								shouldAdd = false
-								break
-							end
-						end
-						if shouldAdd then
+						if msg[3] and msg[4] and checkFilters(msg[4], msg[3]) then
 							cacheItem(msg[4])
 						end
 					elseif msg[1] == "mobID" and msg[2] == addonVersion then
