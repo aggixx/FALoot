@@ -1,4 +1,7 @@
 -- Load the libraries
+FARaidTools = LibStub("AceAddon-3.0"):NewAddon("FARaidTools")
+LibStub("AceComm-3.0"):Embed(FARaidTools)
+
 local ScrollingTable = LibStub("ScrollingTable")
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0")
 local libCompress = LibStub:GetLibrary("LibCompress")
@@ -17,7 +20,7 @@ local table_icons = {}
 local table_who = {}
 local table_aliases = {}
 
-local debugOn = false
+local debugOn = true
 local lastLootSetting
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
@@ -31,44 +34,6 @@ local promptBidValue
 local addonVersion
 
 --helper functions
-local function compress(input)
-	local serialized, msg = libSerialize:Serialize(input)
-	if not serialized then
-		if debugOn then print("RT: Serialization of data failed!") end
-		return
-	end
-	--[[local compressed, msg = libCompress:CompressHuffman(serialized)
-	if not compressed then
-		print("RT: Compression of data failed!")
-		return
-	end
-	local encoded, msg = libEncode:Encode(compressed)--]]
-	local encoded, msg = libEncode:Encode(serialized)
-	if not encoded then
-		if debugOn then print("RT: Encoding of data failed!") end
-		return
-	end
-	return encoded, msg
-end
-
-local function decompress(input)
-	-- Decode the compressed data
-	local one = libEncode:Decode(input)
-	--Decompress the decoded data
-	--[[local two, message = libCompress:Decompress(one)
-	if not two then
-		print("RT: Decompression of data failed: "..message)
-		return
-	end
-	-- Deserialize the decompressed data
-	local success, final = libSerialize:Deserialize(two)--]]
-	local success, final = libSerialize:Deserialize(one)
-	if not success then
-		if debugOn then print("RT: Deserialization of data failed: "..final) end
-		return
-	end
-	return final
-end
 
 local function str_split(delimiter, text)
 	local list = {}
@@ -170,22 +135,19 @@ local function isMainRaid()
 end
 
 local function addonEnabled()
-	if isGuildGroup(0.60) and isMainRaid() and GetInstanceDifficulty() ~= 8 and GetNumGroupMembers() >= 20 then
+	local _, instanceType = IsInInstance()
+	if isGuildGroup(0.60) and isMainRaid() and instanceType == "raid" and GetInstanceDifficulty() ~= 8 and GetNumGroupMembers() >= 20 then
 		return 1
 	elseif debugOn then
 		return 1
 	end
 end
 
-local function checkFilters(link, mobID)
+local function checkFilters(link)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
-
-	-- check if the mob this item is on has been looted before
-	for i=1,#hasBeenLooted do 
-		if hasBeenLooted[i] == mobID then
-			if debugOn then print("Mob of "..link.." has already been looted.") end
-			return false
-		end
+	
+	if debugOn then
+		return true
 	end
 	
 	-- check properties of item
@@ -193,7 +155,7 @@ local function checkFilters(link, mobID)
 	
 	-- check if the quality of the item is high enough
 	if quality ~= 4 then -- TODO: Add customizable quality filters
-		if debugOn() then print("Quality of "..link.." is too low.") end
+		if debugOn then print("Quality of "..link.." is too low.") end
 		return false
 	end
 		
@@ -215,6 +177,119 @@ end
 
 local function StaticDataSave(data)
 	promptBidValue = data
+end
+
+function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needsCompress)
+	--serialize
+	local serialized, msg = libSerialize:Serialize(text)
+	if serialized then
+		text = serialized
+	else
+		print("RT: Serialization of data failed!")
+		return
+	end
+	--compress
+	if needsCompress and false then -- disabled
+		local compressed, msg = libCompress:CompressHuffman(text)
+		if compressed then
+			text = compressed
+		else
+			print("RT: Compression of data failed!")
+			return
+		end
+	end
+	--encode
+	local encoded, msg = libEncode:Encode(text)
+	if encoded then
+		text = encoded
+	else
+		print("RT: Encoding of data failed!")
+		return
+	end
+	
+	FARaidTools:SendCommMessage(prefix, text, distribution, target, prio)
+end
+
+function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
+	if not text --[[or sender == UnitName("PLAYER")--]] then
+		return
+	end
+	if debugOn then print("Recieved message.") end
+	
+	-- Decode the data
+	local text = libEncode:Decode(text)
+	
+	-- Deserialize the data
+	local success, deserialized = libSerialize:Deserialize(text)
+	if success then
+		text = deserialized
+	else
+		if debugOn then print("RT: Deserialization of data failed: "..text) end
+		return
+	end
+	
+	if debugOn then DevTools_Dump(text) end
+	
+	if prefix == "FA_RTreport" and text[1] == addonVersion then
+		local data = text[2]
+		local mobID = table.remove(data, 1)
+		
+		-- check if the mob has been looted before
+		for i=1,#hasBeenLooted do 
+			if hasBeenLooted[i] == mobID then
+				return
+			end
+		end
+		
+		for i=1, #data do
+			if checkFilters(data[i]) then
+				FARaidTools:cacheItem(data[i])
+			end
+		end
+		table.insert(hasBeenLooted, mobID)
+	elseif prefix == "FA_RTend" and text[1] == addonVersion then
+		local itemLink = text[2]
+		
+		if debugOn then
+			print("Recieved end message from "..sender..":")
+			DevTools_Dump(itemLink)
+		end
+		local id
+		for i=1,#table_mainData do
+			local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
+			local link2 = stripItemData(itemLink)
+			if link == link2 then
+				id = i
+				break
+			end
+		end
+		if id then
+			table_mainData[id]["cols"][2]["value"] = "Ended"
+			table_mainData[id]["cols"][2]["color"]["r"] = 0.5
+			table_mainData[id]["cols"][2]["color"]["g"] = 0.5
+			table_mainData[id]["cols"][2]["color"]["b"] = 0.5
+			table_mainData[id]["cols"][2]["color"]["a"] = 1
+			FA_RTscrollingtable:SetData(table_mainData, false)
+			table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+		end
+	elseif prefix == "FA_RTwho" then
+		if distribution == "WHISPER" then
+			local version = text[2]
+			
+			local table_who = table_who or {}
+			if text[2] then
+				if debugOn then print("Who response recieved from "..sender..".") end
+				if not table_who[msg[3]] then
+					table_who[msg[3]] = {}
+					table.insert(table_who, msg[3])
+				end
+				table.insert(table_who[msg[3]], sender)
+			end
+			table_who["time"] = GetTime()
+		elseif distribution == "GUILD" then
+			FARaidTools:sendMessage("FA_RTwho", {"response", addonVersion}, "WHISPER", sender)
+		end
+	end
 end
 
 --Create GUI elements
@@ -494,7 +569,7 @@ FA_RTbutton1:SetScript("OnMouseUp", function(self, button)
 	end
 end) 
 
-local function generateIcons()
+function FARaidTools:generateIcons()
 	local lasticon = nil -- reference value for anchoring to the most recently constructed icon
 	local firsticon = nil -- reference value for anchoring the first constructed icon
 	local k = 0 -- this variable contains the number of the icon we're currently constructing, necessary because we need to be able to create multiple icons per entry in the table
@@ -569,7 +644,7 @@ local function generateIcons()
 							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
 							local total = 0
 							local id
-							for i=1,#table_mainData do -- figure out what row of data associates to this icon by counting up the quanities of each row
+							for i=1,#table_mainData do -- figure out what row of data associates to this icon by counting up the quantities of each row
 								local quantity = tonumber(string.match(table_mainData[i]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1
 								total = total + quantity
 								if total >= iconNum then
@@ -586,7 +661,7 @@ local function generateIcons()
 							StaticPopup_Show("FA_RTEND_CONFIRM")
 							coroutine.yield()
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-								SendAddonMessage("FA_RT", compress({"end", addonVersion, msg}), "RAID")
+								FARaidTools:sendMessage("FA_RTend", {addonVersion, msg}, "RAID")
 							end
 							table_mainData[id]["cols"][2]["value"] = "Ended"
 							table_mainData[id]["cols"][2]["color"]["r"] = 0.5
@@ -630,7 +705,7 @@ local function slashparse(msg, editbox)
 			end
 		elseif msg[1]:lower() == "who" then
 			if #msg == 1 then
-				SendAddonMessage("FA_RT", compress({"who", "query"}), "GUILD")
+				FARaidTools:sendMessage("FA_RTwho", "query", "GUILD")
 			else
 				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
 			end
@@ -819,7 +894,7 @@ StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
 	enterClicksFirstButton = 1
 }
 
-local function valueFormat(itemLink, value)
+function FARaidTools:valueFormat(itemLink, value)
 	if debugOn then print("valueFormat("..itemLink..", "..tostring(value)..")") end
 	local id
 	for i=1,#table_mainData do
@@ -902,7 +977,7 @@ local function valueFormat(itemLink, value)
 	FA_RTscrollingtable:SetData(table_mainData, false)
 end
 
-local function addToLootWindow(itemLink)
+function FARaidTools:addToLootWindow(itemLink)
 	if debugOn then print("addToLootWindow("..itemLink..")") end
 	local id
 	for i=1,#table_mainData do
@@ -972,7 +1047,7 @@ local function addToLootWindow(itemLink)
 		})
 	end
 	FA_RTscrollingtable:SetData(table_mainData, false)
-	generateIcons()
+	FARaidTools:generateIcons()
 	if not FA_RTframe:IsShown() then
 		if UnitAffectingCombat("PLAYER") then
 			showAfterCombat = true
@@ -983,7 +1058,7 @@ local function addToLootWindow(itemLink)
 	end
 end
 
-local function cacheItem(itemLink)
+function FARaidTools:cacheItem(itemLink)
 	if debugOn then print("cacheItem("..itemLink..")") end
 	itemName = GetItemInfo(itemLink)
 	if itemName == nil then -- check if item is cached or if we need to query it from the server
@@ -991,11 +1066,11 @@ local function cacheItem(itemLink)
 		table.insert(table_itemQuery, itemLink) -- add to the query queue
 	else
 		if debugOn then print("cacheItem(): Item already cached, adding to loot window.") end
-		addToLootWindow(itemLink) -- item is already cached so we can just add it now
+		FARaidTools:addToLootWindow(itemLink) -- item is already cached so we can just add it now
 	end
 end
 
-local function removeFromLootWindow(itemLink)
+function FARaidTools:removeFromLootWindow(itemLink)
 	id = nil
 	for i=1,#table_mainData do
 		link1 = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
@@ -1028,7 +1103,7 @@ local function removeFromLootWindow(itemLink)
 			table.remove(table_bids, table_size-i)
 		end
 	end
-	generateIcons()
+	FARaidTools:generateIcons()
 end
 
 local function onUpdate(self,elapsed)
@@ -1049,7 +1124,7 @@ local function onUpdate(self,elapsed)
 				table.insert(history, 1, {date(), table_mainData[id]["cols"][1]["value"], table_mainData[id]["cols"][3]["value"]}) -- add entry to history table
 				FA_RTscrollingtable2:SetData(history, true)
 				
-				removeFromLootWindow(table_expTimes[tableSize-i][1]) -- remove entry from data table
+				FARaidTools:removeFromLootWindow(table_expTimes[tableSize-i][1]) -- remove entry from data table
 				FA_RTscrollingtable:SetData(table_mainData, false)
 				
 				table.remove(table_expTimes, tableSize-i)
@@ -1153,41 +1228,6 @@ end
 local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
-local function ReportLoot()
-	if debugOn then print("ReportLoot()") end
-	local _, isInInstance = IsInInstance()
-	if isInInstance == "raid" or debugOn then
-		for i=1,GetNumLootItems() do -- loop through all items in the window
-			local mobID = GetLootSourceInfo(i) -- retrieve GUID of the mob that holds the item
-			local link = GetLootSlotLink(i) -- retrieve link of item
-			if link and mobID and checkFilters(link, mobID) then
-				cacheItem(link) -- add this item to the window
-				SendAddonMessage("FA_RT", compress({"report", addonVersion, mobID, link}), "RAID") -- send addon message to tell others to add this to their window
-				if debugOn then print("ReportLoot(): \"FA_RT\", \"report"..addonVersion..":"..mobID.."^^"..link.."\"") end
-			else
-				if debugOn then print("ReportLoot(): Link from slot #"..i.." is invalid.") end
-			end
-		end
-		
-		-- now add all the GUIDs that we just looted to hasBeenLooted table
-		for i=1,GetNumLootItems() do --loop through list of items
-			local source = {GetLootSourceInfo(i)}
-			for j=1,#source/2 do -- loop through list of sources for each item
-				local shouldAnnounce = true
-				for k=1,#hasBeenLooted do -- check if this mob is not on the hasBeenLooted table yet
-					if hasBeenLooted[k] == source[(j*2)-1] then shouldAnnounce = false end
-					break
-				end
-				if shouldAnnounce then
-					table.insert(hasBeenLooted, source[(j*2)-1]) -- add this mob to hasBeenLooted
-					SendAddonMessage("FA_RT", compress({"mobID", addonVersion, source[(j*2)-1]}), "RAID") -- send addon message to tell others to add this mob to hasBeenLooted
-					if debugOn then print("ReportLoot(): \"FA_RT\", \"mobID"..addonVersion..":"..source[(j*2)-1].."\"") end
-				end
-			end
-		end
-	end
-end
-
 local function getLootSettings()
 	lootSettings = {GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE")}
 	return lootSettings
@@ -1235,7 +1275,7 @@ local function setGeneralVis() -- currently not used
 	end
 end
 
-local function parseChat(msg, author)
+function FARaidTools:parseChat(msg, author)
 	--if debugOn then print("parseChat("..msg..", "..tostring(author)..")") end
 	local rank = 0
 	if not debugOn then
@@ -1270,14 +1310,10 @@ local function parseChat(msg, author)
 			if debugOn then print(link) end
 			if debugOn then print(note) end
 			if note then
-				valueFormat(link, note)
+				FARaidTools:valueFormat(link, note)
 			end
 		end
 	end
-end
-
-function FA_RTparseChat(msg, author)
-	parseChat(msg, author)
 end
 	
 local frame, events = CreateFrame("Frame"), {}
@@ -1293,7 +1329,9 @@ function events:ADDON_LOADED(name)
 			history = {}
 		end
 		FA_RTscrollingtable2:SetData(history, true)
-		RegisterAddonMessagePrefix("FA_RT")
+		FARaidTools:RegisterComm("FA_RTreport")
+		FARaidTools:RegisterComm("FA_RTend")
+		FARaidTools:RegisterComm("FA_RTwho")
 	end
 end
 function events:PLAYER_LOGOUT(...)
@@ -1309,7 +1347,7 @@ function events:GET_ITEM_INFO_RECEIVED(...)
 	local list_size = #table_itemQuery
 	for i=0,list_size-1 do -- loop backwards through list of items waiting to be cached
 		if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
-			addToLootWindow(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
+			FARaidTools:addToLootWindow(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
 			table.remove(table_itemQuery, list_size-i) -- remove the entry from the query list
 			if debugOn then print("GET_ITEM_INFO_RECEIVED: Adding item #"..list_size-i.." to loot window.") end
 		end
@@ -1323,88 +1361,56 @@ function events:RAID_ROSTER_UPDATE(...)
 end
 function events:LOOT_OPENED(...)
 	if addonEnabled() then
-		ReportLoot()
-	end
-end
-function events:CHAT_MSG_ADDON(prefix, msg, source, sender)
-	--if debugOn then print("CHAT_MSG_ADDON: "..prefix..", "..msg..", "..source..", "..sender) end
-	if prefix == "FA_RT" then
-		if debugOn then print("Recieved message.") end
-		local msg = decompress(msg)
-		if debugOn then DevTools_Dump(msg) end
-		if msg then
-			if source == "RAID" then
-				if sender ~= UnitName("PLAYER") then -- requests sent from the player are handled internally so testing can be done while not in a raid group, so let's ignore any messages sent by the player.
-					if msg[1] == "report" and msg[2] == addonVersion then
-						if msg[3] and msg[4] and checkFilters(msg[4], msg[3]) then
-							cacheItem(msg[4])
-						end
-					elseif msg[1] == "mobID" and msg[2] == addonVersion then
-						local shouldAdd = true
-						for i=1,#hasBeenLooted do -- check if this mob is not on the hasBeenLooted table yet
-							if hasBeenLooted[i] == msg[3] then shouldAdd = false end
-							break
-						end
-						if shouldAdd then
-							table.insert(hasBeenLooted, msg[3])
-						end
-					elseif msg[1] == "end" and msg[2] == addonVersion then
-						if debugOn then
-							print("Recieved end message from "..sender..":")
-							DevTools_Dump(msg[3])
-						end
-						local id
-						for i=1,#table_mainData do
-							local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
-							local link2 = stripItemData(msg[3])
-							if link == link2 then
-								id = i
-								break
-							end
-						end
-						if id then
-							table_mainData[id]["cols"][2]["value"] = "Ended"
-							table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["a"] = 1
-							FA_RTscrollingtable:SetData(table_mainData, false)
-							table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
-						else
-							return
-						end
-					end
-				end
-			elseif source == "WHISPER" then
-				if msg[1] == "who" and msg[2] == "response" then
-					local table_who = table_who or {}
-					if msg[3] then
-						if debugOn then print("Who response recieved from "..sender..".") end
-						if not table_who[msg[3]] then
-							table_who[msg[3]] = {}
-							table.insert(table_who, msg[3])
-						end
-						table.insert(table_who[msg[3]], sender)
-					end
-					table_who["time"] = GetTime()
-				end
-			elseif source == "GUILD" then
-				if msg[1] == "who" then
-					if msg[2] == "query" then
-						SendAddonMessage("FA_RT", compress({"who", "response", addonVersion}), "WHISPER", sender)
-					end
+		local loot = {} -- create a temporary table to organize the loot on the mob
+		for i=1,GetNumLootItems() do -- loop through all items in the window
+			local mobID = GetLootSourceInfo(i) -- retrieve GUID of the mob that holds the item
+			for i=1,#hasBeenLooted do 
+				if hasBeenLooted[i] == mobID then
+					mobID = nil
+					break
 				end
 			end
-		else
-			if debugOn then print("Recieved malformed addon message.") end
+			if mobID then
+				local id
+				for i=1,#loot do
+					if loot[i][1] == mobID then
+						id = i
+						break
+					end
+				end
+				if not id then
+					table.insert(loot, {mobID}) -- create an entry in table for the mobID
+					id = #loot
+				end
+				
+				local link = GetLootSlotLink(i) -- retrieve link of item
+				if link and checkFilters(link) then
+					table.insert(loot[id], link)
+				end
+			end
+		end
+		
+		for i=1,#loot do
+			FARaidTools:sendMessage("FA_RTreport", {addonVersion, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
+
+			--[[local data = loot[i]
+			local mobID = table.remove(data, 1)
+			
+			for j=1, #data do
+				if checkFilters(data[j]) then
+					FARaidTools:cacheItem(data[j])
+				end
+			end
+			
+			table.insert(hasBeenLooted, mobID)--]]
 		end
 	end
 end
 function events:CHAT_MSG_RAID(msg, author)
-	parseChat(msg, author)
+	FARaidTools:parseChat(msg, author)
 end
 function events:CHAT_MSG_RAID_LEADER(msg, author)
-	parseChat(msg, author)
+	FARaidTools:parseChat(msg, author)
 end
 frame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
@@ -1414,14 +1420,14 @@ for k, v in pairs(events) do
 end
 
 if debugOn then
-	cacheItem("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	cacheItem("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
-	parseChat("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r 30", UnitName("PLAYER"))
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
+	FARaidTools:parseChat("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r 30", UnitName("PLAYER"))
 end

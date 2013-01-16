@@ -1,8 +1,8 @@
 ## Interface: 50001
 ## Title: FARaidTools
 ## Notes: <Forgotten Aspects> loot mod, with some bonus raid utility stuff.
-## Version: v3.01
-## Notes: 301a
+## Version: v3.02
+## Notes: 302
 ## Author: Pawkets
 ## SavedVariables: table_options, history
 
