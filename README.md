@@ -13,3 +13,4 @@ TODO:
 - Add the amount of DKP spent on the item to the LootAlert frame.
 - Bug: If you link a ton of items in one message and then send it it ends an item somehow.
 - Change text on mode button to be more clear.
+- Shift click to link items, Ctrl click to view items.

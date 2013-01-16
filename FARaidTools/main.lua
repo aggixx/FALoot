@@ -20,7 +20,7 @@ local table_icons = {}
 local table_who = {}
 local table_aliases = {}
 
-local debugOn = true
+local debugOn = false
 local lastLootSetting
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
@@ -250,27 +250,8 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	elseif prefix == "FA_RTend" and text[1] == addonVersion then
 		local itemLink = text[2]
 		
-		if debugOn then
-			print("Recieved end message from "..sender..":")
-			DevTools_Dump(itemLink)
-		end
-		local id
-		for i=1,#table_mainData do
-			local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
-			local link2 = stripItemData(itemLink)
-			if link == link2 then
-				id = i
-				break
-			end
-		end
-		if id then
-			table_mainData[id]["cols"][2]["value"] = "Ended"
-			table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-			table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-			table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-			table_mainData[id]["cols"][2]["color"]["a"] = 1
-			FA_RTscrollingtable:SetData(table_mainData, false)
-			table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+		if itemLink then
+			FARaidTools:endItem(itemLink)
 		end
 	elseif prefix == "FA_RTwho" then
 		if distribution == "WHISPER" then
@@ -663,13 +644,7 @@ function FARaidTools:generateIcons()
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FARaidTools:sendMessage("FA_RTend", {addonVersion, msg}, "RAID")
 							end
-							table_mainData[id]["cols"][2]["value"] = "Ended"
-							table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-							table_mainData[id]["cols"][2]["color"]["a"] = 1
-							FA_RTscrollingtable:SetData(table_mainData, false)
-							table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+							FARaidTools:endItem(id)
 						end)
 						coroutine.resume(endPrompt)
 					end
@@ -1070,19 +1045,44 @@ function FARaidTools:cacheItem(itemLink)
 	end
 end
 
-function FARaidTools:removeFromLootWindow(itemLink)
-	id = nil
+function FARaidTools:endItem(input) -- itemLink or ID
+	local id
+	if type(input) == "string" then
+		for i=1,#table_mainData do
+			local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
+			local link2 = stripItemData(input)
+			if link == link2 then
+				id = i
+				break
+			end
+		end
+	elseif type(input) == "number" then
+		id = input
+	end
+	if id then
+		table_mainData[id]["cols"][2]["value"] = "Ended"
+		table_mainData[id]["cols"][2]["color"]["r"] = 0.5
+		table_mainData[id]["cols"][2]["color"]["g"] = 0.5
+		table_mainData[id]["cols"][2]["color"]["b"] = 0.5
+		table_mainData[id]["cols"][2]["color"]["a"] = 1
+		FA_RTscrollingtable:SetData(table_mainData, false)
+		table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+	end
+end
+
+function FARaidTools:removeItem(itemLink)
+	local id
 	for i=1,#table_mainData do
 		link1 = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
 		link2 = stripItemData(itemLink)
 		if link1 == link2 then
 			id = i
-			if debugOn then print("removeFromLootWindow(): Found match in data table. ID #"..id) end
+			if debugOn then print("removeItem(): Found match in data table. ID #"..id) end
 			break
 		end
 	end
 	if id == nil then
-		if debugOn then print("removeFromLootWindow(): No match found in data table. Aborting.") end
+		if debugOn then print("removeItem(): No match found in data table. Aborting.") end
 		return
 	end
 	table.remove(table_mainData, id)
@@ -1124,7 +1124,7 @@ local function onUpdate(self,elapsed)
 				table.insert(history, 1, {date(), table_mainData[id]["cols"][1]["value"], table_mainData[id]["cols"][3]["value"]}) -- add entry to history table
 				FA_RTscrollingtable2:SetData(history, true)
 				
-				FARaidTools:removeFromLootWindow(table_expTimes[tableSize-i][1]) -- remove entry from data table
+				FARaidTools:removeItem(table_expTimes[tableSize-i][1]) -- remove entry from data table
 				FA_RTscrollingtable:SetData(table_mainData, false)
 				
 				table.remove(table_expTimes, tableSize-i)
@@ -1411,6 +1411,19 @@ function events:CHAT_MSG_RAID(msg, author)
 end
 function events:CHAT_MSG_RAID_LEADER(msg, author)
 	FARaidTools:parseChat(msg, author)
+end
+function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
+	if channelName == "aspects" then
+		local itemLink = string.match(msg, hyperlinkPattern) 
+		if itemLink then
+			local msg = string.lower(string.match(msg, hyperlinkPattern.."(.+)")) -- now remove the link
+			print(msg)
+			local msg = " "..string.gsub(msg, "[/,]", " ").." "
+			if string.match(msg, " de ") or string.match(msg, " disenchant ") then
+				FARaidTools:endItem(itemLink)
+			end
+		end
+	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
