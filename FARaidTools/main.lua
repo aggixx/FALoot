@@ -1365,29 +1365,34 @@ function events:LOOT_OPENED(...)
 	if addonEnabled() then
 		local loot = {} -- create a temporary table to organize the loot on the mob
 		for i=1,GetNumLootItems() do -- loop through all items in the window
-			local mobID = GetLootSourceInfo(i) -- retrieve GUID of the mob that holds the item
-			for i=1,#hasBeenLooted do 
-				if hasBeenLooted[i] == mobID then
-					mobID = nil
-					break
-				end
-			end
-			if mobID then
-				local id
-				for i=1,#loot do
-					if loot[i][1] == mobID then
-						id = i
+			local sourceInfo = {GetLootSourceInfo(i)}
+			for j=1,#sourceInfo/2 do
+				local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
+				for k=1,#hasBeenLooted do
+					if hasBeenLooted[i] == mobID then
+						mobID = nil
 						break
 					end
 				end
-				if not id then
-					table.insert(loot, {mobID}) -- create an entry in table for the mobID
-					id = #loot
-				end
-				
-				local link = GetLootSlotLink(i) -- retrieve link of item
-				if link and checkFilters(link) then
-					table.insert(loot[id], link)
+				if mobID then
+					local id
+					for k=1,#loot do
+						if loot[i][1] == mobID then
+							id = i
+							break
+						end
+					end
+					if not id then
+						table.insert(loot, {mobID}) -- create an entry in table for the mobID
+						id = #loot
+					end
+					
+					local link = GetLootSlotLink(i) -- retrieve link of item
+					if link and checkFilters(link) then
+						for l=1,sourceInfo[j*2] do -- repeat the insert if there is multiple of the item in that slot
+							table.insert(loot[id], link)
+						end
+					end
 				end
 			end
 		end
