@@ -258,13 +258,13 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			local version = text[2]
 			
 			local table_who = table_who or {}
-			if text[2] then
+			if version then
 				if debugOn then print("Who response recieved from "..sender..".") end
-				if not table_who[msg[3]] then
-					table_who[msg[3]] = {}
-					table.insert(table_who, msg[3])
+				if not table_who[version] then
+					table_who[version] = {}
+					table.insert(table_who, version)
 				end
-				table.insert(table_who[msg[3]], sender)
+				table.insert(table_who[version], sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
