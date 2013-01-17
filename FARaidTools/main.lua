@@ -162,13 +162,13 @@ local function checkFilters(link)
 	-- check if the item level of the item is high enough
 	local playerTotal = GetAverageItemLevel()
 	if playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-		if debugOn() then print("Item Level of "..link.." is too low.") end
+		if debugOn then print("Item Level of "..link.." is too low.") end
 		return false
 	end
 		
 	-- check if the class of the item is appropriate
 	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
-		if debugOn() then print("Type of "..link.." is invalid.") end
+		if debugOn then print("Type of "..link.." is invalid.") end
 		return false
 	end
 	
@@ -211,7 +211,9 @@ function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needs
 end
 
 function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
-	if not text --[[or sender == UnitName("PLAYER")--]] then
+	if not text then
+		return
+	elseif sender == UnitName("PLAYER") and prefix ~= "FA_RTwho" then
 		return
 	end
 	if debugOn then print("Recieved message.") end
@@ -1393,7 +1395,7 @@ function events:LOOT_OPENED(...)
 		for i=1,#loot do
 			FARaidTools:sendMessage("FA_RTreport", {addonVersion, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
 
-			--[[local data = loot[i]
+			local data = loot[i]
 			local mobID = table.remove(data, 1)
 			
 			for j=1, #data do
@@ -1402,7 +1404,7 @@ function events:LOOT_OPENED(...)
 				end
 			end
 			
-			table.insert(hasBeenLooted, mobID)--]]
+			table.insert(hasBeenLooted, mobID)
 		end
 	end
 end
