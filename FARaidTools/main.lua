@@ -1418,8 +1418,11 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 	if channelName == "aspects" then
 		local itemLink = string.match(msg, hyperlinkPattern) 
 		if itemLink then
-			local msg = string.lower(string.match(msg, hyperlinkPattern.."(.+)")) -- now remove the link
-			print(msg)
+			local msg = string.match(msg, hyperlinkPattern.."(.+)") -- now remove the link
+			if msg == "" then
+				return
+			end
+			local msg = string.lower(msg) -- put in lower case
 			local msg = " "..string.gsub(msg, "[/,]", " ").." "
 			if string.match(msg, " de ") or string.match(msg, " disenchant ") then
 				if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
