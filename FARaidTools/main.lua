@@ -143,6 +143,10 @@ local function addonEnabled()
 	end
 end
 
+function FARaidTools:addonEnabled()
+	return addonEnabled()
+end
+
 local function checkFilters(link)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	
@@ -1375,10 +1379,14 @@ function events:LOOT_OPENED(...)
 					end
 				end
 				if mobID then
+					if debugOn then
+						DevTools_Dump(loot)
+						DevTools_Dump(#loot)
+					end
 					local id
 					for k=1,#loot do
-						if loot[i][1] == mobID then
-							id = i
+						if loot[k][1] == mobID then
+							id = k
 							break
 						end
 					end
