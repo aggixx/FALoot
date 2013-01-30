@@ -140,6 +140,18 @@ local function addonEnabled()
 		return 1
 	elseif debugOn then
 		return 1
+	else
+		if not isGuildGroup(0.60) then
+			return 0, "not guild group"
+		elseif not isMainRaid() then
+			return 0, "not enough officers"
+		elseif not instanceType == "raid" then
+			return 0, "wrong instance type"
+		elseif not GetInstanceDifficulty() ~= 8 then
+			return 0, "wrong instance difficulty"
+		elseif not GetNumGroupMembers() >= 20 then
+			return 0, "not enough group members"
+		end
 	end
 end
 
@@ -247,7 +259,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 		end
 		
-		for i=1, #data do
+		for i=1,#data do
 			if checkFilters(data[i]) then
 				FARaidTools:cacheItem(data[i])
 			end
@@ -1321,6 +1333,10 @@ function FARaidTools:parseChat(msg, author)
 		end
 	end
 end
+
+function FARaidTools:dumpHBL()
+	DevTools_Dump(hasBeenLooted)
+end
 	
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
@@ -1373,16 +1389,12 @@ function events:LOOT_OPENED(...)
 			for j=1,#sourceInfo/2 do
 				local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
 				for k=1,#hasBeenLooted do
-					if hasBeenLooted[i] == mobID then
+					if hasBeenLooted[k] == mobID then
 						mobID = nil
 						break
 					end
 				end
 				if mobID then
-					if debugOn then
-						DevTools_Dump(loot)
-						DevTools_Dump(#loot)
-					end
 					local id
 					for k=1,#loot do
 						if loot[k][1] == mobID then
@@ -1405,11 +1417,15 @@ function events:LOOT_OPENED(...)
 			end
 		end
 		
+		if #loot and debugOn then DevTools_Dump(loot) end
+		
 		for i=1,#loot do
 			FARaidTools:sendMessage("FA_RTreport", {addonVersion, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
 
 			local data = loot[i]
 			local mobID = table.remove(data, 1)
+			
+			-- we can assume that everything in the table is not on the HBL
 			
 			for j=1, #data do
 				if checkFilters(data[j]) then
@@ -1429,20 +1445,18 @@ function events:CHAT_MSG_RAID_LEADER(msg, author)
 end
 function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 	if channelName == "aspects" then
+		if not msg then return end
 		local itemLink = string.match(msg, hyperlinkPattern) 
-		if itemLink then
-			local msg = string.match(msg, hyperlinkPattern.."(.+)") -- now remove the link
-			if msg == "" then
-				return
+		if not itemLink then return end
+		local msg = string.match(msg, hyperlinkPattern.."(.+)") -- now remove the link
+		if msg == "" then return end
+		local msg = string.lower(msg) -- put in lower case
+		local msg = " "..string.gsub(msg, "[/,]", " ").." "
+		if string.match(msg, " de ") or string.match(msg, " disenchant ") then
+			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+				FARaidTools:sendMessage("FA_RTend", {addonVersion, itemLink}, "RAID")
 			end
-			local msg = string.lower(msg) -- put in lower case
-			local msg = " "..string.gsub(msg, "[/,]", " ").." "
-			if string.match(msg, " de ") or string.match(msg, " disenchant ") then
-				if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-					FARaidTools:sendMessage("FA_RTend", {addonVersion, itemLink}, "RAID")
-				end
-				FARaidTools:endItem(itemLink)
-			end
+			FARaidTools:endItem(itemLink)
 		end
 	end
 end
