@@ -743,6 +743,17 @@ local function slashparse(msg, editbox)
 			else
 				print("Invalid subcommand for /rt "..msg[1]:lower()..".")
 			end
+		elseif msg[1]:lower() == "reset" then
+			FA_RTframe:ClearAllPoints()
+			FA_RTframe:SetPoint("CENTER")
+		else
+			print("The following are valid commands for /rt:")
+			print("/rt debug <true/false> -- set status of debug mode")
+			print("/rt who -- see who is running the addon and what version")
+			print("/rt alias add <name> -- add an alias for award detection")
+			print("/rt alias remove <name> -- remove an alias for award detection")
+			print("/rt alias list -- list aliases for award detection")
+			print("/rt reset -- resets the position of the RT window")
 		end
 	end
 end
