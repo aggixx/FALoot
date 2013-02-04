@@ -356,6 +356,7 @@ FA_RTframe:SetScript("OnMouseUp", function(self, button)
 		self:StopMovingOrSizing()
 	end
 end)
+FA_RTframe:SetPoint("CENTER")
 FA_RTframe:Hide()
 FA_RTbutton1 = CreateFrame("button", "FA_RTbutton", FA_RTframe)
 FA_RTbutton1:SetPoint("BOTTOMLEFT", FA_RTframe, "BOTTOMLEFT", 11, -2)
@@ -753,7 +754,7 @@ local function slashparse(msg, editbox)
 			print("/rt alias add <name> -- add an alias for award detection")
 			print("/rt alias remove <name> -- remove an alias for award detection")
 			print("/rt alias list -- list aliases for award detection")
-			print("/rt reset -- resets the position of the RT window")
+			print("/rt resetpos -- resets the position of the RT window")
 		end
 	end
 end
