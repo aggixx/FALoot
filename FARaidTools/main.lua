@@ -142,15 +142,15 @@ local function addonEnabled()
 		return 1
 	else
 		if not isGuildGroup(0.60) then
-			return 0, "not guild group"
+			return nil, "not guild group"
 		elseif not isMainRaid() then
-			return 0, "not enough officers"
+			return nil, "not enough officers"
 		elseif not instanceType == "raid" then
-			return 0, "wrong instance type"
+			return nil, "wrong instance type"
 		elseif not GetInstanceDifficulty() ~= 8 then
-			return 0, "wrong instance difficulty"
+			return nil, "wrong instance difficulty"
 		elseif not GetNumGroupMembers() >= 20 then
-			return 0, "not enough group members"
+			return nil, "not enough group members"
 		end
 	end
 end
