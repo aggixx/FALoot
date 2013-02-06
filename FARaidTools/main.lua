@@ -250,21 +250,24 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	
 	if prefix == "FA_RTreport" and text[1] == addonVersion then
 		local data = text[2]
-		local mobID = table.remove(data, 1)
-		
-		-- check if the mob has been looted before
-		for i=1,#hasBeenLooted do 
-			if hasBeenLooted[i] == mobID then
-				return
+		if data[2] == #data then -- check data integrity
+			table.remove(data, 2)
+			local mobID = table.remove(data, 1)
+			
+			-- check if the mob has been looted before
+			for i=1,#hasBeenLooted do 
+				if hasBeenLooted[i] == mobID then
+					return
+				end
 			end
-		end
-		
-		for i=1,#data do
-			if checkFilters(data[i]) then
-				FARaidTools:cacheItem(data[i])
+			
+			for i=1,#data do
+				if checkFilters(data[i]) then
+					FARaidTools:cacheItem(data[i])
+				end
 			end
+			table.insert(hasBeenLooted, mobID)
 		end
-		table.insert(hasBeenLooted, mobID)
 	elseif prefix == "FA_RTend" and text[1] == addonVersion then
 		local itemLink = text[2]
 		
@@ -744,7 +747,7 @@ local function slashparse(msg, editbox)
 			else
 				print("Invalid subcommand for /rt "..msg[1]:lower()..".")
 			end
-		elseif msg[1]:lower() == "reset" then
+		elseif msg[1]:lower() == "resetpos" then
 			FA_RTframe:ClearAllPoints()
 			FA_RTframe:SetPoint("CENTER")
 		else
@@ -1429,23 +1432,32 @@ function events:LOOT_OPENED(...)
 			end
 		end
 		
+		-- add an item count for each GUID so that other clients may verify data integrity
+		for i=1,#loot do
+			table.insert(loot[i], 2, 0) -- insert 0 as the second value in the table
+			loot[i][2] = #loot[i] -- set the second value in the table to the size of the table
+		end
+		
 		if #loot and debugOn then DevTools_Dump(loot) end
 		
 		for i=1,#loot do
 			FARaidTools:sendMessage("FA_RTreport", {addonVersion, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
 
 			local data = loot[i]
-			local mobID = table.remove(data, 1)
-			
-			-- we can assume that everything in the table is not on the HBL
-			
-			for j=1, #data do
-				if checkFilters(data[j]) then
-					FARaidTools:cacheItem(data[j])
+			if data[2] == #data then
+				table.remove(data, 2)
+				local mobID = table.remove(data, 1)
+				
+				-- we can assume that everything in the table is not on the HBL
+				
+				for j=1, #data do
+					if checkFilters(data[j]) then
+						FARaidTools:cacheItem(data[j])
+					end
 				end
+				
+				table.insert(hasBeenLooted, mobID)
 			end
-			
-			table.insert(hasBeenLooted, mobID)
 		end
 	end
 end
