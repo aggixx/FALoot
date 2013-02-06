@@ -289,7 +289,10 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
-			FARaidTools:sendMessage("FA_RTwho", {"response", addonVersion}, "WHISPER", sender)
+			local version = GetAddonMetadata("FARaidTools", "Version")
+			if version then
+				FARaidTools:sendMessage("FA_RTwho", {"response", version}, "WHISPER", sender)
+			end
 		end
 	end
 end
