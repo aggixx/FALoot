@@ -10,6 +10,7 @@ local libEncode = libCompress:GetAddonEncodeTable()
 -- Declare local variables
 local hyperlinkPattern = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
 --				"|cffa335ee|Hitem:71472:0:0:0:0:0:0:0:90:0:0|h[Flowform Choker]|h|r"
+local downloadUrl = "http://tinyurl.com/FARaidTools"
 
 local table_mainData = {}
 local table_bids = {}
@@ -32,6 +33,8 @@ local endPrompt
 local bidPrompt
 local promptBidValue
 local addonVersion
+local addonVersionFull
+local updateMsg = nil
 
 --helper functions
 
@@ -289,9 +292,23 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
-			local version = GetAddOnMetadata("FARaidTools", "Version")
-			if version then
-				FARaidTools:sendMessage("FA_RTwho", {"response", version}, "WHISPER", sender)
+			FARaidTools:sendMessage("FA_RTwho", {"response", addonVersionFull}, "WHISPER", sender)
+		end
+	elseif prefix == "FA_RTupdate" then
+		if distribution == "WHISPER" then
+			if not updateMsg then
+				print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
+				updateMsg = true
+			end
+		elseif distribution == "GUILD" then
+			local version = text[2]
+			if version < addonVersionFull then
+				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
+			elseif not updateMsg then
+				if addonVersionFull < version then
+					print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
+					updateMsg = true
+				end
 			end
 		end
 	end
@@ -1360,6 +1377,7 @@ local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
 	if name == "FARaidTools" then
 		_, _, addonVersion = GetAddOnInfo("FARaidTools")
+		addonVersionFull = GetAddOnMetadata("FARaidTools", "Version")
 		if table_options then -- if options loaded, then load into local variables
 			lootSettings = table_options[1] or getLootSettings()
 			history = history or {}
@@ -1372,6 +1390,7 @@ function events:ADDON_LOADED(name)
 		FARaidTools:RegisterComm("FA_RTreport")
 		FARaidTools:RegisterComm("FA_RTend")
 		FARaidTools:RegisterComm("FA_RTwho")
+		FARaidTools:RegisterComm("FA_RTupdate")
 	end
 end
 function events:PLAYER_LOGOUT(...)
@@ -1485,6 +1504,11 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 			end
 			FARaidTools:endItem(itemLink)
 		end
+	end
+end
+function events:GROUP_JOINED()
+	if IsInRaid() then
+		FARaidTools:sendMessage("FA_RTupdate", {addonVersionFull}, "RAID", nil, "BULK")
 	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
