@@ -21,10 +21,11 @@ local table_icons = {}
 local table_who = {}
 local table_aliases = {}
 
-local debugOn = false
+local debugOn = true
 local lastLootSetting
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
+local cacheInterval = 200 -- this is how often we recheck for item data
 local tableMode = 0
 
 local showAfterCombat
@@ -1006,7 +1007,7 @@ function FARaidTools:valueFormat(itemLink, value)
 end
 
 function FARaidTools:addToLootWindow(itemLink)
-	if debugOn then print("addToLootWindow("..itemLink..")") end
+	--if debugOn then print("addToLootWindow("..itemLink..")") end
 	local id
 	for i=1,#table_mainData do
 		local match = string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)
@@ -1091,6 +1092,9 @@ function FARaidTools:cacheItem(itemLink)
 	itemName = GetItemInfo(itemLink)
 	if itemName == nil then -- check if item is cached or if we need to query it from the server
 		if debugOn then print("cacheItem(): Item info for item "..itemLink.." requested from server.") end
+		if #table_itemQuery == 0 then
+			table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that it onupdate knows when to check if the data is ready yet
+		end
 		table.insert(table_itemQuery, itemLink) -- add to the query queue
 	else
 		if debugOn then print("cacheItem(): Item already cached, adding to loot window.") end
@@ -1276,6 +1280,29 @@ local function onUpdate(self,elapsed)
 			FA_RTscrollingtable3:SetData(table_bids, true)
 		end
 	end
+	
+	-- Item caching stuff
+	if table_itemQuery[1] and currentTime > table_itemQuery[1] then
+		if debugOn then print("Checking for item info for "..(#table_itemQuery-1).." items...") end
+		table_itemQuery[1] = currentTime+(cacheInterval/1000)
+		
+		local list_size = #table_itemQuery
+		for i=0,list_size-2 do -- loop backwards through list of items waiting to be cached
+			if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
+				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." is ready, adding to loot window.") end
+				FARaidTools:addToLootWindow(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
+				table.remove(table_itemQuery, list_size-i) -- remove the entry from the query list
+			--[[else
+				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." was not found.") end--]]
+			end
+		end
+		
+		if #table_itemQuery == 1 then
+			table_itemQuery = {}
+		elseif debugOn then
+			print("Item info for "..(#table_itemQuery-1).." items is not ready. Checking again in "..cacheInterval.."ms.")
+		end
+	end
 end
 
 local ouframe = CreateFrame("frame")
@@ -1402,7 +1429,7 @@ function events:PLAYER_LOGOUT(...)
 	end
 	table_options = {lootSettings, table_aliases}
 end
-function events:GET_ITEM_INFO_RECEIVED(...)
+--[[function events:GET_ITEM_INFO_RECEIVED(...)
 	local list_size = #table_itemQuery
 	for i=0,list_size-1 do -- loop backwards through list of items waiting to be cached
 		if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
@@ -1411,7 +1438,7 @@ function events:GET_ITEM_INFO_RECEIVED(...)
 			if debugOn then print("GET_ITEM_INFO_RECEIVED: Adding item #"..list_size-i.." to loot window.") end
 		end
 	end
-end
+end--]]
 function events:PLAYER_ENTERING_WORLD(...)
 	setAutoLoot(1)
 end
