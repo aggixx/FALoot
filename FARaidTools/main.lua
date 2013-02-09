@@ -235,7 +235,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	elseif sender == UnitName("PLAYER") and prefix ~= "FA_RTwho" then
 		return
 	end
-	if debugOn then print("Recieved \"".prefix."\" message.") end
+	if debugOn then print("Recieved \""..prefix.."\" message.") end
 	
 	-- Decode the data
 	local text = libEncode:Decode(text)
@@ -301,7 +301,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
-			local version = text[2]
+			local version = text[1]
 			if version < addonVersionFull then
 				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
 			elseif not updateMsg then
