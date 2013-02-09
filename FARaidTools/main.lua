@@ -21,12 +21,12 @@ local table_icons = {}
 local table_who = {}
 local table_aliases = {}
 
-local debugOn = true
-local lastLootSetting
+local debugOn = false
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
 local cacheInterval = 200 -- this is how often we recheck for item data
 local tableMode = 0
+local lootSettings
 
 local showAfterCombat
 local iconSelect
@@ -36,6 +36,7 @@ local promptBidValue
 local addonVersion
 local addonVersionFull
 local updateMsg = nil
+local modifyLootSettings = nil
 
 --helper functions
 
@@ -1199,14 +1200,6 @@ local function onUpdate(self,elapsed)
 		FA_RTbutton3:Disable()
 	end
 	
-	-- showAfterCombat
-	if showAfterCombat then
-		if not UnitAffectingCombat("PLAYER") then
-			FA_RTframe:Show()
-			showAfterCombat = false
-		end
-	end
-	
 	-- /rt who stuff
 	if table_who and table_who["time"] and table_who["time"]+1 <= currentTime then
 		for i=1,#table_who do
@@ -1303,39 +1296,33 @@ end
 local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
-local function getLootSettings()
+local function saveLootSettings()
 	lootSettings = {GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE")}
 	return lootSettings
 end
 
-local function setAutoLoot(suppress)
-	if GetLootMethod() == "freeforall" or debugOn then
-		if addonEnabled() then
-			if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
-				if lastLootSetting ~= 1 then
-					getLootSettings()
-					lastLootSetting = 1
-					SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
-					SetCVar("autoLootDefault", 0)
-					if not suppress then print("RT: Autoloot is now off.") end
-				end
-			end
-		else
-			if lastLootSetting ~= 0 then
-				lastLootSetting = 0
-				SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
-				SetCVar("autoLootDefault", lootSettings[1])
-				if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
+local function restoreLootSettings()
+	SetCVar("autoLootDefault", lootSettings[1])
+	SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
+end
+
+function FARaidTools:setAutoLoot(suppress)
+	modifyLootSettings = 1
+	if (GetLootMethod() == "freeforall" and addonEnabled()) or debugOn then
+		if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
+			if GetCVar("autoLootDefault") == "1" then
+				SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
+				SetCVar("autoLootDefault", 0)
+				if not suppress then print("RT: Autoloot is now off.") end
 			end
 		end
 	else
-		if lastLootSetting ~= 0 then
-			lastLootSetting = 0
-			SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
-			SetCVar("autoLootDefault", lootSettings[1])
+		if GetCVar("autoLootDefault") == "0" then
+			restoreLootSettings()
 			if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
 		end
 	end
+	modifyLootSettings = nil
 end
 
 local function setGeneralVis() -- currently not used
@@ -1401,11 +1388,11 @@ function events:ADDON_LOADED(name)
 		_, _, addonVersion = GetAddOnInfo("FARaidTools")
 		addonVersionFull = GetAddOnMetadata("FARaidTools", "Version")
 		if table_options then -- if options loaded, then load into local variables
-			lootSettings = table_options[1] or getLootSettings()
+			lootSettings = table_options[1] or saveLootSettings()
 			history = history or {}
 			table_aliases = table_options[2] or table_aliases
 		else -- if not, set to default values
-			getLootSettings()
+			saveLootSettings()
 			history = {}
 		end
 		FA_RTscrollingtable2:SetData(history, true)
@@ -1416,29 +1403,14 @@ function events:ADDON_LOADED(name)
 	end
 end
 function events:PLAYER_LOGOUT(...)
-	if lastLootSetting == 1 then
-		SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
-		SetCVar("autoLootDefault", lootSettings[1])
-	else
-		getLootSettings()
-	end
+	restoreLootSettings()
 	table_options = {lootSettings, table_aliases}
 end
---[[function events:GET_ITEM_INFO_RECEIVED(...)
-	local list_size = #table_itemQuery
-	for i=0,list_size-1 do -- loop backwards through list of items waiting to be cached
-		if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
-			FARaidTools:addToLootWindow(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
-			table.remove(table_itemQuery, list_size-i) -- remove the entry from the query list
-			if debugOn then print("GET_ITEM_INFO_RECEIVED: Adding item #"..list_size-i.." to loot window.") end
-		end
-	end
-end--]]
 function events:PLAYER_ENTERING_WORLD(...)
-	setAutoLoot(1)
+	FARaidTools:setAutoLoot(1)
 end
 function events:RAID_ROSTER_UPDATE(...)
-	setAutoLoot()
+	FARaidTools:setAutoLoot()
 end
 function events:LOOT_OPENED(...)
 	if addonEnabled() then
@@ -1531,6 +1503,20 @@ end
 function events:GROUP_JOINED()
 	if IsInRaid() then
 		FARaidTools:sendMessage("FA_RTupdate", {addonVersionFull}, "RAID", nil, "BULK")
+	end
+end
+function events:CVAR_UPDATE(glStr, value)
+	if glStr == "AUTO_LOOT_DEFAULT_TEXT" then
+		if not modifyLootSettings then
+			if debugOn then print("Autoloot settings saved.") end
+			saveLootSettings()
+		end
+	end
+end
+function events:PLAYER_REGEN_ENABLED()
+	if showAfterCombat then
+		FA_RTframe:Show()
+		showAfterCombat = false
 	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
