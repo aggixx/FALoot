@@ -1384,6 +1384,9 @@ function events:ADDON_LOADED(name)
 	if name == "FARaidTools" then
 		_, _, addonVersion = GetAddOnInfo("FARaidTools")
 		addonVersionFull = GetAddOnMetadata("FARaidTools", "Version")
+		if not addonVersionFull then
+			addonVersionFull = ""
+		end
 		if table_options then -- if options loaded, then load into local variables
 			lootSettings = table_options[1] or saveLootSettings()
 			history = history or {}
