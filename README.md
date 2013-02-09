@@ -12,6 +12,7 @@ Put the folder named "FARaidTools" (NOT FARaidTools-master) into the Interface/A
 - **/rt alias remove <name>** - remove an alias for award detection
 - **/rt alias list** - list aliases for award detection
 - **/rt resetpos** - resets the position of the RT window
+- **Any command not listed above** - shows this list in-game.
 
 ### Upcoming Features ###
 - Spec/class based gear filters on what shows up in the window
