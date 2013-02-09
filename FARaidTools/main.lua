@@ -235,7 +235,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	elseif sender == UnitName("PLAYER") and prefix ~= "FA_RTwho" then
 		return
 	end
-	if debugOn then print("Recieved message.") end
+	if debugOn then print("Recieved \"".prefix."\" message.") end
 	
 	-- Decode the data
 	local text = libEncode:Decode(text)
@@ -1436,7 +1436,10 @@ function events:LOOT_OPENED(...)
 					
 					local link = GetLootSlotLink(i) -- retrieve link of item
 					if link and checkFilters(link) then
-						for l=1,sourceInfo[j*2] do -- repeat the insert if there is multiple of the item in that slot
+						for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
+							-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
+							-- GetLootSourceInfo may also return multiple quantity when there is actually only
+							-- one of the item, but there's not much we can do about that.
 							table.insert(loot[id], link)
 						end
 					end
