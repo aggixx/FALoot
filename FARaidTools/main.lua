@@ -853,6 +853,7 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 	timeout = 0,
 	whileDead = true,
 	hideOnEscape = true,
+	enterClicksFirstButton = 1,
 	OnShow = function (self, data)
 		self.editBox:SetText("")
 	end,
@@ -860,8 +861,7 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 		StaticDataSave(self2.editBox:GetText())
 		coroutine.resume(bidPrompt)
 	end,
-	hasEditBox = true,
-	enterClicksFirstButton = 1
+	hasEditBox = true
 }
 
 FA_RTbutton2:SetScript("OnMouseUp", function(self, button)
@@ -988,22 +988,17 @@ function FARaidTools:valueFormat(itemLink, value)
 	else
 		wincount = #str_split(",", table_mainData[id]["cols"][3]["value"])
 	end
-	itemcount = str_split("]\124h\124rx", table_mainData[id]["cols"][1]["value"])
-	if #itemcount == 2 then
-		itemcount = itemcount[2]
+	itemcount = string.match(table_mainData[id]["cols"][1]["value"], "x(%d+)$")
+	if itemcount then
+		itemcount = tonumber(itemcount)
 	else
-		itemcount = "1"
+		itemcount = 1
 	end
-	itemcount = tonumber(itemcount)
-	if wincount == itemcount then
-		table_mainData[id]["cols"][2]["value"] = "Ended"
-		table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["a"] = 1
-		table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
+	if wincount >= itemcount then
+		FARaidTools:endItem(id)
+	else
+		FA_RTscrollingtable:SetData(table_mainData, false) -- this is done in the endItem function so we only need to do it here
 	end
-	FA_RTscrollingtable:SetData(table_mainData, false)
 end
 
 function FARaidTools:addToLootWindow(itemLink)
