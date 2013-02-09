@@ -36,7 +36,6 @@ local promptBidValue
 local addonVersion
 local addonVersionFull
 local updateMsg = nil
-local modifyLootSettings = nil
 
 --helper functions
 
@@ -1301,13 +1300,12 @@ local function saveLootSettings()
 	return lootSettings
 end
 
-local function restoreLootSettings()
+function FARaidTools:restoreLootSettings()
 	SetCVar("autoLootDefault", lootSettings[1])
 	SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
 end
 
 function FARaidTools:setAutoLoot(suppress)
-	modifyLootSettings = 1
 	if (GetLootMethod() == "freeforall" and addonEnabled()) or debugOn then
 		if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
 			if GetCVar("autoLootDefault") == "1" then
@@ -1318,11 +1316,10 @@ function FARaidTools:setAutoLoot(suppress)
 		end
 	else
 		if GetCVar("autoLootDefault") == "0" then
-			restoreLootSettings()
+			FARaidTools:restoreLootSettings()
 			if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
 		end
 	end
-	modifyLootSettings = nil
 end
 
 local function setGeneralVis() -- currently not used
@@ -1403,7 +1400,7 @@ function events:ADDON_LOADED(name)
 	end
 end
 function events:PLAYER_LOGOUT(...)
-	restoreLootSettings()
+	FARaidTools:restoreLootSettings()
 	table_options = {lootSettings, table_aliases}
 end
 function events:PLAYER_ENTERING_WORLD(...)
@@ -1506,11 +1503,9 @@ function events:GROUP_JOINED()
 	end
 end
 function events:CVAR_UPDATE(glStr, value)
-	if glStr == "AUTO_LOOT_DEFAULT_TEXT" then
-		if not modifyLootSettings then
-			if debugOn then print("Autoloot settings saved.") end
-			saveLootSettings()
-		end
+	if glStr == "AUTO_LOOT_DEFAULT_TEXT" and not addonEnabled() then
+		if debugOn then print("Autoloot settings saved.") end
+		saveLootSettings()
 	end
 end
 function events:PLAYER_REGEN_ENABLED()
