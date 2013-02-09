@@ -5,13 +5,13 @@ Put the folder named "FARaidTools" (**NOT** FARaidTools-master) into the Interfa
 
 ### In-game slash commands ###
 **The following are valid commands for /rt**:
-**/rt** - shows the addon window
-**/rt debug <true/false>** - set status of debug mode
-**/rt who** - see who is running the addon and what version
-**/rt alias add <name>** - add an alias for award detection
-**/rt alias remove <name>** - remove an alias for award detection
-**/rt alias list** - list aliases for award detection
-**/rt resetpos** - resets the position of the RT window
+- **/rt** - shows the addon window
+- **/rt debug <true/false>** - set status of debug mode
+- **/rt who** - see who is running the addon and what version
+- **/rt alias add <name>** - add an alias for award detection
+- **/rt alias remove <name>** - remove an alias for award detection
+- **/rt alias list** - list aliases for award detection
+- **/rt resetpos** - resets the position of the RT window
 
 ### Upcoming Features ###
 - Spec/class based gear filters on what shows up in the window
