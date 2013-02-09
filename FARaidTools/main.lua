@@ -301,6 +301,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
+			if not text[1] then return end
 			local version = text[1]
 			if version < addonVersionFull then
 				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
