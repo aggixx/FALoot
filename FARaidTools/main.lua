@@ -163,7 +163,7 @@ function FARaidTools:addonEnabled()
 	return addonEnabled()
 end
 
-local function checkFilters(link)
+local function checkFilters(link, checkItemLevel)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	
 	if debugOn then
@@ -179,16 +179,15 @@ local function checkFilters(link)
 		return false
 	end
 		
-	-- check if the item level of the item is high enough
-	local playerTotal = GetAverageItemLevel()
-	if playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-		if debugOn then print("Item Level of "..link.." is too low.") end
-		return false
-	end
-		
 	-- check if the class of the item is appropriate
-	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
-		if debugOn then print("Type of "..link.." is invalid.") end
+	if class == "Armor" or class == "Weapon" then
+		-- check if the item level of the item is high enough
+		local playerTotal = GetAverageItemLevel()
+		if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
+			if debugOn then print("Item Level of "..link.." is too low.") end
+			return false
+		end
+	elseif not class == "Miscellaneous" and subClass == "Junk" then
 		return false
 	end
 	
@@ -266,7 +265,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			
 			for i=1,#data do
-				if checkFilters(data[i]) then
+				if checkFilters(data[i], true) then
 					FARaidTools:cacheItem(data[i])
 				end
 			end
@@ -1464,7 +1463,7 @@ function events:LOOT_OPENED(...)
 				-- we can assume that everything in the table is not on the HBL
 				
 				for j=1, #data do
-					if checkFilters(data[j]) then
+					if checkFilters(data[j], true) then
 						FARaidTools:cacheItem(data[j])
 					end
 				end
