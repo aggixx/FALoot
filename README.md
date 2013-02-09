@@ -1,7 +1,7 @@
 **FA_RaidTools** is a loot and raid utility addon for <Forgotten Aspects> of Hyjal-US developed by Pawkets aka Fearmonger aka aggixx.
 
 ### How to Use ###
-Put the folder named "FARaidTools" (**NOT** FARaidTools-master) into the Interface/Addons/ folder in your WoW install.
+Put the folder named "FARaidTools" (NOT FARaidTools-master) into the Interface/Addons/ folder in your WoW install.
 
 ### In-game slash commands ###
 **The following are valid commands for /rt**:
