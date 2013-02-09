@@ -300,7 +300,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 				print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
 				updateMsg = true
 			end
-		elseif distribution == "GUILD" then
+		elseif distribution == "RAID" or distribution == "GUILD" then
 			local version = text[2]
 			if version < addonVersionFull then
 				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
