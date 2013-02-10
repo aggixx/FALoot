@@ -649,6 +649,7 @@ function FARaidTools:generateIcons()
 				end)
 				table_icons[k]:SetScript("OnMouseUp", function(self, button) -- set code that triggers on clicks
 					if button == "LeftButton" then -- left click: Selects the clicked row
+						-- retrieve the row id that corresponds to the icon we're mousedover
 						local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
 						local total = 0
 						local id
@@ -661,8 +662,20 @@ function FARaidTools:generateIcons()
 							end
 						end
 						
-						--table select stuff
-						iconSelect = id
+						if IsModifiedClick("CHATLINK") then
+							local itemLink = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
+							if itemLink then
+								ChatEdit_InsertLink(itemLink)
+							end
+						elseif IsModifiedClick("DRESSUP") then
+							local itemLink = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
+							if itemLink then
+								DressUpItemLink(itemLink)
+							end
+						else
+							iconSelect = id -- set iconSelect so that after the user finishes mousing over icons
+									     -- the row corresponding to this one gets selected
+						end
 					end
 					if button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
 						--remove command stuff
@@ -1527,7 +1540,8 @@ for k, v in pairs(events) do
 end
 
 if debugOn then
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
+	--FARaidTools:itemAdd("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
+	FARaidTools:itemAdd(select(2,GetItemInfo(71472)))
 	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
 	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
 	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
