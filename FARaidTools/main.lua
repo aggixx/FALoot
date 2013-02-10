@@ -266,7 +266,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			
 			for i=1,#data do
 				if checkFilters(data[i], true) then
-					FARaidTools:cacheItem(data[i])
+					FARaidTools:itemAdd(data[i])
 				end
 			end
 			table.insert(hasBeenLooted, mobID)
@@ -275,7 +275,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 		local itemLink = text[2]
 		
 		if itemLink then
-			FARaidTools:endItem(itemLink)
+			FARaidTools:itemEnd(itemLink)
 		end
 	elseif prefix == "FA_RTwho" then
 		if distribution == "WHISPER" then
@@ -392,7 +392,7 @@ FA_RTbutton1:SetWidth(60)
 FA_RTbutton1text = FA_RTbutton1:CreateFontString("FA_RTbutton_text")
 FA_RTbutton1text:SetPoint("CENTER", FA_RTbutton1, "CENTER", 0, 4)
 FA_RTbutton1text:SetFont(GameFontNormal:GetFont(), 10, "")
-FA_RTbutton1text:SetText("Mode")
+FA_RTbutton1text:SetText("History")
 FA_RTbutton1text:SetTextColor(1, 1, 1)
 FA_RTbutton1:Show()
 
@@ -578,10 +578,12 @@ local function modeSet(num)
 		tableMode = 0
 		FA_RTscrollingtable:Show()
 		FA_RTscrollingtable2:Hide()
+		FA_RTbutton1text:SetText("History")
 	elseif num == 1 then
 		tableMode = 1
 		FA_RTscrollingtable2:Show()
 		FA_RTscrollingtable:Hide()
+		FA_RTbutton1text:SetText("Active Items")
 	end
 end
 
@@ -629,7 +631,7 @@ function FARaidTools:generateIcons()
 					end
 					
 					--table select stuff
-					iconSelect = FA_RTscrollingtable:GetSelection() -- store what row was selected so we can restore it later
+					iconSelect = FA_RTscrollingtable:GetSelection() or 0 -- store what row was selected so we can restore it later
 					FA_RTscrollingtable:SetSelection(id) -- select the row that correlates to the icon
 					
 					--tooltip stuff
@@ -687,7 +689,7 @@ function FARaidTools:generateIcons()
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FARaidTools:sendMessage("FA_RTend", {addonVersion, msg}, "RAID")
 							end
-							FARaidTools:endItem(id)
+							FARaidTools:itemEnd(id)
 						end)
 						coroutine.resume(endPrompt)
 					end
@@ -803,49 +805,6 @@ local function faRoll(value)
 end
 SlashCmdList["FAROLL"] = faRoll
 
-local function FA_RTbid(itemLink, bid)
-	bid = tostring(bid)
-	if debugOn then print("FA_RTbid("..itemLink..", "..bid..")") end
-	local name = nil
-	for i=1,#table_nameAssociations do
-		if stripItemData(table_nameAssociations[i][1]) == stripItemData(itemLink) then
-			name = table_nameAssociations[i][2]
-			break
-		end
-	end
-	local id = nil
-	for i=1,#table_mainData do
-		if stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(itemLink) then
-			id = i
-			break
-		end
-	end
-	if id == nil then
-		if debugOn then print("bid(): ID returned nil, aborting.") end
-		return
-	end
-	local sent = true
-	if name == nil then sent = false end
-	if string.match(table_mainData[id]["cols"][2]["value"], "(Tells)") then
-		local at = tonumber(string.match(table_mainData[id]["cols"][2]["value"], "^%d%d"))
-		if at == tonumber(bid) or (at == 30 and tonumber(bid) > 30) then
-			SendChatMessage(tostring(bid), "WHISPER", nil, name)
-			table.insert(table_bids, {itemLink, bid, "Waiting to roll..."})
-		else
-			sent = false
-		end
-	else
-		sent = false
-	end
-	if sent == false then
-		table.insert(table_bids, {itemLink, bid, "Waiting to bid..."})
-		FA_RTscrollingtable3:SetData(table_bids, true)
-		if debugOn then print("FA_RTbid(): Queued bid.") end
-	else
-		if debugOn then print("FA_RTbid(): Sent bid.") end
-	end
-end
-
 StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 	text = "How much would you like to bid?",
 	button1 = "Bid",
@@ -886,8 +845,8 @@ FA_RTbutton2:SetScript("OnMouseUp", function(self, button)
 					promptBidValue = promptBidValue - 1
 				end
 			end
-			if debugOn then print("Passed info onto FA_RTbid().") end
-			FA_RTbid(link, promptBidValue)
+			if debugOn then print("Passed info onto FARaidTools:itemBid().") end
+			FARaidTools:itemBid(link, promptBidValue)
 		end)
 		coroutine.resume(bidPrompt)
 	end
@@ -923,18 +882,18 @@ StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
 	enterClicksFirstButton = 1
 }
 
-function FARaidTools:valueFormat(itemLink, value)
-	if debugOn then print("valueFormat("..itemLink..", "..tostring(value)..")") end
+function FARaidTools:itemUpdate(itemLink, value)
+	if debugOn then print("itemUpdate("..itemLink..", "..tostring(value)..")") end
 	local id
 	for i=1,#table_mainData do
 		if stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(itemLink) then
 			id = i
-			if debugOn then print("valueFormat(): Found match in data table. ID #"..id) end
+			if debugOn then print("itemUpdate(): Found match in data table. ID #"..id) end
 			break
 		end
 	end
 	if not id then
-		if debugOn then print("valueFormat(): No match found in data table. Aborting.") end
+		if debugOn then print("itemUpdate(): No match found in data table. Aborting.") end
 		return
 	end
 	local message_value = string.match(value, "[321]0")
@@ -995,14 +954,19 @@ function FARaidTools:valueFormat(itemLink, value)
 		itemcount = 1
 	end
 	if wincount >= itemcount then
-		FARaidTools:endItem(id)
+		FARaidTools:itemEnd(id)
 	else
-		FA_RTscrollingtable:SetData(table_mainData, false) -- this is done in the endItem function so we only need to do it here
+		FA_RTscrollingtable:SetData(table_mainData, false) -- this is done in the itemEnd function so we only need to do it here
 	end
+	FARaidTools:checkBids()
 end
 
-function FARaidTools:addToLootWindow(itemLink)
-	--if debugOn then print("addToLootWindow("..itemLink..")") end
+function FARaidTools:itemAdd(itemLink)
+	if not GetItemInfo(itemLink) then -- check if the item needs to be cached
+		FARaidTools:itemCache(itemLink) -- we don't have item data so we have to cache the item
+		return --                                              itemAdd will be called again via onUpdate once it's ready
+	end
+	
 	local id
 	for i=1,#table_mainData do
 		local match = string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)
@@ -1082,22 +1046,61 @@ function FARaidTools:addToLootWindow(itemLink)
 	end
 end
 
-function FARaidTools:cacheItem(itemLink)
-	if debugOn then print("cacheItem("..itemLink..")") end
-	itemName = GetItemInfo(itemLink)
-	if itemName == nil then -- check if item is cached or if we need to query it from the server
-		if debugOn then print("cacheItem(): Item info for item "..itemLink.." requested from server.") end
-		if #table_itemQuery == 0 then
-			table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that it onupdate knows when to check if the data is ready yet
+function FARaidTools:itemBid(itemLink, bid)
+	bid = tostring(bid)
+	if debugOn then print("FARaidTools:itemBid("..itemLink..", "..bid..")") end
+	local name = nil
+	for i=1,#table_nameAssociations do
+		if stripItemData(table_nameAssociations[i][1]) == stripItemData(itemLink) then
+			name = table_nameAssociations[i][2]
+			break
 		end
-		table.insert(table_itemQuery, itemLink) -- add to the query queue
+	end
+	local id = nil
+	for i=1,#table_mainData do
+		if stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(itemLink) then
+			id = i
+			break
+		end
+	end
+	if id == nil then
+		if debugOn then print("bid(): ID returned nil, aborting.") end
+		return
+	end
+	local sent = true
+	if name == nil then sent = false end
+	if string.match(table_mainData[id]["cols"][2]["value"], "(Tells)") then
+		local at = tonumber(string.match(table_mainData[id]["cols"][2]["value"], "^%d%d"))
+		if at == tonumber(bid) or (at == 30 and tonumber(bid) > 30) then
+			SendChatMessage(tostring(bid), "WHISPER", nil, name)
+			table.insert(table_bids, {itemLink, bid, "Waiting to roll..."})
+			FA_RTscrollingtable3:SetData(table_bids, true)
+			FA_RTbidframe:Show() -- we know there's bids/rolls waiting now so let's show the frame
+		else
+			sent = false
+		end
 	else
-		if debugOn then print("cacheItem(): Item already cached, adding to loot window.") end
-		FARaidTools:addToLootWindow(itemLink) -- item is already cached so we can just add it now
+		sent = false
+	end
+	if sent == false then
+		table.insert(table_bids, {itemLink, bid, "Waiting to bid..."})
+		FA_RTscrollingtable3:SetData(table_bids, true)
+		FA_RTbidframe:Show() -- we know there's bids/rolls waiting now so let's show the frame
+		if debugOn then print("FARaidTools:itemBid(): Queued bid.") end
+	else
+		if debugOn then print("FARaidTools:itemBid(): Sent bid.") end
 	end
 end
 
-function FARaidTools:endItem(input) -- itemLink or ID
+function FARaidTools:itemCache(itemLink)
+	if debugOn then print("cacheItem(): Item info for item "..itemLink.." requested from server.") end
+	if #table_itemQuery == 0 then
+		table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that it onupdate knows when to check if the data is ready yet
+	end
+	table.insert(table_itemQuery, itemLink) -- add to the query queue
+end
+
+function FARaidTools:itemEnd(input) -- itemLink or ID
 	local id
 	if type(input) == "string" then
 		for i=1,#table_mainData do
@@ -1122,7 +1125,7 @@ function FARaidTools:endItem(input) -- itemLink or ID
 	end
 end
 
-function FARaidTools:removeItem(itemLink)
+function FARaidTools:itemRemove(itemLink)
 	local id
 	for i=1,#table_mainData do
 		link1 = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
@@ -1158,71 +1161,7 @@ function FARaidTools:removeItem(itemLink)
 	FARaidTools:generateIcons()
 end
 
-local function onUpdate(self,elapsed)
-	--check if it's time to remove any expired items
-	local tableSize = #table_expTimes
-	local currentTime = GetTime()
-	for i=0,tableSize-1 do -- loop backwards through table of all expired items
-		if currentTime >= table_expTimes[tableSize-i][2] + expTime then
-			local id
-			for j=1,#table_mainData do -- loop through data table
-				if stripItemData(string.match(table_mainData[j]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(table_expTimes[tableSize-i][1]) then
-					id = j
-					if debugOn then print("onUpdate/remove: Found match in data table. ID #"..id) end
-					break
-				end
-			end
-			if id then
-				table.insert(history, 1, {date(), table_mainData[id]["cols"][1]["value"], table_mainData[id]["cols"][3]["value"]}) -- add entry to history table
-				FA_RTscrollingtable2:SetData(history, true)
-				
-				FARaidTools:removeItem(table_expTimes[tableSize-i][1]) -- remove entry from data table
-				FA_RTscrollingtable:SetData(table_mainData, false)
-				
-				table.remove(table_expTimes, tableSize-i)
-			else
-				table.remove(table_expTimes, tableSize-i)
-				if debugOn then print("onUpdate/remove: Found and removed invalid table_expTimes entry. ID #"..tableSize-i) end
-			end
-		end
-	end
-	
-	--enable/disable buttons
-	-- TODO: Make this so it doesn't flash in interaction with iconSelect
-	if FA_RTscrollingtable:GetSelection() and not iconSelect then
-		FA_RTbutton2:Enable()
-		if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or not UnitInRaid("PLAYER") then
-			FA_RTbutton3:Enable()
-		end
-	else
-		FA_RTbutton2:Disable()
-		FA_RTbutton3:Disable()
-	end
-	
-	-- /rt who stuff
-	if table_who and table_who["time"] and table_who["time"]+1 <= currentTime then
-		for i=1,#table_who do
-			local s = table_who[i]..": "
-			for j=1,#table_who[table_who[i]] do
-				if j > 1 then
-					s = s..", "
-				end
-				s = s..table_who[table_who[i]][j]
-			end
-			print(s)
-		end
-		table_who = {}
-	end
-	
-	-- table_bids stuff
-	-- FIXME: cpu excessive
-	-- TODO: fix
-	FA_RTscrollingtable3:SetData(table_bids, true)
-	if #table_bids == 0 then
-		FA_RTbidframe:Hide()
-	else
-		FA_RTbidframe:Show()
-	end
+function FARaidTools:checkBids()
 	local table_size = #table_bids
 	for i=0,table_size-1 do
 		local id = nil
@@ -1268,6 +1207,67 @@ local function onUpdate(self,elapsed)
 		end
 	end
 	
+	if #table_bids == 0 then -- if the table is empty now we need to hide it
+		FA_RTbidframe:Hide()
+	end
+end
+
+local function onUpdate(self,elapsed)
+	local currentTime = GetTime() -- get the time and put it in a variable so we don't have to call it a billion times throughout this function
+	
+	--check if it's time to remove any expired items
+	local tableSize = #table_expTimes
+	for i=0,tableSize-1 do -- loop backwards through table of all expired items
+		if currentTime >= table_expTimes[tableSize-i][2] + expTime then
+			local id
+			for j=1,#table_mainData do -- loop through data table
+				if stripItemData(string.match(table_mainData[j]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(table_expTimes[tableSize-i][1]) then
+					id = j
+					if debugOn then print("onUpdate/remove: Found match in data table. ID #"..id) end
+					break
+				end
+			end
+			if id then
+				table.insert(history, 1, {date(), table_mainData[id]["cols"][1]["value"], table_mainData[id]["cols"][3]["value"]}) -- add entry to history table
+				FA_RTscrollingtable2:SetData(history, true)
+				
+				FARaidTools:itemRemove(table_expTimes[tableSize-i][1]) -- remove entry from data table
+				FA_RTscrollingtable:SetData(table_mainData, false)
+				
+				table.remove(table_expTimes, tableSize-i)
+			else
+				table.remove(table_expTimes, tableSize-i)
+				if debugOn then print("onUpdate/remove: Found and removed invalid table_expTimes entry. ID #"..tableSize-i) end
+			end
+		end
+	end
+	
+	--enable/disable buttons
+	if FA_RTscrollingtable:GetSelection() == nil or FA_RTscrollingtable:GetSelection() == 0 or iconSelect == 0 then
+		FA_RTbutton2:Disable()
+		FA_RTbutton3:Disable()
+	else
+		FA_RTbutton2:Enable()
+		if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or debugOn then
+			FA_RTbutton3:Enable()
+		end
+	end
+	
+	-- /rt who stuff
+	if table_who and table_who["time"] and table_who["time"]+1 <= currentTime then
+		for i=1,#table_who do
+			local s = table_who[i]..": "
+			for j=1,#table_who[table_who[i]] do
+				if j > 1 then
+					s = s..", "
+				end
+				s = s..table_who[table_who[i]][j]
+			end
+			print(s)
+		end
+		table_who = {}
+	end
+	
 	-- Item caching stuff
 	if table_itemQuery[1] and currentTime > table_itemQuery[1] then
 		if debugOn then print("Checking for item info for "..(#table_itemQuery-1).." items...") end
@@ -1277,7 +1277,7 @@ local function onUpdate(self,elapsed)
 		for i=0,list_size-2 do -- loop backwards through list of items waiting to be cached
 			if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
 				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." is ready, adding to loot window.") end
-				FARaidTools:addToLootWindow(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
+				FARaidTools:itemAdd(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
 				table.remove(table_itemQuery, list_size-i) -- remove the entry from the query list
 			--[[else
 				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." was not found.") end--]]
@@ -1335,9 +1335,8 @@ local function setGeneralVis() -- currently not used
 end
 
 function FARaidTools:parseChat(msg, author)
-	--if debugOn then print("parseChat("..msg..", "..tostring(author)..")") end
-	local rank = 0
 	if not debugOn then
+		local rank = 0
 		for i=1,40 do
 			local name, rank_ = GetRaidRosterInfo(i)
 			if name == author then
@@ -1346,30 +1345,28 @@ function FARaidTools:parseChat(msg, author)
 			end
 		end
 	end
-	if rank > 0 or debugOn then
-		local _, replaces = string.gsub(msg, hyperlinkPattern, "")
+	if debugOn or rank > 0 then
+		local linkless, replaces = string.gsub(msg, hyperlinkPattern, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
-			local link = string.match(msg, hyperlinkPattern)
-			if debugOn then print("link: "..link) end
-			msg = string.gsub(msg, hyperlinkPattern, "")
-			if debugOn then print("msg after links removed: "..msg) end
-			msg = link..msg
-			if debugOn then print("reassembled msg: "..msg) end
+			local itemLink = string.match(msg, hyperlinkPattern) -- retrieve itemLink from the message
 			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
 			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
 			note = string.gsub(note, "%s+", " ") -- replace any double spaces with a single space
-			if debugOn then print("final note: "..note) end
 			local shouldadd = true
-			for i=1,#table_nameAssociations do
-				if table_nameAssociations[i][1] == link then shouldadd = false end
+			for i=1,#table_nameAssociations do -- check if the item already has a whisper target associated with it
+				if table_nameAssociations[i][1] == itemLink then
+					shouldadd = false
+				end
 			end
-			if shouldadd == true then
-				table.insert(table_nameAssociations, {link, author})
+			if shouldadd == true then -- if it doesn't, insert the whisper target into the table.
+				table.insert(table_nameAssociations, {itemLink, author})
 			end
-			if debugOn then print(link) end
-			if debugOn then print(note) end
-			if note then
-				FARaidTools:valueFormat(link, note)
+			if itemLink and note then
+				if debugOn then
+					print("itemLink: "..itemLink)
+					print("note: "..note)
+				end
+				FARaidTools:itemUpdate(itemLink, note)
 			end
 		end
 	end
@@ -1382,10 +1379,12 @@ end
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
 	if name == "FARaidTools" then
-		_, _, addonVersion = GetAddOnInfo("FARaidTools")
 		addonVersionFull = GetAddOnMetadata("FARaidTools", "Version")
-		if not addonVersionFull then
+		if addonVersionFull then
+			addonVersion = string.gsub(addonVersionFull, "[^%d]", "")
+		else
 			addonVersionFull = ""
+			addonVersion = ""
 		end
 		if table_options then -- if options loaded, then load into local variables
 			lootSettings = table_options[1] or saveLootSettings()
@@ -1471,7 +1470,7 @@ function events:LOOT_OPENED(...)
 				
 				for j=1, #data do
 					if checkFilters(data[j], true) then
-						FARaidTools:cacheItem(data[j])
+						FARaidTools:itemAdd(data[j])
 					end
 				end
 				
@@ -1499,7 +1498,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 				FARaidTools:sendMessage("FA_RTend", {addonVersion, itemLink}, "RAID")
 			end
-			FARaidTools:endItem(itemLink)
+			FARaidTools:itemEnd(itemLink)
 		end
 	end
 end
@@ -1528,14 +1527,14 @@ for k, v in pairs(events) do
 end
 
 if debugOn then
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	FARaidTools:cacheItem("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
 	FARaidTools:parseChat("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r 30", UnitName("PLAYER"))
 end
