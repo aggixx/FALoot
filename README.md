@@ -27,3 +27,4 @@ Click the **ZIP** button at the top of left of the page, save the zip file. Open
 - If you link a ton of items in one message and then send it it ends an item somehow. (needs checking)
 - Pressing enter doesn't submit the bid amount form. (maybe not fixable?)
 - Autoloot toggle being dumb again. (committed a fix, needs confirm)
+- Items missing in window for the non-looter. (needs checking)
