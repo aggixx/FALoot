@@ -163,7 +163,7 @@ function FARaidTools:addonEnabled()
 	return addonEnabled()
 end
 
-local function checkFilters(link, checkItemLevel)
+function FARaidTools:checkFilters(link, checkItemLevel)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	
 	if debugOn then
@@ -180,14 +180,15 @@ local function checkFilters(link, checkItemLevel)
 	end
 		
 	-- check if the class of the item is appropriate
-	if class == "Armor" or class == "Weapon" then
-		-- check if the item level of the item is high enough
-		local playerTotal = GetAverageItemLevel()
-		if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-			if debugOn then print("Item Level of "..link.." is too low.") end
-			return false
-		end
-	elseif not class == "Miscellaneous" and subClass == "Junk" then
+	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
+		if debugOn then print("Class of "..link.." is incorrect.") end
+		return false
+	end
+	
+	-- check if the item level of the item is high enough
+	local playerTotal = GetAverageItemLevel()
+	if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
+		if debugOn then print("Item Level of "..link.." is too low.") end
 		return false
 	end
 	
@@ -252,24 +253,26 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	if debugOn then DevTools_Dump(text) end
 	
 	if prefix == "FA_RTreport" and text[1] == addonVersion then
-		local data = text[2]
-		if data[2] == #data then -- check data integrity
-			table.remove(data, 2)
-			local mobID = table.remove(data, 1)
-			
-			-- check if the mob has been looted before
-			for i=1,#hasBeenLooted do 
-				if hasBeenLooted[i] == mobID then
-					return
+		if addonEnabled() then
+			local data = text[2]
+			if data[2] == #data then -- check data integrity
+				table.remove(data, 2)
+				local mobID = table.remove(data, 1)
+				
+				-- check if the mob has been looted before
+				for i=1,#hasBeenLooted do 
+					if hasBeenLooted[i] == mobID then
+						return
+					end
 				end
-			end
-			
-			for i=1,#data do
-				if checkFilters(data[i], true) then
-					FARaidTools:itemAdd(data[i])
+				
+				for i=1,#data do
+					if FARaidTools:checkFilters(data[i], true) then
+						FARaidTools:itemAdd(data[i])
+					end
 				end
+				table.insert(hasBeenLooted, mobID)
 			end
-			table.insert(hasBeenLooted, mobID)
 		end
 	elseif prefix == "FA_RTend" and text[1] == addonVersion then
 		local itemLink = text[2]
@@ -977,7 +980,8 @@ end
 function FARaidTools:itemAdd(itemLink)
 	if not GetItemInfo(itemLink) then -- check if the item needs to be cached
 		FARaidTools:itemCache(itemLink) -- we don't have item data so we have to cache the item
-		return --                                              itemAdd will be called again via onUpdate once it's ready
+		return                                     -- itemAdd will be called again via onUpdate once it's ready
+		                                             -- potential problem here if this code triggers from onUpdate, but it shouldnt
 	end
 	
 	local id
@@ -986,6 +990,7 @@ function FARaidTools:itemAdd(itemLink)
 		if match == nil then
 			print("Error: match returned nil. i="..i)
 			DevTools_Dump(table_mainData[i])
+			return
 		end
 		local link1 = stripItemData(match)
 		local link2 = stripItemData(itemLink)
@@ -996,7 +1001,7 @@ function FARaidTools:itemAdd(itemLink)
 		end
 	end
 	if id then
-		local quantity = tonumber(string.match(table_mainData[id]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1
+		local quantity = tonumber(string.match(table_mainData[id]["cols"][1]["value"], "x(%d+)$")) or 1
 		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern).."x"..tostring(quantity+1)
 	else
 		local cell1 = {
@@ -1108,7 +1113,7 @@ end
 function FARaidTools:itemCache(itemLink)
 	if debugOn then print("cacheItem(): Item info for item "..itemLink.." requested from server.") end
 	if #table_itemQuery == 0 then
-		table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that it onupdate knows when to check if the data is ready yet
+		table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that onupdate knows when to check if the data is ready yet
 	end
 	table.insert(table_itemQuery, itemLink) -- add to the query queue
 end
@@ -1282,7 +1287,7 @@ local function onUpdate(self,elapsed)
 	end
 	
 	-- Item caching stuff
-	if table_itemQuery[1] and currentTime > table_itemQuery[1] then
+	if table_itemQuery[1] and currentTime >= table_itemQuery[1] then
 		if debugOn then print("Checking for item info for "..(#table_itemQuery-1).." items...") end
 		table_itemQuery[1] = currentTime+(cacheInterval/1000)
 		
@@ -1451,7 +1456,7 @@ function events:LOOT_OPENED(...)
 					end
 					
 					local link = GetLootSlotLink(i) -- retrieve link of item
-					if link and checkFilters(link) then
+					if link and FARaidTools:checkFilters(link) then
 						for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
 							-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
 							-- GetLootSourceInfo may also return multiple quantity when there is actually only
@@ -1482,7 +1487,7 @@ function events:LOOT_OPENED(...)
 				-- we can assume that everything in the table is not on the HBL
 				
 				for j=1, #data do
-					if checkFilters(data[j], true) then
+					if FARaidTools:checkFilters(data[j], true) then
 						FARaidTools:itemAdd(data[j])
 					end
 				end
