@@ -1354,7 +1354,6 @@ end
 
 function FARaidTools:parseChat(msg, author)
 	if not debugOn then
-		local rank = 0
 		for i=1,40 do
 			local name, rank_ = GetRaidRosterInfo(i)
 			if name == author then
@@ -1363,7 +1362,7 @@ function FARaidTools:parseChat(msg, author)
 			end
 		end
 	end
-	if debugOn or rank > 0 then
+	if debugOn or (rank and rank > 0) then
 		local linkless, replaces = string.gsub(msg, hyperlinkPattern, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
 			local itemLink = string.match(msg, hyperlinkPattern) -- retrieve itemLink from the message
