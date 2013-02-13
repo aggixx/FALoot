@@ -250,7 +250,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
-	if debugOn then DevTools_Dump(text) end
+	if debugOn and (prefix == "FA_RTwho" or prefix == "FA_RTupdate" or text[1] == addonVersion) then DevTools_Dump(text) end
 	
 	if prefix == "FA_RTreport" and text[1] == addonVersion then
 		if addonEnabled() then
