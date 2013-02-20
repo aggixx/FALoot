@@ -1004,52 +1004,53 @@ function FARaidTools:itemAdd(itemLink)
 		local quantity = tonumber(string.match(table_mainData[id]["cols"][1]["value"], "x(%d+)$")) or 1
 		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern).."x"..tostring(quantity+1)
 	else
-		local cell1 = {
-		    ["value"] = itemLink,
-		    ["args"] = nil,
-		    ["color"] = {
-			["r"] = 1.0,
-			["g"] = 1.0,
-			["b"] = 1.0,
-			["a"] = 1.0,
-		    },
-		    ["colorargs"] = nil,
-		    ["DoCellUpdate"] = nil,
-		}
-		local cell2 = {
-		    ["value"] = "30",
-		    ["args"] = nil,
-		    ["color"] = {
-			["r"] = 0.5,
-			["g"] = 0.5,
-			["b"] = 0.5,
-			["a"] = 1.0,
-		    },
-		    ["colorargs"] = nil,
-		    ["DoCellUpdate"] = nil,
-		}
-		local cell3 = {
-		    ["value"] = "",
-		    ["args"] = nil,
-		    ["color"] = {
-			["r"] = 1.0,
-			["g"] = 1.0,
-			["b"] = 1.0,
-			["a"] = 1.0,
-		    },
-		    ["colorargs"] = nil,
-		    ["DoCellUpdate"] = nil,
-		}
 		table.insert(table_mainData, {
-		    ["cols"] = {cell1, cell2, cell3},
-		    ["color"] = {
-			["r"] = 1.0,
-			["g"] = 0.0,
-			["b"] = 0.0,
-			["a"] = 1.0,
-		    },
-		    ["colorargs"] = nil,
-		    ["DoCellUpdate"] = nil,
+			["cols"] = {
+				{
+					["value"] = itemLink,
+					["args"] = nil,
+					["color"] = {
+						["r"] = 1.0,
+						["g"] = 1.0,
+						["b"] = 1.0,
+						["a"] = 1.0,
+					},
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+				{
+					["value"] = "30",
+					["args"] = nil,
+					["color"] = {
+						["r"] = 0.5,
+						["g"] = 0.5,
+						["b"] = 0.5,
+						["a"] = 1.0,
+					},
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+				{
+					["value"] = "",
+					["args"] = nil,
+					["color"] = {
+						["r"] = 1.0,
+						["g"] = 1.0,
+						["b"] = 1.0,
+						["a"] = 1.0,
+					},
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+			},
+			["color"] = {
+				["r"] = 1.0,
+				["g"] = 0.0,
+				["b"] = 0.0,
+				["a"] = 1.0,
+			},
+			["colorargs"] = nil,
+			["DoCellUpdate"] = nil,
 		})
 	end
 	FA_RTscrollingtable:SetData(table_mainData, false)
@@ -1367,6 +1368,7 @@ function FARaidTools:parseChat(msg, author)
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
 			local itemLink = string.match(msg, hyperlinkPattern) -- retrieve itemLink from the message
 			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
+			if not msg then return end
 			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
 			note = string.gsub(note, "%s+", " ") -- replace any double spaces with a single space
 			local shouldadd = true
@@ -1389,8 +1391,20 @@ function FARaidTools:parseChat(msg, author)
 	end
 end
 
-function FARaidTools:dumpHBL()
-	DevTools_Dump(hasBeenLooted)
+function FARaidTools:dataDump(name)
+	if name == "hasBeenLooted" then
+		DevTools_Dump(hasBeenLooted)
+	elseif name == "mainData" then
+		DevTools_Dump(table_mainData)
+	elseif name == "itemQuery" then
+		DevTools_Dump(table_itemQuery)
+	elseif name == "bids" then
+		DevTools_Dump(table_bids)
+	elseif name == "expTimes" then
+		DevTools_Dump(table_expTimes)
+	elseif name == "nameAssociations" then
+		DevTools_Dump(table_nameAssociations)
+	end
 end
 	
 local frame, events = CreateFrame("Frame"), {}
