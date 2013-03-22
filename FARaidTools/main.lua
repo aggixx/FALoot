@@ -1,5 +1,9 @@
+local ADDON_NAME = "FARaidTools"
+local ADDON_VERSION_FULL = "v3.03n"
+local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
+
 -- Load the libraries
-FARaidTools = LibStub("AceAddon-3.0"):NewAddon("FARaidTools")
+FARaidTools = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
 LibStub("AceComm-3.0"):Embed(FARaidTools)
 
 local ScrollingTable = LibStub("ScrollingTable")
@@ -33,9 +37,9 @@ local iconSelect
 local endPrompt
 local bidPrompt
 local promptBidValue
-local addonVersion
-local addonVersionFull
 local updateMsg = nil
+
+local _
 
 --helper functions
 
@@ -250,9 +254,9 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
-	if debugOn and (prefix == "FA_RTwho" or prefix == "FA_RTupdate" or text[1] == addonVersion) then DevTools_Dump(text) end
+	if debugOn and (prefix == "FA_RTwho" or prefix == "FA_RTupdate" or text[1] == ADDON_VERSION) then DevTools_Dump(text) end
 	
-	if prefix == "FA_RTreport" and text[1] == addonVersion then
+	if prefix == "FA_RTreport" and text[1] == ADDON_VERSION then
 		if addonEnabled() then
 			local data = text[2]
 			if data[2] == #data then -- check data integrity
@@ -274,7 +278,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 				table.insert(hasBeenLooted, mobID)
 			end
 		end
-	elseif prefix == "FA_RTend" and text[1] == addonVersion then
+	elseif prefix == "FA_RTend" and text[1] == ADDON_VERSION then
 		local itemLink = text[2]
 		
 		if itemLink then
@@ -295,7 +299,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
-			FARaidTools:sendMessage("FA_RTwho", {"response", addonVersionFull}, "WHISPER", sender)
+			FARaidTools:sendMessage("FA_RTwho", {"response", ADDON_VERSION_FULL}, "WHISPER", sender)
 		end
 	elseif prefix == "FA_RTupdate" then
 		if distribution == "WHISPER" then
@@ -306,10 +310,10 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 		elseif distribution == "RAID" or distribution == "GUILD" then
 			if not text[1] then return end
 			local version = text[1]
-			if version < addonVersionFull then
+			if version < ADDON_VERSION_FULL then
 				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
 			elseif not updateMsg then
-				if addonVersionFull < version then
+				if ADDON_VERSION_FULL < version then
 					print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
 					updateMsg = true
 				end
@@ -598,6 +602,10 @@ FA_RTbutton1:SetScript("OnMouseUp", function(self, button)
 	end
 end) 
 
+function FARaidTools:isThunderforged(iLevel)
+	return iLevel == 541 or iLevel == 528
+end
+
 function FARaidTools:generateIcons()
 	local lasticon = nil -- reference value for anchoring to the most recently constructed icon
 	local firsticon = nil -- reference value for anchoring the first constructed icon
@@ -703,7 +711,7 @@ function FARaidTools:generateIcons()
 							StaticPopup_Show("FA_RTEND_CONFIRM")
 							coroutine.yield()
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-								FARaidTools:sendMessage("FA_RTend", {addonVersion, msg}, "RAID")
+								FARaidTools:sendMessage("FA_RTend", {ADDON_VERSION, msg}, "RAID")
 							end
 							FARaidTools:itemEnd(id)
 						end)
@@ -977,11 +985,32 @@ function FARaidTools:itemUpdate(itemLink, value)
 	FARaidTools:checkBids()
 end
 
-function FARaidTools:itemAdd(itemLink)
-	if not GetItemInfo(itemLink) then -- check if the item needs to be cached
-		FARaidTools:itemCache(itemLink) -- we don't have item data so we have to cache the item
-		return                                     -- itemAdd will be called again via onUpdate once it's ready
-		                                             -- potential problem here if this code triggers from onUpdate, but it shouldnt
+function FARaidTools:itemAdd(input, checkCache)
+	local name, itemLink, itemId, iLevel
+	
+	if type(input) == "string" then -- it must be an item link
+		name, _, _, iLevel = GetItemInfo(input)
+		itemLink = input
+		itemId = tonumber(string.match(itemLink, "item:(%d+)"))
+	elseif type(input) == "number" then -- it must be an item id
+		name, itemLink, _, iLevel = GetItemInfo(input)
+		itemId = input
+	else -- ???
+		return
+	end
+	
+	if name and itemLink and itemId then
+		for i=1,#table_itemQuery do
+			if table_itemQuery[i] == input then
+				table.remove(table_itemQuery, i)
+				break
+			end
+		end
+	else
+		if not checkCache then
+			table.insert(table_itemQuery, input)
+		end
+		return
 	end
 	
 	local id
@@ -1001,13 +1030,25 @@ function FARaidTools:itemAdd(itemLink)
 		end
 	end
 	if id then
-		local quantity = tonumber(string.match(table_mainData[id]["cols"][1]["value"], "x(%d+)$")) or 1
-		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern).."x"..tostring(quantity+1)
+		local name = table_mainData[id]["cols"][1]["value"]
+		local quantity = tonumber(string.match(name, "]\124h\124rx(%d+)")) or 1
+		local thunderforged = ""
+		if string.match(name, "Thunderforged") then
+			thunderforged = " |cFF00FF00(Thunderforged)|r"
+		end
+		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern).."x"..tostring(quantity+1)..thunderforged
 	else
+		local thunderforged = ""
+		if FARaidTools:isThunderforged(iLevel) then
+			thunderforged = " |cFF00FF00(Thunderforged)|r"
+		end
+		
+		local name = itemLink..thunderforged
+	
 		table.insert(table_mainData, {
 			["cols"] = {
 				{
-					["value"] = itemLink,
+					["value"] = name,
 					["args"] = nil,
 					["color"] = {
 						["r"] = 1.0,
@@ -1109,14 +1150,6 @@ function FARaidTools:itemBid(itemLink, bid)
 	else
 		if debugOn then print("FARaidTools:itemBid(): Sent bid.") end
 	end
-end
-
-function FARaidTools:itemCache(itemLink)
-	if debugOn then print("cacheItem(): Item info for item "..itemLink.." requested from server.") end
-	if #table_itemQuery == 0 then
-		table.insert(table_itemQuery, GetTime()+(cacheInterval/1000)) -- add a time so that onupdate knows when to check if the data is ready yet
-	end
-	table.insert(table_itemQuery, itemLink) -- add to the query queue
 end
 
 function FARaidTools:itemEnd(input) -- itemLink or ID
@@ -1286,29 +1319,6 @@ local function onUpdate(self,elapsed)
 		end
 		table_who = {}
 	end
-	
-	-- Item caching stuff
-	if table_itemQuery[1] and currentTime >= table_itemQuery[1] then
-		if debugOn then print("Checking for item info for "..(#table_itemQuery-1).." items...") end
-		table_itemQuery[1] = currentTime+(cacheInterval/1000)
-		
-		local list_size = #table_itemQuery
-		for i=0,list_size-2 do -- loop backwards through list of items waiting to be cached
-			if GetItemInfo(table_itemQuery[list_size-i]) then -- check if this item in the list is cached yet
-				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." is ready, adding to loot window.") end
-				FARaidTools:itemAdd(table_itemQuery[list_size-i]) -- it's ready so add it to the loot window
-				table.remove(table_itemQuery, list_size-i) -- remove the entry from the query list
-			--[[else
-				if debugOn then print("Item info for "..table_itemQuery[list_size-i].." was not found.") end--]]
-			end
-		end
-		
-		if #table_itemQuery == 1 then
-			table_itemQuery = {}
-		elseif debugOn then
-			print("Item info for "..(#table_itemQuery-1).." items is not ready. Checking again in "..cacheInterval.."ms.")
-		end
-	end
 end
 
 local ouframe = CreateFrame("frame")
@@ -1409,14 +1419,7 @@ end
 	
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
-	if name == "FARaidTools" then
-		addonVersionFull = GetAddOnMetadata("FARaidTools", "Version")
-		if addonVersionFull then
-			addonVersion = string.gsub(addonVersionFull, "[^%d]", "")
-		else
-			addonVersionFull = ""
-			addonVersion = ""
-		end
+	if name == ADDON_NAME then
 		if table_options then -- if options loaded, then load into local variables
 			lootSettings = table_options[1] or saveLootSettings()
 			history = history or {}
@@ -1490,7 +1493,7 @@ function events:LOOT_OPENED(...)
 		if #loot and debugOn then DevTools_Dump(loot) end
 		
 		for i=1,#loot do
-			FARaidTools:sendMessage("FA_RTreport", {addonVersion, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
+			FARaidTools:sendMessage("FA_RTreport", {ADDON_VERSION, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
 
 			local data = loot[i]
 			if data[2] == #data then
@@ -1527,7 +1530,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		local msg = " "..string.gsub(msg, "[/,]", " ").." "
 		if string.match(msg, " de ") or string.match(msg, " disenchant ") then
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-				FARaidTools:sendMessage("FA_RTend", {addonVersion, itemLink}, "RAID")
+				FARaidTools:sendMessage("FA_RTend", {ADDON_VERSION, itemLink}, "RAID")
 			end
 			FARaidTools:itemEnd(itemLink)
 		end
@@ -1535,7 +1538,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 end
 function events:GROUP_JOINED()
 	if IsInRaid() then
-		FARaidTools:sendMessage("FA_RTupdate", {addonVersionFull}, "RAID", nil, "BULK")
+		FARaidTools:sendMessage("FA_RTupdate", {ADDON_VERSION_FULL}, "RAID", nil, "BULK")
 	end
 end
 function events:CVAR_UPDATE(glStr, value)
@@ -1548,6 +1551,12 @@ function events:PLAYER_REGEN_ENABLED()
 	if showAfterCombat then
 		FA_RTframe:Show()
 		showAfterCombat = false
+	end
+end
+function events:GET_ITEM_INFO_RECEIVED()
+	local limit = #table_itemQuery
+	for i=0,limit-1 do
+		FARaidTools:itemAdd(table_itemQuery[limit-i], true)
 	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
