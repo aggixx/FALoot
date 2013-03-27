@@ -1,5 +1,5 @@
 local ADDON_NAME = "FARaidTools"
-local ADDON_VERSION_FULL = "v3.03n"
+local ADDON_VERSION_FULL = "v3.03o"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 -- Load the libraries
@@ -144,22 +144,22 @@ end
 
 local function addonEnabled()
 	local _, instanceType = IsInInstance()
-	if isGuildGroup(0.60) and isMainRaid() and instanceType == "raid" and GetInstanceDifficulty() ~= 8 and GetNumGroupMembers() >= 20 then
-		return 1
-	elseif debugOn then
-		return 1
+	
+	if not isGuildGroup(0.60) then
+		return nil, "not guild group"
+	elseif not isMainRaid() then
+		return nil, "not enough officers"
+	elseif instanceType ~= "raid" then
+		return nil, "wrong instance type"
+	elseif not (GetRaidDifficultyID() == 4 or GetRaidDifficultyID() == 6) then
+		return nil, "wrong instance difficulty"
+	elseif GetNumGroupMembers() < 20 then
+		return nil, "not enough group members"
 	else
-		if not isGuildGroup(0.60) then
-			return nil, "not guild group"
-		elseif not isMainRaid() then
-			return nil, "not enough officers"
-		elseif not instanceType == "raid" then
-			return nil, "wrong instance type"
-		elseif not GetInstanceDifficulty() ~= 8 then
-			return nil, "wrong instance difficulty"
-		elseif not GetNumGroupMembers() >= 20 then
-			return nil, "not enough group members"
-		end
+		return 1
+	end
+	if debugOn then
+		return 1
 	end
 end
 
@@ -1569,13 +1569,13 @@ end
 if debugOn then
 	--FARaidTools:itemAdd("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
 	FARaidTools:itemAdd(select(2,GetItemInfo(71472)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71466)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71466)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71781)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71469)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71475)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71673)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71673)))
-	FARaidTools:itemAdd(select(2,GetItemInfo(71687)))
-	FARaidTools:parseChat(select(2,GetItemInfo(71466)).." 30", UnitName("PLAYER"))
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
+	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
+	FARaidTools:parseChat("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r 30", UnitName("PLAYER"))
 end
