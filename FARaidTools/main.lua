@@ -1,5 +1,5 @@
 local ADDON_NAME = "FARaidTools"
-local ADDON_VERSION_FULL = "v3.03o"
+local ADDON_VERSION_FULL = "v3.03p"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 -- Load the libraries
@@ -1336,13 +1336,13 @@ end
 
 function FARaidTools:setAutoLoot(suppress)
 	if (GetLootMethod() == "freeforall" and addonEnabled()) or debugOn then
-		if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
+		--if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
 			if GetCVar("autoLootDefault") == "1" then
 				SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
 				SetCVar("autoLootDefault", 0)
 				if not suppress then print("RT: Autoloot is now off.") end
 			end
-		end
+		--end
 	else
 		if GetCVar("autoLootDefault") == "0" then
 			FARaidTools:restoreLootSettings()
@@ -1380,7 +1380,13 @@ function FARaidTools:parseChat(msg, author)
 			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
 			if not msg then return end
 			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
+			if not note then
+				return
+			end
 			note = string.gsub(note, "%s+", " ") -- replace any double spaces with a single space
+			if not note then
+				return
+			end
 			local shouldadd = true
 			for i=1,#table_nameAssociations do -- check if the item already has a whisper target associated with it
 				if table_nameAssociations[i][1] == itemLink then
