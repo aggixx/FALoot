@@ -3,7 +3,11 @@
 ### How to Use (READ THIS!!!)###
 Click the link below and save the zip file. Open the zip file with your favorite archiving program and extract the folder named "FARaidTools" (NOT FARaidTools-master) into the Interface/Addons/ folder in your WoW install.
 
-Download here: https://codeload.github.com/aggixx/FA_RaidTools/zip/master
+Download here:
+https://codeload.github.com/aggixx/FA_RaidTools/zip/master
+
+Advanced users may instead choose to check out the repository directly into their addon folder using the following repository url:
+https://github.com/aggixx/FA_RaidTools.git/trunk/FARaidTools
 
 ### In-game slash commands ###
 **The following are valid commands for /rt**:
