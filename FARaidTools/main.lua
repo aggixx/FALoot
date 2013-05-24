@@ -10,10 +10,10 @@
 	parseChat()
 	itemBid()
 	checkBids()
+	OnCommRecieved()
 	
 	TODO:
 	slashparse()
-	OnCommRecieved()
 	
 -]]
 
@@ -42,11 +42,7 @@ local AceGUI = LibStub("AceGUI-3.0");
 
 -- Declare local variables
 local table_items = {}
-local table_mainData = {}
-local table_bids = {}
 local table_itemQuery = {}
-local table_expTimes = {}
-local table_nameAssociations = {}
 local table_icons = {}
 local table_who = {}
 local table_aliases = {}
@@ -55,7 +51,6 @@ local debugOn = 2
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
 local cacheInterval = 200 -- this is how often we recheck for item data
-local tableMode = 0
 local lootSettings
 
 local showAfterCombat
@@ -66,127 +61,6 @@ local promptBidValue
 local updateMsg = nil
 
 local _
-
---[[
-
--- Create a container frame
-local frame = AceGUI:Create("Frame");
-frame:SetCallback("OnClose", function(this)
-  this:Hide();
-end);
-frame:SetTitle("FARaidTools");
---frame:SetStatusText("Status Bar");
-frame:SetWidth(400);
-frame:SetHeight(400);
---frame:EnableResize(false);
-frame:SetLayout("Fill");
-
-local iconGroup = AceGUI:Create("ScrollFrame");
-frame:AddChild(iconGroup);
-
-local function addIcon(link, texture)
-	local path, size, flags = GameFontNormal:GetFont();
-	
-	local iconCallback = function(this, event, ...)
-		if event == "OnEnter" then
-			GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR");
-			GameTooltip:SetHyperlink(link);
-			
-			-- Show the tooltip
-			GameTooltip:Show();
-		elseif event == "OnLeave" then
-			GameTooltip:Hide();
-		elseif event == "OnClick" then
-			local button = ...;
-			if button == "LeftButton" then
-				if IsModifiedClick("CHATLINK") then
-					ChatEdit_InsertLink(link)
-				elseif IsModifiedClick("DRESSUP") then
-					DressUpItemLink(link)
-				end
-			end
-		end
-	end
-
-	local group = AceGUI:Create("SimpleGroup");
-	iconGroup:AddChild(group);
-	group:SetLayout("Flow");
-	group:SetWidth(350);
-	group:SetHeight(55);
-	
-	local subGroup1 = AceGUI:Create("SimpleGroup");
-	group:AddChild(subGroup1);
-	subGroup1:SetLayout("Fill");
-	subGroup1:SetWidth(60);
-	subGroup1:SetHeight(55);
-
-	local icon = AceGUI:Create("Icon");
-	subGroup1:AddChild(icon);
-	icon:SetImage(texture);
-	icon:SetImageSize(50, 50);
-	icon:SetCallback("OnEnter", iconCallback);
-	icon:SetCallback("OnLeave", iconCallback);
-	icon:SetCallback("OnClick", iconCallback);
-
-	local subGroup2 = AceGUI:Create("SimpleGroup");
-	group:AddChild(subGroup2);
-	subGroup2:SetLayout("Flow");
-	subGroup2:SetWidth(200);
-	subGroup2:SetHeight(55);
-
-	local label1 = AceGUI:Create("InteractiveLabel");
-	subGroup2:AddChild(label1);
-	label1:SetText(link);
-	label1:SetFont(path, 14, flags);
-	label1:SetCallback("OnEnter", iconCallback);
-	label1:SetCallback("OnLeave", iconCallback);
-	label1:SetCallback("OnClick", iconCallback);
-
-	local button1 = AceGUI:Create("Button");
-	subGroup2:AddChild(button1);
-	button1:SetText("Bid");
-	button1:SetWidth(55)
-	button1:SetCallback("OnClick", nil);
-
-	local button2 = AceGUI:Create("Button");
-	subGroup2:AddChild(button2);
-	button2:SetText("Start");
-	button2:SetWidth(55)
-	button2:SetCallback("OnClick", nil);
-
-	local button3 = AceGUI:Create("Button");
-	subGroup2:AddChild(button3);
-	button3:SetText("End");
-	button3:SetWidth(55)
-	button3:SetCallback("OnClick", nil);
-
-	local subGroup3 = AceGUI:Create("SimpleGroup");
-	group:AddChild(subGroup3);
-	subGroup3:SetLayout("Fill");
-	subGroup3:SetWidth(60);
-	subGroup3:SetHeight(55);
-
-	local label2 = AceGUI:Create("InteractiveLabel");
-	subGroup3:AddChild(label2);
-	label2:SetText("30");
-	label2:SetFont(path, 28, flags);
-end
-
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96369);
-addIcon(link, texture)
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96376);
-addIcon(link, texture)
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96379);
-addIcon(link, texture)
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96387);
-addIcon(link, texture)
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96372);
-addIcon(link, texture)
-local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96382);
-addIcon(link, texture)
-
---]]
-
 
 --helper functions
 
@@ -456,60 +330,59 @@ function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needs
 end
 
 function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
-	if not text then
-		return
-	elseif sender == UnitName("PLAYER") and prefix ~= "FA_RTwho" then
-		return
+	if prefix ~= ADDON_MSG_PREFIX or not text or sender == UnitName("PLAYER") then
+		return;
 	end
-	if debugOn then print("Recieved \""..prefix.."\" message.") end
+	debug("Recieved addon message.", 1);
 	
 	-- Decode the data
-	local text = libEncode:Decode(text)
+	local t = libEncode:Decode(text)
 	
 	-- Deserialize the data
-	local success, deserialized = libSerialize:Deserialize(text)
+	local success, deserialized = libSerialize:Deserialize(t)
 	if success then
-		text = deserialized
+		t = deserialized
 	else
-		if debugOn then print("RT: Deserialization of data failed: "..text) end
+		if debugOn then print("RT: Deserialization of data failed: "..t) end
 		return
 	end
 	
-	if debugOn and (prefix == "FA_RTwho" or prefix == "FA_RTupdate" or text[1] == ADDON_VERSION) then DevTools_Dump(text) end
+	debug(t, 2);
 	
-	if prefix == "FA_RTreport" and text[1] == ADDON_VERSION then
+	if t["ADDON_VERSION"] and t["ADDON_VERSION"] ~= ADDON_VERSION then
+		return;
+	end
+	
+	if t["loot"] then -- FIXME
 		if addonEnabled() then
-			local data = text[2]
-			if data[2] == #data then -- check data integrity
-				table.remove(data, 2)
-				local mobID = table.remove(data, 1)
-				
-				-- check if the mob has been looted before
-				for i=1,#hasBeenLooted do 
-					if hasBeenLooted[i] == mobID then
-						return
-					end
+			local loot = t["loot"]
+			
+			-- check data integrity
+			for i, v in pairs(loot) do
+				if not (v["checkSum"] and v["checkSum"] == #v) then
+					debug("Loot data recieved via an addon message failed the integrity check.");
+					return;
 				end
-				
-				for i=1,#data do
-					if FARaidTools:checkFilters(data[i], true) then
-						FARaidTools:itemAdd(data[i])
+			end
+			
+			for i, v in pairs(loot) do
+				if not hasBeenLooted[i] then
+					for j=1,#v do
+						if FARaidTools:checkFilters(v[j], true) then
+							FARaidTools:itemAdd(v[j])
+						end
 					end
+					hasBeenLooted[i] = true;
 				end
-				table.insert(hasBeenLooted, mobID)
 			end
 		end
-	elseif prefix == "FA_RTend" and text[1] == ADDON_VERSION then
-		local itemLink = text[2]
-		
-		if itemLink then
-			FARaidTools:itemEnd(itemLink)
-		end
-	elseif prefix == "FA_RTwho" then
+	elseif t["end"] then
+		FARaidTools:itemEnd(t["end"])
+	elseif t["who"] then
 		if distribution == "WHISPER" then
-			local version = text[2]
+			local version = t["who"]
 			
-			local table_who = table_who or {}
+			table_who = table_who or {}
 			if version then
 				if debugOn then print("Who response recieved from "..sender..".") end
 				if not table_who[version] then
@@ -520,22 +393,25 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
-			FARaidTools:sendMessage("FA_RTwho", {"response", ADDON_VERSION_FULL}, "WHISPER", sender)
+			FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+				["who"] = ADDON_VERSION_FULL,
+			}, "WHISPER", sender)
 		end
-	elseif prefix == "FA_RTupdate" then
+	elseif t["update"] then
 		if distribution == "WHISPER" then
 			if not updateMsg then
-				print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
+				print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.");
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
-			if not text[1] then return end
-			local version = text[1]
+			local version = t["update"]
 			if version < ADDON_VERSION_FULL then
-				FARaidTools:sendMessage("FA_RTupdate", {}, "WHISPER", sender)
+				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+					["update"] = true,
+				}, "WHISPER", sender)
 			elseif not updateMsg then
 				if ADDON_VERSION_FULL < version then
-					print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.")
+					debug("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.");
 					updateMsg = true
 				end
 			end
@@ -546,8 +422,8 @@ end
 --Create GUI elements
 local cols = {
 	{
-		["name"] = "Name",
-		["width"] = 200,
+		["name"] = "Item",
+		["width"] = 207,
 		["align"] = "LEFT",
 		["color"] = { 
 			["r"] = 1.0, 
@@ -574,8 +450,8 @@ local cols = {
 		["DoCellUpdate"] = nil,
 	},
 	{
-		["name"] = "Winners",
-		["width"] = 150,
+		["name"] = "Winner(s)",
+		["width"] = 140,
 		["align"] = "LEFT",
 		["color"] = { 
 			["r"] = 1.0, 
@@ -588,240 +464,35 @@ local cols = {
 		["DoCellUpdate"] = nil,
 	}
 }
-FA_RTframe = CreateFrame("frame", "FALoot")
-FA_RTframe:SetBackdrop({
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-	tile = true, 
-	tileSize = 16
-})
-FA_RTframe:SetBackdropColor(0, 0, 0, 0.6)
-FA_RTframe:SetWidth(460)
-FA_RTframe:SetHeight(235)
-FA_RTframe:SetMovable(true)
-FA_RTframe:SetScript("OnMouseDown", function(self, button)
-	if button == "LeftButton" then
-		self:StartMoving()
-	end
-end)
-FA_RTframe:SetScript("OnMouseUp", function(self, button)
-	if button == "LeftButton" then
-		self:StopMovingOrSizing()
-	end
-end)
-FA_RTframe:SetPoint("CENTER")
-FA_RTframe:Hide()
-FA_RTbutton1 = CreateFrame("button", "FA_RTbutton", FA_RTframe)
-FA_RTbutton1:SetPoint("BOTTOMLEFT", FA_RTframe, "BOTTOMLEFT", 11, -2)
-FA_RTbutton1:SetNormalTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Up.png")
-FA_RTbutton1:SetPushedTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Down.png")
-FA_RTbutton1:SetDisabledTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Disabled.png")
-FA_RTbutton1:SetHeight(25)
-FA_RTbutton1:SetWidth(60)
-FA_RTbutton1text = FA_RTbutton1:CreateFontString("FA_RTbutton_text")
-FA_RTbutton1text:SetPoint("CENTER", FA_RTbutton1, "CENTER", 0, 4)
-FA_RTbutton1text:SetFont(GameFontNormal:GetFont(), 10, "")
-FA_RTbutton1text:SetText("History")
-FA_RTbutton1text:SetTextColor(1, 1, 1)
-FA_RTbutton1:Show()
 
-FA_RTbutton2 = CreateFrame("button", "FA_RTbutton", FA_RTframe)
-FA_RTbutton2:SetPoint("LEFT", FA_RTbutton1, "RIGHT", 5, 0)
-FA_RTbutton2:SetNormalTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Up.png")
-FA_RTbutton2:SetPushedTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Down.png")
-FA_RTbutton2:SetDisabledTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Disabled.png")
-FA_RTbutton2:SetHeight(25)
-FA_RTbutton2:SetWidth(60)
-FA_RTbutton2text = FA_RTbutton2:CreateFontString("FA_RTbutton_text")
-FA_RTbutton2text:SetPoint("CENTER", FA_RTbutton2, "CENTER", 0, 4)
-FA_RTbutton2text:SetFont(GameFontNormal:GetFont(), 10, "")
-FA_RTbutton2text:SetText("Bid")
-FA_RTbutton2text:SetTextColor(1, 1, 1)
-FA_RTbutton2:Show()
+-- GUI
+-- Create a container frame
+local window = AceGUI:Create("FALootFrame");
+window:SetTitle("FA Loot");
+window:SetStatusText("");
+window:SetWidth(500);
+window:SetHeight(270);
+window:EnableResize(false);
 
-FA_RTbutton3 = CreateFrame("button", "FA_RTbutton", FA_RTframe)
-FA_RTbutton3:SetPoint("LEFT", FA_RTbutton2, "RIGHT", 5, 0)
-FA_RTbutton3:SetNormalTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Up.png")
-FA_RTbutton3:SetPushedTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Down.png")
-FA_RTbutton3:SetDisabledTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Disabled.png")
-FA_RTbutton3:SetHeight(25)
-FA_RTbutton3:SetWidth(60)
-FA_RTbutton3text = FA_RTbutton3:CreateFontString("FA_RTbutton_text")
-FA_RTbutton3text:SetPoint("CENTER", FA_RTbutton3, "CENTER", 0, 4)
-FA_RTbutton3text:SetFont(GameFontNormal:GetFont(), 10, "")
-FA_RTbutton3text:SetText("Edit")
-FA_RTbutton3text:SetTextColor(1, 1, 1)
-FA_RTbutton3:Show()
-FA_RTbutton3:SetScript("OnMouseUp", function(self, button)
-	if button == "LeftButton" then
-		if FA_RTscrollingtable:GetSelection() then
-			StaticPopupDialogs["FA_RTTEXT_EDIT"]["text"] = "Edit Winners for "..table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][1]["value"]..":"
-			StaticPopup_Show("FA_RTTEXT_EDIT")
-		end
-	end
-end) 
+local frame = window.frame;
 
-FA_RTbutton4 = CreateFrame("button", "FA_RTbutton", FA_RTframe)
-FA_RTbutton4:SetPoint("TOPRIGHT", FA_RTframe, "TOPRIGHT", -12, -5)
-FA_RTbutton4:SetNormalTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Up.png")
-FA_RTbutton4:SetPushedTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Down.png")
-FA_RTbutton4:SetDisabledTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Disabled.png")
-FA_RTbutton4:SetHeight(25)
-FA_RTbutton4:SetWidth(15)
-FA_RTbutton4text = FA_RTbutton3:CreateFontString("FA_RTbutton_text")
-FA_RTbutton4text:SetPoint("CENTER", FA_RTbutton4, "CENTER", 0, 4)
-FA_RTbutton4text:SetFont(GameFontNormal:GetFont(), 10, "")
-FA_RTbutton4text:SetText("X")
-FA_RTbutton4text:SetTextColor(1, 1, 1)
-FA_RTbutton4:Show()
-FA_RTbutton4:SetScript("OnMouseUp", function(self, button)
-	self:GetParent():Hide()
-end) 
-
-FA_RTscrollingtable = ScrollingTable:CreateST(cols, 9, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, FA_RTframe)
-FA_RTscrollingtable:EnableSelection(true)
-FA_RTscrollingtable.frame:SetPoint("CENTER", FA_RTframe, "CENTER", 0, -22.5)
-FA_RTicons = CreateFrame("frame", "FA_RTicons", FA_RTframe)
-FA_RTicons:SetHeight(30)
-FA_RTicons:SetWidth(400)
-FA_RTicons:SetPoint("BOTTOM", FA_RTscrollingtable.frame, "TOP", 0, 22.5)
+FA_RTicons = CreateFrame("frame", "FA_RTicons", frame)
+FA_RTicons:SetHeight(40)
+FA_RTicons:SetWidth(500)
+FA_RTicons:SetPoint("TOP", frame, "TOP", 0, -30)
 FA_RTicons:Show()
---
-local cols2 = {
-	{
-		["name"] = "Date",
-		["width"] = 105,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "asc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Name",
-		["width"] = 155,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Winners",
-		["width"] = 150,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	}
-}
-FA_RTscrollingtable2 = ScrollingTable:CreateST(cols2, 9, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, FA_RTframe)
-FA_RTscrollingtable2.frame:SetPoint("CENTER", FA_RTframe, "CENTER", 0, -22.5)
-FA_RTscrollingtable2:Hide()
---
-local cols3 = {
-	{
-		["name"] = "Name",
-		["width"] = 150,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "asc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Bid",
-		["width"] = 30,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Status",
-		["width"] = 80,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	}
-}
-FA_RTbidframe = CreateFrame("frame", "FALoot_bid", FA_RTframe)
-FA_RTbidframe:SetBackdrop({
-	bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-	tile = true, 
-	tileSize = 16
-})
-FA_RTbidframe:SetBackdropColor(0, 0, 0, 0.6)
-FA_RTbidframe:SetWidth(295)
-FA_RTbidframe:SetHeight(75)
-FA_RTbidframe:SetPoint("TOP", FA_RTframe, "BOTTOM", 0, 0)
-FA_RTbidframe:Hide()
-FA_RTscrollingtable3 = ScrollingTable:CreateST(cols3, 3, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, FA_RTbidframe)
-FA_RTscrollingtable3.frame:SetPoint("CENTER", FA_RTbidframe, "CENTER", 0, -8)
-FA_RTscrollingtable3:Show()
-FA_RTscrollingtable3:SetData(table_bids, true)
+
+FA_RTscrollingtable = ScrollingTable:CreateST(cols, 8, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, frame)
+FA_RTscrollingtable:EnableSelection(true)
+FA_RTscrollingtable.frame:SetPoint("TOP", FA_RTicons, "BOTTOM", 0, -20)
+FA_RTscrollingtable.frame:SetScale(1.1)
 
 for i=1,13 do
 	table_icons[i] = CreateFrame("frame", "FA_RTicon"..tostring(i), FA_RTicons)
-	table_icons[i]:SetWidth(30)
-	table_icons[i]:SetHeight(30)
+	table_icons[i]:SetWidth(40)
+	table_icons[i]:SetHeight(40)
 	table_icons[i]:Hide()
 end
-
-local function modeSet(num)
-	if num == 0 then
-		tableMode = 0
-		FA_RTscrollingtable:Show()
-		FA_RTscrollingtable2:Hide()
-		FA_RTbutton1text:SetText("History")
-	elseif num == 1 then
-		tableMode = 1
-		FA_RTscrollingtable2:Show()
-		FA_RTscrollingtable:Hide()
-		FA_RTbutton1text:SetText("Active Items")
-	end
-end
-
-FA_RTbutton1:SetScript("OnMouseUp", function(self, button)
-	if tableMode == 1 then
-		modeSet(0)
-	elseif tableMode == 0 then
-		modeSet(1)
-	end
-end) 
 
 function FARaidTools:isThunderforged(iLevel)
 	return iLevel == 541 or iLevel == 528
@@ -927,13 +598,13 @@ function FARaidTools:generateIcons()
 			end
 		end
 	end
-	table_icons[1]:SetPoint("LEFT", FA_RTicons, "LEFT", (401-(k*31))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
+	table_icons[1]:SetPoint("LEFT", FA_RTicons, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
 end
 	
 SLASH_RT1 = "/rt"
 local function slashparse(msg, editbox)
 	if msg == "" then
-		FA_RTframe:Show()
+		frame:Show()
 	else
 		local msg = str_split(" ", msg)
 		if msg[1]:lower() == "debug" then
@@ -950,7 +621,9 @@ local function slashparse(msg, editbox)
 			end
 		elseif msg[1]:lower() == "who" then
 			if #msg == 1 then
-				FARaidTools:sendMessage("FA_RTwho", "query", "GUILD")
+				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+					["who"] = "query",
+				}, "GUILD")
 			else
 				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
 			end
@@ -996,8 +669,8 @@ local function slashparse(msg, editbox)
 				print("Invalid subcommand for /rt "..msg[1]:lower()..".")
 			end
 		elseif msg[1]:lower() == "resetpos" then
-			FA_RTframe:ClearAllPoints()
-			FA_RTframe:SetPoint("CENTER")
+			frame:ClearAllPoints()
+			frame:SetPoint("CENTER")
 		else
 			print("The following are valid commands for /rt:")
 			print("/rt debug <true/false> -- set status of debug mode")
@@ -1048,39 +721,37 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 	hasEditBox = true
 }
 
-FA_RTbutton2:SetScript("OnMouseUp", function(self, button)
-	if button == "LeftButton" then
-		local id = FA_RTscrollingtable:GetSelection()
-		local j, itemLink, itemString = 0;
-		for i, v in pairs(table_items) do
-			j = j + 1;
-			if j == id then
-				itemLink, itemString = v["itemLink"], i;
-			end
+window:SetCallback("OnClick", function(self, event)
+	local id = FA_RTscrollingtable:GetSelection()
+	local j, itemLink, itemString = 0;
+	for i, v in pairs(table_items) do
+		j = j + 1;
+		if j == id then
+			itemLink, itemString = v["itemLink"], i;
 		end
-		bidPrompt = coroutine.create( function(self)
-			StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..itemLink.."?"
-			StaticPopup_Show("BID_AMOUNT_QUERY")
-			debug("Querying for bid, coroutine paused.", 1);
-			coroutine.yield()
-			debug("Bid recieved, resuming coroutine.", 1)
-			bid = tonumber(promptBidValue)
-			if bid < 30 and bid ~= 10 and bid ~= 20 then
-				debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
-				return
-			end
-			if bid % 2 ~= 0 then
-				bid = math.floor(bid)
-				if bid % 2 == 1 then
-					bid = bid - 1
-				end
-				debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
-			end
-			debug("Passed info onto FARaidTools:itemBid().", 1);
-			FARaidTools:itemBid(itemString, bid)
-		end)
-		coroutine.resume(bidPrompt)
 	end
+	bidPrompt = coroutine.create( function(self)
+		StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..itemLink.."?"
+		StaticPopup_Show("BID_AMOUNT_QUERY")
+		debug("Querying for bid, coroutine paused.", 1);
+		coroutine.yield()
+		debug("Bid recieved, resuming coroutine.", 1)
+		bid = tonumber(promptBidValue)
+		if bid < 30 and bid ~= 10 and bid ~= 20 then
+			debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
+			return
+		end
+		if bid % 2 ~= 0 then
+			bid = math.floor(bid)
+			if bid % 2 == 1 then
+				bid = bid - 1
+			end
+			debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
+		end
+		debug("Passed info onto FARaidTools:itemBid().", 1);
+		FARaidTools:itemBid(itemString, bid)
+	end)
+	coroutine.resume(bidPrompt)
 end) 
 
 StaticPopupDialogs["FA_RTEND_CONFIRM"] = {
@@ -1172,12 +843,12 @@ function FARaidTools:itemAdd(itemString, checkCache)
 	
 	FARaidTools:itemTableUpdate();
 	
-	if not FA_RTframe:IsShown() then
+	if not frame:IsShown() then
 		if UnitAffectingCombat("PLAYER") then
 			showAfterCombat = true
 			debug(itemLink.." was found but the player is in combat.");
 		else
-			FA_RTframe:Show()
+			frame:Show()
 		end
 	end
 end
@@ -1295,20 +966,11 @@ function FARaidTools:itemBid(itemString, bid)
 		return;
 	end
 	
-	if table_items[itemString]["host"] and table_items[itemString]["status"] == "Tells"
-	and ((table_items[itemString]["currentValue"] == 30 and bid >= 30)
-	or table_items[itemString]["currentValue"] == bid) then
-		SendChatMessage(tostring(bid), "WHISPER", nil, table_items[itemString]["host"])
-		table.insert(table_bids, {itemString, bid, "Waiting to roll..."});
-		FA_RTscrollingtable3:SetData(table_bids, true);
-		FA_RTbidframe:Show(); -- we know there's bids/rolls waiting now so let's show the frame
-		debug("FARaidTools:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
-	else
-		table.insert(table_bids, {itemString, bid, "Waiting to bid..."})
-		FA_RTscrollingtable3:SetData(table_bids, true)
-		FA_RTbidframe:Show() -- we know there's bids/rolls waiting now so let's show the frame
-		debug("FARaidTools:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
-	end
+	table_items[itemString]["bid"] = bid;
+	table_items[itemString]["bidStatus"] = "Waiting to bid...";
+	debug("FARaidTools:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
+	
+	FARaidTools:checkBids();
 end
 
 function FARaidTools:itemEnd(itemString) -- itemLink or ID
@@ -1325,25 +987,57 @@ function FARaidTools:itemRemove(itemString)
 end
 
 function FARaidTools:checkBids()
-	local table_size = #table_bids
-	for i=0,table_size-1 do
-		local itemString, bid, status = table_bids[table_size-i][1], table_bids[table_size-i][2], table_bids[table_size-i][3]
-		if table_items[itemString]["host"] and ((table_items[itemString]["currentValue"] == 30 and bid >= 30) or table_items[itemString]["currentValue"] == bid) then
-			if status == "Waiting to bid..." and table_items[itemString]["status"] == "Tells" then
-				SendChatMessage(tostring(bid), "WHISPER", nil, table_items[itemString]["host"]);
-				table_bids[table_size-i][3] = "Waiting to roll...";
-				FA_RTscrollingtable3:SetData(table_bids, true);
+	for itemString, v in pairs(table_items) do
+		if table_items[itemString]["bidStatus"] and table_items[itemString]["host"] and ((v["currentValue"] == 30 and v["bid"] >= 30) or v["currentValue"] == v["bid"]) then
+			if v["bidStatus"] == "Waiting to bid..." and v["status"] == "Tells" then
+				SendChatMessage(tostring(bid), "WHISPER", nil, v["host"]);
+				table_items[itemString]["bidStatus"] = "Waiting to roll...";
 				debug("FARaidTools:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
-			elseif status == "Waiting to roll..." and table_items[itemString]["status"] == "Rolls" then
+			elseif v["bidStatus"] == "Waiting to roll..." and v["status"] == "Rolls" then
 				faRoll(bid);
-				table.remove(table_bids, table_size-i);
+				table_items[itemString]["bidStatus"] = nil;
 				debug("FARaidTools:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
 			end
 		end
 	end
 	
-	if #table_bids == 0 then -- if the table is empty now we need to hide it
-		FA_RTbidframe:Hide()
+	local bidding, rolling, only = 0, 0;
+	for itemString, v in pairs(table_items) do
+		if table_items[itemString]["bidStatus"] then
+			only = itemString;
+			if table_items[itemString]["bidStatus"] == "Waiting to bid..." then
+				bidding = bidding + 1;
+			elseif table_items[itemString]["bidStatus"] == "Waiting to roll..." then
+				rolling = rolling + 1;
+			end
+		end
+	end
+	
+	if bidding + rolling == 0 then
+		window:SetStatusText("");
+	elseif bidding + rolling == 1 then
+		local verb = "";
+		if bidding > 0 then
+			verb = "bid"
+		else
+			verb = "roll"
+		end
+		window:SetStatusText("Waiting to " .. verb .. " on " .. table_items[only]["displayName"] .. ".")
+	else
+		if bidding > 0 and rolling > 0 then
+			local plural1, plural2 = "", "";
+			if bidding > 1 then
+				plural1 = "s";
+			end
+			if rolling > 1 then
+				plural2 = "s";
+			end
+			window:SetStatusText("Waiting to bid on " .. bidding .. " item" .. plural1 .. " and roll on " .. rolling .. " item" .. plural2 .. ".");
+		elseif bidding > 0 then
+			window:SetStatusText("Waiting to bid on " .. bidding .. " items.");
+		else
+			window:SetStatusText("Waiting to roll on " .. rolling .. " items.");
+		end
 	end
 end
 
@@ -1359,14 +1053,10 @@ local function onUpdate(self,elapsed)
 	end
 	
 	--enable/disable buttons
-	if FA_RTscrollingtable:GetSelection() == nil or FA_RTscrollingtable:GetSelection() == 0 or iconSelect == 0 then
-		FA_RTbutton2:Disable()
-		FA_RTbutton3:Disable()
+	if (iconSelect and iconSelect > 0) or (FA_RTscrollingtable:GetSelection() and FA_RTscrollingtable:GetSelection() > 0 and not iconSelect) then
+		window:SetDisabled(false);
 	else
-		FA_RTbutton2:Enable()
-		if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or debugOn then
-			FA_RTbutton3:Enable()
-		end
+		window:SetDisabled(true);
 	end
 	
 	-- /rt who stuff
@@ -1501,12 +1191,12 @@ function FARaidTools:parseChat(msg, author)
 						
 						if string.match(winners[i], UnitName("player"):lower()) then -- if the player is one of the winners
 							debug("The player won an item!", 1)
-							LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+							LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
 						else
 							for j=1,#table_aliases do
 								if string.match(winners[i], table_aliases[j]) then
 									debug("The player won an item!", 1)
-									LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+									LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
 								end
 							end
 						end
@@ -1532,16 +1222,8 @@ end
 function FARaidTools:dataDump(name)
 	if name == "hasBeenLooted" then
 		DevTools_Dump(hasBeenLooted)
-	elseif name == "mainData" then
-		DevTools_Dump(table_mainData)
 	elseif name == "itemQuery" then
 		DevTools_Dump(table_itemQuery)
-	elseif name == "bids" then
-		DevTools_Dump(table_bids)
-	elseif name == "expTimes" then
-		DevTools_Dump(table_expTimes)
-	elseif name == "nameAssociations" then
-		DevTools_Dump(table_nameAssociations)
 	end
 end
 	
@@ -1556,7 +1238,6 @@ function events:ADDON_LOADED(name)
 			saveLootSettings()
 			history = {}
 		end
-		FA_RTscrollingtable2:SetData(history, true)
 		FARaidTools:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
@@ -1664,7 +1345,9 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 end
 function events:GROUP_JOINED()
 	if IsInRaid() then
-		FARaidTools:sendMessage("FA_RTupdate", {ADDON_VERSION_FULL}, "RAID", nil, "BULK")
+		FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+			["update"] = ADDON_VERSION_FULL,
+		}, "RAID", nil, "BULK")
 	end
 end
 function events:CVAR_UPDATE(glStr, value)
@@ -1675,7 +1358,7 @@ function events:CVAR_UPDATE(glStr, value)
 end
 function events:PLAYER_REGEN_ENABLED()
 	if showAfterCombat then
-		FA_RTframe:Show()
+		frame:Show()
 		showAfterCombat = false
 	end
 end
