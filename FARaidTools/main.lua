@@ -1,3 +1,22 @@
+--[[
+	DONE:
+	ItemLinkStrip()
+	ItemLinkAssemble()
+	generateIcons()
+	itemAdd()
+	itemTableUpdate()
+	itemEnd()
+	itemRemove()
+	parseChat()
+	itemBid()
+	checkBids()
+	
+	TODO:
+	slashparse()
+	OnCommRecieved()
+	
+-]]
+
 -- Declare strings
 local ADDON_NAME = "FARaidTools"
 local ADDON_VERSION_FULL = "v4.0"
@@ -201,6 +220,47 @@ local function str_split(delimiter, text)
 		end
 	end
 	return list
+end
+
+function string.levenshtein(str1, str2)
+	local len1 = string.len(str1)
+	local len2 = string.len(str2)
+	local matrix = {}
+	local cost = 0
+	
+        -- quick cut-offs to save time
+	if (len1 == 0) then
+		return len2
+	elseif (len2 == 0) then
+		return len1
+	elseif (str1 == str2) then
+		return 0
+	end
+	
+        -- initialise the base matrix values
+	for i = 0, len1, 1 do
+		matrix[i] = {}
+		matrix[i][0] = i
+	end
+	for j = 0, len2, 1 do
+		matrix[0][j] = j
+	end
+	
+        -- actual Levenshtein algorithm
+	for i = 1, len1, 1 do
+		for j = 1, len2, 1 do
+			if (str1:byte(i) == str2:byte(j)) then
+				cost = 0
+			else
+				cost = 1
+			end
+			
+			matrix[i][j] = math.min(matrix[i-1][j] + 1, matrix[i][j-1] + 1, matrix[i-1][j-1] + cost)
+		end
+	end
+	
+        -- return the last value - this is the Levenshtein distance
+	return matrix[len1][len2]
 end
 
 local function ItemLinkStrip(itemLink)
@@ -991,27 +1051,33 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 FA_RTbutton2:SetScript("OnMouseUp", function(self, button)
 	if button == "LeftButton" then
 		local id = FA_RTscrollingtable:GetSelection()
-		local link = string.match(table_mainData[id]["cols"][1]["value"], HYPERLINK_PATTERN)
+		local j, itemLink, itemString = 0;
+		for i, v in pairs(table_items) do
+			j = j + 1;
+			if j == id then
+				itemLink, itemString = v["itemLink"], i;
+			end
+		end
 		bidPrompt = coroutine.create( function(self)
-			StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..string.match(table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][1]["value"], HYPERLINK_PATTERN).."?"
+			StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..itemLink.."?"
 			StaticPopup_Show("BID_AMOUNT_QUERY")
-			if debugOn then print("Querying for bid, coroutine paused.") end
+			debug("Querying for bid, coroutine paused.", 1);
 			coroutine.yield()
-			if debugOn then print("Bid recieved, resuming coroutine.") end
-			promptBidValue = tonumber(promptBidValue)
-			if promptBidValue < 30 and promptBidValue ~= 10 and promptBidValue ~= 20 then
-				print("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
+			debug("Bid recieved, resuming coroutine.", 1)
+			bid = tonumber(promptBidValue)
+			if bid < 30 and bid ~= 10 and bid ~= 20 then
+				debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
 				return
 			end
-			if promptBidValue % 2 ~= 0 then
-				print("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
-				promptBidValue = math.floor(promptBidValue)
-				if promptBidValue % 2 == 1 then
-					promptBidValue = promptBidValue - 1
+			if bid % 2 ~= 0 then
+				bid = math.floor(bid)
+				if bid % 2 == 1 then
+					bid = bid - 1
 				end
+				debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
 			end
-			if debugOn then print("Passed info onto FARaidTools:itemBid().") end
-			FARaidTools:itemBid(link, promptBidValue)
+			debug("Passed info onto FARaidTools:itemBid().", 1);
+			FARaidTools:itemBid(itemString, bid)
 		end)
 		coroutine.resume(bidPrompt)
 	end
@@ -1046,61 +1112,6 @@ StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
 	end,
 	enterClicksFirstButton = 1
 }
-
-function FARaidTools:itemUpdate(itemString, value)
-	if not table_items[itemString] then
-		debug("itemUpdate(): No match found in data table. Aborting.", 1);
-		return;
-	end
-	local value = string.lower(value);
-	if string.match(value, "roll") then
-		table_items[itemString]["status"] = "Rolls";
-	elseif string.match(value, "[321]0") then
-		table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
-		table_items[itemString]["status"] = "Tells";
-	else
-		-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
-		value = string.gsub(value, "%sand%s", ", ")
-		value = string.gsub(value, "%s?&%s?", ", ")
-		value = string.gsub(value, "%s?/%s?", ", ")
-		value = string.gsub(value, "%s?\+%s?", ", ")
-		
-		if table_items[itemString]["currentValue"] == 30 then
-			table.insert(table_items[itemString]["winners"], value.." (30+)"); -- add name followed by 30+
-		else
-			table.insert(table_items[itemString]["winners"], value.." ("..table_items[itemString]["currentValue"]..")"); -- add name followed by 30+
-		end
-		
-		if string.match(value, UnitName("player"):lower()) then -- if the player is one of the winners
-			debug("The player won an item!", 1)
-			LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
-		else
-			for i=1,#table_aliases do
-				if string.match(value, table_aliases[i]) then
-					debug("The player won an item!", 1)
-					LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
-				end
-			end
-		end
-	end
-	--[[if table_mainData[id]["cols"][3]["value"] == "" then
-		wincount = 0
-	else
-		wincount = #str_split(",", table_mainData[id]["cols"][3]["value"])
-	end
-	itemcount = string.match(table_mainData[id]["cols"][1]["value"], "x(%d+)$")
-	if itemcount then
-		itemcount = tonumber(itemcount)
-	else
-		itemcount = 1
-	end
-	if wincount >= itemcount then
-		FARaidTools:itemEnd(id)
-	else
-		FA_RTscrollingtable:SetData(table_mainData, false) -- this is done in the itemEnd function so we only need to do it here
-	end-]]
-	FARaidTools:itemTableUpdate();
-end
 
 function FARaidTools:itemAdd(itemString, checkCache)
 	debug("itemAdd(), itemString = "..itemString, 1);
@@ -1190,11 +1201,18 @@ function FARaidTools:itemTableUpdate()
 			statusColor = {["r"] = 0.5, ["g"] = 0.5, ["b"] = 0.5, ["a"] = 1};
 		end
 		local winnerString = "";
-		for j=1,#v["winners"] do
-			if j > 1 then
+		for j, w in pairs(v["winners"]) do
+			if winnerString ~= "" then
 				winnerString = winnerString .. ", ";
 			end
-			winnerString = winnerString .. v["winners"][j];
+			local subString = "";
+			for k=1,#w do
+				if subString ~= "" then
+					subString = subString .. " & ";
+				end
+				subString = subString .. w[k];
+			end
+			winnerString = winnerString .. subString .. " (" .. j .. ")";
 		end
 		table.insert(t, {
 			["cols"] = {
@@ -1216,7 +1234,7 @@ function FARaidTools:itemTableUpdate()
 					["value"] = winnerString,
 					["args"] = nil,
 					["color"] = {["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0},
-					["colorargs"] = nil,
+					["colorargs"] = wnil,
 					["DoCellUpdate"] = nil,
 				},
 			},
@@ -1269,56 +1287,34 @@ function FARaidTools:itemTableUpdate()
 	--]]
 end
 
-function FARaidTools:itemBid(itemLink, bid)
-	bid = tostring(bid)
-	if debugOn then print("FARaidTools:itemBid("..itemLink..", "..bid..")") end
-	local name = nil
-	for i=1,#table_nameAssociations do
-		if ItemLinkStrip(table_nameAssociations[i][1]) == ItemLinkStrip(itemLink) then
-			name = table_nameAssociations[i][2]
-			break
-		end
+function FARaidTools:itemBid(itemString, bid)
+	bid = tonumber(bid)
+	debug("FARaidTools:itemBid("..itemString..", "..bid..")", 1)
+	if not table_items[itemString] then
+		debug("Item not found! Aborting.", 1);
+		return;
 	end
-	local id = nil
-	for i=1,#table_mainData do
-		if ItemLinkStrip(string.match(table_mainData[i]["cols"][1]["value"], HYPERLINK_PATTERN)) == ItemLinkStrip(itemLink) then
-			id = i
-			break
-		end
-	end
-	if id == nil then
-		if debugOn then print("bid(): ID returned nil, aborting.") end
-		return
-	end
-	local sent = true
-	if name == nil then sent = false end
-	if string.match(table_mainData[id]["cols"][2]["value"], "(Tells)") then
-		local at = tonumber(string.match(table_mainData[id]["cols"][2]["value"], "^%d%d"))
-		if at == tonumber(bid) or (at == 30 and tonumber(bid) > 30) then
-			SendChatMessage(tostring(bid), "WHISPER", nil, name)
-			table.insert(table_bids, {itemLink, bid, "Waiting to roll..."})
-			FA_RTscrollingtable3:SetData(table_bids, true)
-			FA_RTbidframe:Show() -- we know there's bids/rolls waiting now so let's show the frame
-		else
-			sent = false
-		end
+	
+	if table_items[itemString]["host"] and table_items[itemString]["status"] == "Tells"
+	and ((table_items[itemString]["currentValue"] == 30 and bid >= 30)
+	or table_items[itemString]["currentValue"] == bid) then
+		SendChatMessage(tostring(bid), "WHISPER", nil, table_items[itemString]["host"])
+		table.insert(table_bids, {itemString, bid, "Waiting to roll..."});
+		FA_RTscrollingtable3:SetData(table_bids, true);
+		FA_RTbidframe:Show(); -- we know there's bids/rolls waiting now so let's show the frame
+		debug("FARaidTools:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
 	else
-		sent = false
-	end
-	if sent == false then
-		table.insert(table_bids, {itemLink, bid, "Waiting to bid..."})
+		table.insert(table_bids, {itemString, bid, "Waiting to bid..."})
 		FA_RTscrollingtable3:SetData(table_bids, true)
 		FA_RTbidframe:Show() -- we know there's bids/rolls waiting now so let's show the frame
-		if debugOn then print("FARaidTools:itemBid(): Queued bid.") end
-	else
-		if debugOn then print("FARaidTools:itemBid(): Sent bid.") end
+		debug("FARaidTools:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
 	end
 end
 
 function FARaidTools:itemEnd(itemString) -- itemLink or ID
 	if table_items[itemString] then
 		table_items[itemString]["status"] = "Ended";
-		table_items[itemString]["expirationTime"] = GetTime() + expTime;
+		table_items[itemString]["expirationTime"] = GetTime();
 	end
 	FARaidTools:itemTableUpdate();
 end
@@ -1331,46 +1327,18 @@ end
 function FARaidTools:checkBids()
 	local table_size = #table_bids
 	for i=0,table_size-1 do
-		local id = nil
-		for j=1,#table_mainData do
-			if ItemLinkStrip(table_bids[table_size-i][1]) == ItemLinkStrip(string.match(table_mainData[j]["cols"][1]["value"], HYPERLINK_PATTERN)) then
-				id = j
+		local itemString, bid, status = table_bids[table_size-i][1], table_bids[table_size-i][2], table_bids[table_size-i][3]
+		if table_items[itemString]["host"] and ((table_items[itemString]["currentValue"] == 30 and bid >= 30) or table_items[itemString]["currentValue"] == bid) then
+			if status == "Waiting to bid..." and table_items[itemString]["status"] == "Tells" then
+				SendChatMessage(tostring(bid), "WHISPER", nil, table_items[itemString]["host"]);
+				table_bids[table_size-i][3] = "Waiting to roll...";
+				FA_RTscrollingtable3:SetData(table_bids, true);
+				debug("FARaidTools:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
+			elseif status == "Waiting to roll..." and table_items[itemString]["status"] == "Rolls" then
+				faRoll(bid);
+				table.remove(table_bids, table_size-i);
+				debug("FARaidTools:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
 			end
-		end
-		local name = nil
-		for j=1,#table_nameAssociations do
-			if ItemLinkStrip(table_nameAssociations[j][1]) == ItemLinkStrip(table_bids[table_size-i][1]) then
-				name = table_nameAssociations[j][2]
-				break
-			end
-		end
-		local bid = table_bids[table_size-i][2]
-		local executed = false
-		if string.match(table_mainData[id]["cols"][2]["value"], "(Tells)") and table_bids[table_size-i][3] == "Waiting to bid..." then
-			local at = tonumber(string.match(table_mainData[id]["cols"][2]["value"], "^%d%d"))
-			if at == tonumber(bid) then
-				SendChatMessage(tostring(bid), "WHISPER", nil, name)
-				executed = 1
-			elseif at == 30 and tonumber(bid) > 30 then
-				SendChatMessage(tostring(bid), "WHISPER", nil, name)
-				executed = 1
-			end
-		elseif string.match(table_mainData[id]["cols"][2]["value"], "(Rolls)") and table_bids[table_size-i][3] == "Waiting to roll..." then
-			local at = tonumber(string.match(table_mainData[id]["cols"][2]["value"], "^%d%d"))
-			if at == tonumber(bid) then
-				faRoll(bid)
-				executed = 2
-			elseif at == 30 and tonumber(bid) > 30 then
-				faRoll(bid)
-				executed = 2
-			end
-		end
-		if executed == 2 then
-			table.remove(table_bids, table_size-i)
-			FA_RTscrollingtable3:SetData(table_bids, true)
-		elseif executed == 1 then
-			table_bids[table_size-i][3] = "Waiting to roll..."
-			FA_RTscrollingtable3:SetData(table_bids, true)
 		end
 	end
 	
@@ -1383,29 +1351,10 @@ local function onUpdate(self,elapsed)
 	local currentTime = GetTime() -- get the time and put it in a variable so we don't have to call it a billion times throughout this function
 	
 	--check if it's time to remove any expired items
-	local tableSize = #table_expTimes
-	for i=0,tableSize-1 do -- loop backwards through table of all expired items
-		if currentTime >= table_expTimes[tableSize-i][2] + expTime then
-			local id
-			for j=1,#table_mainData do -- loop through data table
-				if ItemLinkStrip(string.match(table_mainData[j]["cols"][1]["value"], HYPERLINK_PATTERN)) == ItemLinkStrip(table_expTimes[tableSize-i][1]) then
-					id = j
-					if debugOn then print("onUpdate/remove: Found match in data table. ID #"..id) end
-					break
-				end
-			end
-			if id then
-				table.insert(history, 1, {date(), table_mainData[id]["cols"][1]["value"], table_mainData[id]["cols"][3]["value"]}) -- add entry to history table
-				FA_RTscrollingtable2:SetData(history, true)
-				
-				FARaidTools:itemRemove(table_expTimes[tableSize-i][1]) -- remove entry from data table
-				FA_RTscrollingtable:SetData(table_mainData, false)
-				
-				table.remove(table_expTimes, tableSize-i)
-			else
-				table.remove(table_expTimes, tableSize-i)
-				if debugOn then print("onUpdate/remove: Found and removed invalid table_expTimes entry. ID #"..tableSize-i) end
-			end
+	for i, v in pairs(table_items) do
+		if v["expirationTime"] and v["expirationTime"] + expTime <= currentTime then
+			debug(v["itemLink"].." has expired, removing.", 1);
+			FARaidTools:itemRemove(i);
 		end
 	end
 	
@@ -1491,31 +1440,90 @@ function FARaidTools:parseChat(msg, author)
 	if debugOn or (rank and rank > 0) then
 		local linkless, replaces = string.gsub(msg, HYPERLINK_PATTERN, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
-			local itemLink = string.match(msg, HYPERLINK_PATTERN) -- retrieve itemLink from the message
-			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
-			if not msg then return end
-			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
-			if not note then
-				return
+			local itemLink = string.match(msg, HYPERLINK_PATTERN); -- retrieve itemLink from the message
+			local itemString = ItemLinkStrip(itemLink);
+			msg = string.gsub(msg, "x%d+", ""); -- remove any "x2" or "x3"s from the string
+			if not msg then
+				return;
 			end
-			note = string.gsub(note, "%s+", " ") -- replace any double spaces with a single space
-			if not note then
-				return
+			local value = string.match(msg, "]|h|r%s*(.+)"); -- take anything else after the link and any following spaces as the value value
+			if not value then
+				return;
 			end
-			local shouldadd = true
-			for i=1,#table_nameAssociations do -- check if the item already has a whisper target associated with it
-				if table_nameAssociations[i][1] == itemLink then
-					shouldadd = false
+			value = string.gsub(value, "%s+", " "); -- replace any double spaces with a single space
+			if not value then
+				return;
+			end
+			value = string.lower(value);
+			
+			if table_items[itemString] then
+				if not table_items[itemString]["host"] then
+					table_items[itemString]["host"] = author;
 				end
-			end
-			if shouldadd == true then -- if it doesn't, insert the whisper target into the table.
-				table.insert(table_nameAssociations, {itemLink, author})
-			end
-			if itemLink and note then
-				local itemString = ItemLinkStrip(itemLink);
-				debug("itemString: "..itemString, 1);
-				debug("note: "..note, 1);
-				FARaidTools:itemUpdate(itemString, note)
+				
+				if string.match(value, "roll") then
+					table_items[itemString]["status"] = "Rolls";
+				elseif string.match(value, "[321]0") then
+					table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
+					table_items[itemString]["status"] = "Tells";
+				else
+					-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
+					value = string.gsub(value, "%sand%s", ", ")
+					value = string.gsub(value, "%s?&%s?", ", ")
+					value = string.gsub(value, "%s?/%s?", ", ")
+					value = string.gsub(value, "%s?\+%s?", ", ")
+					
+					winners = str_split(", ", value);
+					debug(winners, 1);
+					for i=1, #winners do
+						local closestMatch, closestMatchId = math.huge;
+						for j=1,GetNumGroupMembers() do
+							local distance = string.levenshtein(winners[i], UnitName("raid"..j):lower())
+							if distance and distance < closestMatch then
+								closestMatch = distance;
+								closestMatchId = j;
+							end
+						end
+						if closestMatchId then
+							winners[i] = UnitName("raid"..closestMatchId);
+						end
+						
+						local cost;
+						if table_items[itemString]["currentValue"] == 30 then
+							cost = "30+"
+						else
+							cost = tostring(table_items[itemString]["currentValue"]);
+						end
+						if not table_items[itemString]["winners"][cost] then
+							table_items[itemString]["winners"][cost] = {};
+						end
+						table.insert(table_items[itemString]["winners"][cost], winners[i]);
+						
+						if string.match(winners[i], UnitName("player"):lower()) then -- if the player is one of the winners
+							debug("The player won an item!", 1)
+							LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+						else
+							for j=1,#table_aliases do
+								if string.match(winners[i], table_aliases[j]) then
+									debug("The player won an item!", 1)
+									LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+								end
+							end
+						end
+						
+						local numWinners = 0;
+						for j, v in pairs(table_items[itemString]["winners"]) do
+							numWinners = numWinners + #v;
+						end
+						debug("numWinners = "..numWinners, 1);
+						if numWinners >= table_items[itemString]["quantity"] then
+							FARaidTools:itemEnd(itemString);
+							break;
+						end
+					end
+				end
+				FARaidTools:itemTableUpdate();
+				FARaidTools:checkBids();
 			end
 		end
 	end
