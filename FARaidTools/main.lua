@@ -1,6 +1,15 @@
+-- Declare strings
 local ADDON_NAME = "FARaidTools"
-local ADDON_VERSION_FULL = "v3.03p"
+local ADDON_VERSION_FULL = "v4.0"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
+
+local ADDON_COLOR = "FFF9CC30";
+local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. ADDON_NAME .. ":|r ";
+local ADDON_MSG_PREFIX = "FA_RT";
+local ADDON_DOWNLOAD_URL = "http://tinyurl.com/FARaidTools"
+
+local HYPERLINK_PATTERN = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
+local THUNDERFORGED = " |cFF00FF00(TF)|r"
 
 -- Load the libraries
 FARaidTools = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
@@ -10,12 +19,10 @@ local ScrollingTable = LibStub("ScrollingTable")
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0")
 local libCompress = LibStub:GetLibrary("LibCompress")
 local libEncode = libCompress:GetAddonEncodeTable()
+local AceGUI = LibStub("AceGUI-3.0");
 
 -- Declare local variables
-local hyperlinkPattern = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
---				"|cffa335ee|Hitem:71472:0:0:0:0:0:0:0:90:0:0|h[Flowform Choker]|h|r"
-local downloadUrl = "http://tinyurl.com/FARaidTools"
-
+local table_items = {}
 local table_mainData = {}
 local table_bids = {}
 local table_itemQuery = {}
@@ -25,7 +32,7 @@ local table_icons = {}
 local table_who = {}
 local table_aliases = {}
 
-local debugOn = false
+local debugOn = 2
 local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
 local cacheInterval = 200 -- this is how often we recheck for item data
@@ -41,7 +48,141 @@ local updateMsg = nil
 
 local _
 
+--[[
+
+-- Create a container frame
+local frame = AceGUI:Create("Frame");
+frame:SetCallback("OnClose", function(this)
+  this:Hide();
+end);
+frame:SetTitle("FARaidTools");
+--frame:SetStatusText("Status Bar");
+frame:SetWidth(400);
+frame:SetHeight(400);
+--frame:EnableResize(false);
+frame:SetLayout("Fill");
+
+local iconGroup = AceGUI:Create("ScrollFrame");
+frame:AddChild(iconGroup);
+
+local function addIcon(link, texture)
+	local path, size, flags = GameFontNormal:GetFont();
+	
+	local iconCallback = function(this, event, ...)
+		if event == "OnEnter" then
+			GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR");
+			GameTooltip:SetHyperlink(link);
+			
+			-- Show the tooltip
+			GameTooltip:Show();
+		elseif event == "OnLeave" then
+			GameTooltip:Hide();
+		elseif event == "OnClick" then
+			local button = ...;
+			if button == "LeftButton" then
+				if IsModifiedClick("CHATLINK") then
+					ChatEdit_InsertLink(link)
+				elseif IsModifiedClick("DRESSUP") then
+					DressUpItemLink(link)
+				end
+			end
+		end
+	end
+
+	local group = AceGUI:Create("SimpleGroup");
+	iconGroup:AddChild(group);
+	group:SetLayout("Flow");
+	group:SetWidth(350);
+	group:SetHeight(55);
+	
+	local subGroup1 = AceGUI:Create("SimpleGroup");
+	group:AddChild(subGroup1);
+	subGroup1:SetLayout("Fill");
+	subGroup1:SetWidth(60);
+	subGroup1:SetHeight(55);
+
+	local icon = AceGUI:Create("Icon");
+	subGroup1:AddChild(icon);
+	icon:SetImage(texture);
+	icon:SetImageSize(50, 50);
+	icon:SetCallback("OnEnter", iconCallback);
+	icon:SetCallback("OnLeave", iconCallback);
+	icon:SetCallback("OnClick", iconCallback);
+
+	local subGroup2 = AceGUI:Create("SimpleGroup");
+	group:AddChild(subGroup2);
+	subGroup2:SetLayout("Flow");
+	subGroup2:SetWidth(200);
+	subGroup2:SetHeight(55);
+
+	local label1 = AceGUI:Create("InteractiveLabel");
+	subGroup2:AddChild(label1);
+	label1:SetText(link);
+	label1:SetFont(path, 14, flags);
+	label1:SetCallback("OnEnter", iconCallback);
+	label1:SetCallback("OnLeave", iconCallback);
+	label1:SetCallback("OnClick", iconCallback);
+
+	local button1 = AceGUI:Create("Button");
+	subGroup2:AddChild(button1);
+	button1:SetText("Bid");
+	button1:SetWidth(55)
+	button1:SetCallback("OnClick", nil);
+
+	local button2 = AceGUI:Create("Button");
+	subGroup2:AddChild(button2);
+	button2:SetText("Start");
+	button2:SetWidth(55)
+	button2:SetCallback("OnClick", nil);
+
+	local button3 = AceGUI:Create("Button");
+	subGroup2:AddChild(button3);
+	button3:SetText("End");
+	button3:SetWidth(55)
+	button3:SetCallback("OnClick", nil);
+
+	local subGroup3 = AceGUI:Create("SimpleGroup");
+	group:AddChild(subGroup3);
+	subGroup3:SetLayout("Fill");
+	subGroup3:SetWidth(60);
+	subGroup3:SetHeight(55);
+
+	local label2 = AceGUI:Create("InteractiveLabel");
+	subGroup3:AddChild(label2);
+	label2:SetText("30");
+	label2:SetFont(path, 28, flags);
+end
+
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96369);
+addIcon(link, texture)
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96376);
+addIcon(link, texture)
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96379);
+addIcon(link, texture)
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96387);
+addIcon(link, texture)
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96372);
+addIcon(link, texture)
+local _, link, _, _, _, _, _, _, _, texture = GetItemInfo(96382);
+addIcon(link, texture)
+
+--]]
+
+
 --helper functions
+
+local function debug(msg, verbosity)
+	if (not verbosity or debugOn >= verbosity) then
+		if type(msg) == "string" or type(msg) == "number" then
+			print(ADDON_CHAT_HEADER..msg);
+		elseif type(msg) == "table" then
+			if not DevTools_Dump then
+				LoadAddOn("Blizzard UI Debug Tools");
+			end
+			DevTools_Dump(msg);
+		end
+	end
+end
 
 local function str_split(delimiter, text)
 	local list = {}
@@ -62,12 +203,31 @@ local function str_split(delimiter, text)
 	return list
 end
 
-local function stripItemData(itemLink)
+local function ItemLinkStrip(itemLink)
 	if itemLink then
-		local _, _, Color, Ltype, Id, Enchant, Gem1, Gem2, Gem3, Gem4, Suffix, Unique, LinkLvl, reforging, Name = string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
-		return "|"..Color.."|Hitem:"..Id..":"..Suffix.."|h["..Name.."]|h|r"
+		local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
+		string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+		if itemId and suffixId then
+			local s = itemId..":"..suffixId;
+			debug(s, 3);
+			return s;
+		end
 	elseif debugOn then
-		print("stripItemData was passed a nil value!")
+		debug("ItemLinkStrip was passed a nil value!", 1);
+		return;
+	end
+end
+
+local function ItemLinkAssemble(itemString)
+	if string.match(itemString, "^%d+:%-?%d+") then
+		local itemId, suffixId, srcGUID = string.match(itemString, "^(%d+):(%-?%d+)");
+		local fullItemString = "item:"..itemId..":0:0:0:0:0:"..suffixId;
+		local _, link = GetItemInfo(fullItemString);
+		if not link then
+			return;
+		end
+		debug(link, 3);
+		return link;
 	end
 end
 
@@ -143,6 +303,10 @@ local function isMainRaid()
 end
 
 local function addonEnabled()
+	if debugOn then
+		return 1
+	end
+	
 	local _, instanceType = IsInInstance()
 	
 	if not isGuildGroup(0.60) then
@@ -156,9 +320,6 @@ local function addonEnabled()
 	elseif GetNumGroupMembers() < 20 then
 		return nil, "not enough group members"
 	else
-		return 1
-	end
-	if debugOn then
 		return 1
 	end
 end
@@ -619,35 +780,23 @@ function FARaidTools:generateIcons()
 		table_icons[i]:SetScript("OnEnter", nil)
 		table_icons[i]:SetScript("OnLeave", nil)
 	end
-	for i=1,#table_mainData do -- loop through each row of data
-		local itemIcon = GetItemIcon(table_mainData[i]["cols"][1]["value"]) -- retrieve path to item icon
-		local itemCount = tonumber(string.match(table_mainData[i]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1 -- parse how many there are of this item so we know how many icons to create
-		for j=1,itemCount do
+	for i, v in pairs(table_items) do -- loop through each row of data
+		for j=1,v["quantity"] do
 			if k < #table_icons then -- if we're constructing an icon number that's higher than what we're setup to display then just skip it
 				k = k + 1 -- increment k by 1 before starting to construct
 				table_icons[k]:SetBackdrop({ -- set the texture of the icon
-					bgFile = itemIcon,
+					bgFile = v["texture"],
 				})
 				table_icons[k]:SetScript("OnEnter", function(self, button) -- set code that triggers on mouse enter
 					local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
-					local total = 0
-					local id
-					for i=1,#table_mainData do -- figure out what row of data associates to this icon by counting up the quanities of each row
-						local quantity = tonumber(string.match(table_mainData[i]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1
-						total = total + quantity
-						if total >= iconNum then
-							id = i
-							break
-						end
-					end
 					
 					--table select stuff
 					iconSelect = FA_RTscrollingtable:GetSelection() or 0 -- store what row was selected so we can restore it later
-					FA_RTscrollingtable:SetSelection(id) -- select the row that correlates to the icon
+					FA_RTscrollingtable:SetSelection(iconNum) -- select the row that correlates to the icon
 					
 					--tooltip stuff
 					GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-					GameTooltip:SetHyperlink(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern))
+					GameTooltip:SetHyperlink(v["itemLink"])
 					GameTooltip:Show()
 					end)
 				table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
@@ -662,58 +811,50 @@ function FARaidTools:generateIcons()
 					if button == "LeftButton" then -- left click: Selects the clicked row
 						-- retrieve the row id that corresponds to the icon we're mousedover
 						local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
-						local total = 0
-						local id
-						for i=1,#table_mainData do -- figure out what row of data associates to this icon by counting up the quanities of each row
-							local quantity = tonumber(string.match(table_mainData[i]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1
-							total = total + quantity
-							if total >= iconNum then
-								id = i
-								break
-							end
-						end
-						
-						if IsModifiedClick("CHATLINK") then
-							local itemLink = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
-							if itemLink then
-								ChatEdit_InsertLink(itemLink)
-							end
-						elseif IsModifiedClick("DRESSUP") then
-							local itemLink = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
-							if itemLink then
-								DressUpItemLink(itemLink)
-							end
-						else
-							iconSelect = id -- set iconSelect so that after the user finishes mousing over icons
-									     -- the row corresponding to this one gets selected
-						end
-					end
-					if button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
-						--remove command stuff
-						endPrompt = coroutine.create( function()
-							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
-							local total = 0
-							local id
-							for i=1,#table_mainData do -- figure out what row of data associates to this icon by counting up the quantities of each row
-								local quantity = tonumber(string.match(table_mainData[i]["cols"][1]["value"], "]\124h\124rx(%d+)")) or 1
-								total = total + quantity
-								if total >= iconNum then
-									id = i
+						if IsModifiedClick("CHATLINK") or IsModifiedClick("DRESSUP") then
+							local j = 0;
+							for i, v in pairs(table_items) do
+								j = j + 1;
+								if j == iconNum then
+									if IsModifiedClick("CHATLINK") then
+										ChatEdit_InsertLink(v["itemLink"])
+									elseif IsModifiedClick("DRESSUP") then
+										DressUpItemLink(v["itemLink"])
+									end
 									break
 								end
 							end
-							local msg = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
-							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-								StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..msg.." for all players in the raid?"
-							else
-								StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..msg.."?"
+						else
+							-- set iconSelect so that after the user finishes mousing over icons
+							-- the row corresponding to this one gets selected
+							iconSelect = iconNum
+						end
+					elseif button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
+						--remove command stuff
+						endPrompt = coroutine.create( function()
+							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
+							local j = 0;
+							for i, v in pairs(table_items) do
+								j = j + 1;
+								if j == iconNum then
+									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+										StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
+									else
+										StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
+									end
+									StaticPopup_Show("FA_RTEND_CONFIRM")
+									coroutine.yield()
+									debug("Ending item "..v["itemLink"]..".", 1);
+									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+										FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+											["ADDON_VERSION"] = ADDON_VERSION, 
+											["end"] = i,
+										}, "RAID")
+									end
+									FARaidTools:itemEnd(i)
+									break
+								end
 							end
-							StaticPopup_Show("FA_RTEND_CONFIRM")
-							coroutine.yield()
-							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-								FARaidTools:sendMessage("FA_RTend", {ADDON_VERSION, msg}, "RAID")
-							end
-							FARaidTools:itemEnd(id)
 						end)
 						coroutine.resume(endPrompt)
 					end
@@ -850,9 +991,9 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 FA_RTbutton2:SetScript("OnMouseUp", function(self, button)
 	if button == "LeftButton" then
 		local id = FA_RTscrollingtable:GetSelection()
-		local link = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern)
+		local link = string.match(table_mainData[id]["cols"][1]["value"], HYPERLINK_PATTERN)
 		bidPrompt = coroutine.create( function(self)
-			StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..string.match(table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][1]["value"], hyperlinkPattern).."?"
+			StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..string.match(table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][1]["value"], HYPERLINK_PATTERN).."?"
 			StaticPopup_Show("BID_AMOUNT_QUERY")
 			if debugOn then print("Querying for bid, coroutine paused.") end
 			coroutine.yield()
@@ -906,36 +1047,17 @@ StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
 	enterClicksFirstButton = 1
 }
 
-function FARaidTools:itemUpdate(itemLink, value)
-	if debugOn then print("itemUpdate("..itemLink..", "..tostring(value)..")") end
-	local id
-	for i=1,#table_mainData do
-		if stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(itemLink) then
-			id = i
-			if debugOn then print("itemUpdate(): Found match in data table. ID #"..id) end
-			break
-		end
+function FARaidTools:itemUpdate(itemString, value)
+	if not table_items[itemString] then
+		debug("itemUpdate(): No match found in data table. Aborting.", 1);
+		return;
 	end
-	if not id then
-		if debugOn then print("itemUpdate(): No match found in data table. Aborting.") end
-		return
-	end
-	local message_value = string.match(value, "[321]0")
-	local table_value = string.match(table_mainData[id]["cols"][2]["value"], "[321]0")
-	if message_value then
-		table_mainData[id]["cols"][2]["value"] = message_value.." (Tells)"
-		table_mainData[id]["cols"][2]["color"]["r"] = 0
-		table_mainData[id]["cols"][2]["color"]["g"] = 1
-		table_mainData[id]["cols"][2]["color"]["b"] = 0
-		table_mainData[id]["cols"][2]["color"]["a"] = 1
-	elseif string.match(string.lower(value), "roll") then
-		if table_value then
-			table_mainData[id]["cols"][2]["value"] = table_value.." (Rolls)"
-		end
-		table_mainData[id]["cols"][2]["color"]["r"] = 1
-		table_mainData[id]["cols"][2]["color"]["g"] = 0
-		table_mainData[id]["cols"][2]["color"]["b"] = 0
-		table_mainData[id]["cols"][2]["color"]["a"] = 1
+	local value = string.lower(value);
+	if string.match(value, "roll") then
+		table_items[itemString]["status"] = "Rolls";
+	elseif string.match(value, "[321]0") then
+		table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
+		table_items[itemString]["status"] = "Tells";
 	else
 		-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
 		value = string.gsub(value, "%sand%s", ", ")
@@ -943,30 +1065,25 @@ function FARaidTools:itemUpdate(itemLink, value)
 		value = string.gsub(value, "%s?/%s?", ", ")
 		value = string.gsub(value, "%s?\+%s?", ", ")
 		
-		if table_mainData[id]["cols"][3]["value"] ~= "" then -- if the winner list is not empty we need to add a comma before adding the name
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..", " -- add a comma
-		end
-		if string.match(table_mainData[id]["cols"][2]["value"], "30") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (30+),").." (30+)" -- add name followed by 30+
-		elseif string.match(table_mainData[id]["cols"][2]["value"], "20") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (20),").." (20)" -- add name followed by 20
-		elseif string.match(table_mainData[id]["cols"][2]["value"], "10") then
-			table_mainData[id]["cols"][3]["value"] = table_mainData[id]["cols"][3]["value"]..string.gsub(value, ",", " (10),").." (10)" -- add name followed by 10
+		if table_items[itemString]["currentValue"] == 30 then
+			table.insert(table_items[itemString]["winners"], value.." (30+)"); -- add name followed by 30+
+		else
+			table.insert(table_items[itemString]["winners"], value.." ("..table_items[itemString]["currentValue"]..")"); -- add name followed by 30+
 		end
 		
-		if string.match(value:lower(), UnitName("player"):lower()) then -- if the player is one of the winners
-			if debugOn then print("The player won an item!") end
-			LootWonAlertFrame_ShowAlert(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+		if string.match(value, UnitName("player"):lower()) then -- if the player is one of the winners
+			debug("The player won an item!", 1)
+			LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
 		else
 			for i=1,#table_aliases do
-				if string.match(value:lower(), table_aliases[i]) then
-					if debugOn then print("The player won an item!") end
-					LootWonAlertFrame_ShowAlert(string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
+				if string.match(value, table_aliases[i]) then
+					debug("The player won an item!", 1)
+					LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1--[[, LOOT_ROLL_TYPE_NEED, "xx DKP"--]]) -- TODO: Specify the exact amount the person bid as the need value
 				end
 			end
 		end
 	end
-	if table_mainData[id]["cols"][3]["value"] == "" then
+	--[[if table_mainData[id]["cols"][3]["value"] == "" then
 		wincount = 0
 	else
 		wincount = #str_split(",", table_mainData[id]["cols"][3]["value"])
@@ -981,48 +1098,148 @@ function FARaidTools:itemUpdate(itemLink, value)
 		FARaidTools:itemEnd(id)
 	else
 		FA_RTscrollingtable:SetData(table_mainData, false) -- this is done in the itemEnd function so we only need to do it here
-	end
-	FARaidTools:checkBids()
+	end-]]
+	FARaidTools:itemTableUpdate();
 end
 
-function FARaidTools:itemAdd(input, checkCache)
-	local name, itemLink, itemId, iLevel
-	
-	if type(input) == "string" then -- it must be an item link
-		name, _, _, iLevel = GetItemInfo(input)
-		itemLink = input
-		itemId = tonumber(string.match(itemLink, "item:(%d+)"))
-	elseif type(input) == "number" then -- it must be an item id
-		name, itemLink, _, iLevel = GetItemInfo(input)
-		itemId = input
-	else -- ???
-		return
+function FARaidTools:itemAdd(itemString, checkCache)
+	debug("itemAdd(), itemString = "..itemString, 1);
+	-- itemString must be a string!
+	if type(itemString) ~= "string" then
+		debug("itemAdd was passed a non-string value!", 1);
+		return;
 	end
+	local itemLink = ItemLinkAssemble(itemString);
 	
-	if name and itemLink and itemId then
+	-- caching stuff
+	if itemLink then
 		for i=1,#table_itemQuery do
-			if table_itemQuery[i] == input then
+			if table_itemQuery[i] == itemString then
 				table.remove(table_itemQuery, i)
 				break
 			end
 		end
 	else
 		if not checkCache then
-			table.insert(table_itemQuery, input)
+			debug("Item is not cached, requesting item info from server.")
+			table.insert(table_itemQuery, itemString);
+		else
+			
+			debug("Item is not cached, aborting.")
 		end
-		return
+		return;
 	end
 	
+	if table_items[itemString] then
+		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
+		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
+		local displayName = itemLink
+		if FARaidTools:isThunderforged(iLevel) then
+			displayName = displayName .. THUNDERFORGED;
+		end
+		if table_items[itemString]["quantity"] > 1 then
+			displayName = displayName .. " x" .. table_items[itemString]["quantity"];
+		end
+		table_items[itemString]["displayName"] = displayName;
+	else
+		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
+		local displayName = itemLink
+		if FARaidTools:isThunderforged(iLevel) then
+			displayName = displayName .. THUNDERFORGED;
+		end
+		table_items[itemString] = {
+			["quantity"] = 1,
+			["displayName"] = displayName,
+			["itemLink"] = itemLink,
+			["texture"] = texture,
+			["currentValue"] = 30,
+			["winners"] = {},
+		}
+	end
+	
+	debug(table_items, 2);
+	
+	FARaidTools:itemTableUpdate();
+	
+	if not FA_RTframe:IsShown() then
+		if UnitAffectingCombat("PLAYER") then
+			showAfterCombat = true
+			debug(itemLink.." was found but the player is in combat.");
+		else
+			FA_RTframe:Show()
+		end
+	end
+end
+
+function FARaidTools:itemTableUpdate()
+	local t = {};
+	
+	for i, v in pairs(table_items) do
+		local statusString, statusColor = "", {["r"] = 1, ["g"] = 1, ["b"] = 1, ["a"] = 1};
+		if v["status"] == "Ended" then
+			statusString = v["status"];
+			statusColor = {["r"] = 0.5, ["g"] = 0.5, ["b"] = 0.5, ["a"] = 1};
+		elseif v["status"] == "Tells" then
+			statusString = v["currentValue"].." ("..v["status"]..")";
+			statusColor = {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 1}
+		elseif v["status"] == "Rolls" then
+			statusString = v["currentValue"].." ("..v["status"]..")";
+			statusColor = {["r"] = 1, ["g"] = 0, ["b"] = 0, ["a"] = 1};
+		elseif not v["status"] or v["status"] == "" then
+			statusString = v["currentValue"];
+			statusColor = {["r"] = 0.5, ["g"] = 0.5, ["b"] = 0.5, ["a"] = 1};
+		end
+		local winnerString = "";
+		for j=1,#v["winners"] do
+			if j > 1 then
+				winnerString = winnerString .. ", ";
+			end
+			winnerString = winnerString .. v["winners"][j];
+		end
+		table.insert(t, {
+			["cols"] = {
+				{
+					["value"] = v["displayName"],
+					["args"] = nil,
+					["color"] = {["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0},
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+				{
+					["value"] = statusString,
+					["args"] = nil,
+					["color"] = statusColor,
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+				{
+					["value"] = winnerString,
+					["args"] = nil,
+					["color"] = {["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0},
+					["colorargs"] = nil,
+					["DoCellUpdate"] = nil,
+				},
+			},
+			["color"] = {["r"] = 1.0, ["g"] = 0.0, ["b"] = 0.0, ["a"] = 1.0},
+			["colorargs"] = nil,
+			["DoCellUpdate"] = nil,
+		})
+	end
+
+	FA_RTscrollingtable:SetData(t, false)
+	FARaidTools:generateIcons()
+	
+	--[[
 	local id
 	for i=1,#table_mainData do
-		local match = string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)
+		local match = string.match(table_mainData[i]["cols"][1]["value"], HYPERLINK_PATTERN)
 		if match == nil then
 			print("Error: match returned nil. i="..i)
 			DevTools_Dump(table_mainData[i])
 			return
 		end
-		local link1 = stripItemData(match)
-		local link2 = stripItemData(itemLink)
+		local link1 = ItemLinkStrip(match)
+		local link2 = ItemLinkStrip(itemLink)
 		if link1 == link2 then
 			id = i
 			if debugOn then print("addToLootWindow(): Found match in data table. ID #"..id) end
@@ -1036,7 +1253,7 @@ function FARaidTools:itemAdd(input, checkCache)
 		if string.match(name, "Thunderforged") then
 			thunderforged = " |cFF00FF00(Thunderforged)|r"
 		end
-		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern).."x"..tostring(quantity+1)..thunderforged
+		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], HYPERLINK_PATTERN).."x"..tostring(quantity+1)..thunderforged
 	else
 		local thunderforged = ""
 		if FARaidTools:isThunderforged(iLevel) then
@@ -1045,65 +1262,11 @@ function FARaidTools:itemAdd(input, checkCache)
 		
 		local name = itemLink..thunderforged
 	
-		table.insert(table_mainData, {
-			["cols"] = {
-				{
-					["value"] = name,
-					["args"] = nil,
-					["color"] = {
-						["r"] = 1.0,
-						["g"] = 1.0,
-						["b"] = 1.0,
-						["a"] = 1.0,
-					},
-					["colorargs"] = nil,
-					["DoCellUpdate"] = nil,
-				},
-				{
-					["value"] = "30",
-					["args"] = nil,
-					["color"] = {
-						["r"] = 0.5,
-						["g"] = 0.5,
-						["b"] = 0.5,
-						["a"] = 1.0,
-					},
-					["colorargs"] = nil,
-					["DoCellUpdate"] = nil,
-				},
-				{
-					["value"] = "",
-					["args"] = nil,
-					["color"] = {
-						["r"] = 1.0,
-						["g"] = 1.0,
-						["b"] = 1.0,
-						["a"] = 1.0,
-					},
-					["colorargs"] = nil,
-					["DoCellUpdate"] = nil,
-				},
-			},
-			["color"] = {
-				["r"] = 1.0,
-				["g"] = 0.0,
-				["b"] = 0.0,
-				["a"] = 1.0,
-			},
-			["colorargs"] = nil,
-			["DoCellUpdate"] = nil,
-		})
+		
 	end
-	FA_RTscrollingtable:SetData(table_mainData, false)
+	FA_RTscrollingtable:SetData(t, false)
 	FARaidTools:generateIcons()
-	if not FA_RTframe:IsShown() then
-		if UnitAffectingCombat("PLAYER") then
-			showAfterCombat = true
-			print("RT: "..itemLink.." was found but the player is in combat.")
-		else
-			FA_RTframe:Show()
-		end
-	end
+	--]]
 end
 
 function FARaidTools:itemBid(itemLink, bid)
@@ -1111,14 +1274,14 @@ function FARaidTools:itemBid(itemLink, bid)
 	if debugOn then print("FARaidTools:itemBid("..itemLink..", "..bid..")") end
 	local name = nil
 	for i=1,#table_nameAssociations do
-		if stripItemData(table_nameAssociations[i][1]) == stripItemData(itemLink) then
+		if ItemLinkStrip(table_nameAssociations[i][1]) == ItemLinkStrip(itemLink) then
 			name = table_nameAssociations[i][2]
 			break
 		end
 	end
 	local id = nil
 	for i=1,#table_mainData do
-		if stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(itemLink) then
+		if ItemLinkStrip(string.match(table_mainData[i]["cols"][1]["value"], HYPERLINK_PATTERN)) == ItemLinkStrip(itemLink) then
 			id = i
 			break
 		end
@@ -1152,65 +1315,17 @@ function FARaidTools:itemBid(itemLink, bid)
 	end
 end
 
-function FARaidTools:itemEnd(input) -- itemLink or ID
-	local id
-	if type(input) == "string" then
-		for i=1,#table_mainData do
-			local link = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
-			local link2 = stripItemData(input)
-			if link == link2 then
-				id = i
-				break
-			end
-		end
-	elseif type(input) == "number" then
-		id = input
+function FARaidTools:itemEnd(itemString) -- itemLink or ID
+	if table_items[itemString] then
+		table_items[itemString]["status"] = "Ended";
+		table_items[itemString]["expirationTime"] = GetTime() + expTime;
 	end
-	if id then
-		table_mainData[id]["cols"][2]["value"] = "Ended"
-		table_mainData[id]["cols"][2]["color"]["r"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["g"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["b"] = 0.5
-		table_mainData[id]["cols"][2]["color"]["a"] = 1
-		FA_RTscrollingtable:SetData(table_mainData, false)
-		table.insert(table_expTimes, {string.match(table_mainData[id]["cols"][1]["value"], hyperlinkPattern), GetTime()})
-	end
+	FARaidTools:itemTableUpdate();
 end
 
-function FARaidTools:itemRemove(itemLink)
-	local id
-	for i=1,#table_mainData do
-		link1 = stripItemData(string.match(table_mainData[i]["cols"][1]["value"], hyperlinkPattern))
-		link2 = stripItemData(itemLink)
-		if link1 == link2 then
-			id = i
-			if debugOn then print("removeItem(): Found match in data table. ID #"..id) end
-			break
-		end
-	end
-	if id == nil then
-		if debugOn then print("removeItem(): No match found in data table. Aborting.") end
-		return
-	end
-	table.remove(table_mainData, id)
-	FA_RTscrollingtable:SetData(table_mainData, false)
-	
-	--clear name association entries for this item
-	local table_size = #table_nameAssociations
-	for i=0,table_size-1 do
-		if stripItemData(string.match(table_nameAssociations[table_size-i][1], hyperlinkPattern)) == stripItemData(itemLink) then
-			table.remove(table_nameAssociations, table_size-i)
-		end
-	end
-	
-	--clear queued bids or rolls for this item
-	local table_size = #table_bids
-	for i=0,table_size-1 do
-		if stripItemData(string.match(table_bids[table_size-i][1], hyperlinkPattern)) == stripItemData(itemLink) then
-			table.remove(table_bids, table_size-i)
-		end
-	end
-	FARaidTools:generateIcons()
+function FARaidTools:itemRemove(itemString)
+	table_items[itemString] = nil;
+	FARaidTools:itemTableUpdate();
 end
 
 function FARaidTools:checkBids()
@@ -1218,13 +1333,13 @@ function FARaidTools:checkBids()
 	for i=0,table_size-1 do
 		local id = nil
 		for j=1,#table_mainData do
-			if stripItemData(table_bids[table_size-i][1]) == stripItemData(string.match(table_mainData[j]["cols"][1]["value"], hyperlinkPattern)) then
+			if ItemLinkStrip(table_bids[table_size-i][1]) == ItemLinkStrip(string.match(table_mainData[j]["cols"][1]["value"], HYPERLINK_PATTERN)) then
 				id = j
 			end
 		end
 		local name = nil
 		for j=1,#table_nameAssociations do
-			if stripItemData(table_nameAssociations[j][1]) == stripItemData(table_bids[table_size-i][1]) then
+			if ItemLinkStrip(table_nameAssociations[j][1]) == ItemLinkStrip(table_bids[table_size-i][1]) then
 				name = table_nameAssociations[j][2]
 				break
 			end
@@ -1273,7 +1388,7 @@ local function onUpdate(self,elapsed)
 		if currentTime >= table_expTimes[tableSize-i][2] + expTime then
 			local id
 			for j=1,#table_mainData do -- loop through data table
-				if stripItemData(string.match(table_mainData[j]["cols"][1]["value"], hyperlinkPattern)) == stripItemData(table_expTimes[tableSize-i][1]) then
+				if ItemLinkStrip(string.match(table_mainData[j]["cols"][1]["value"], HYPERLINK_PATTERN)) == ItemLinkStrip(table_expTimes[tableSize-i][1]) then
 					id = j
 					if debugOn then print("onUpdate/remove: Found match in data table. ID #"..id) end
 					break
@@ -1374,9 +1489,9 @@ function FARaidTools:parseChat(msg, author)
 		end
 	end
 	if debugOn or (rank and rank > 0) then
-		local linkless, replaces = string.gsub(msg, hyperlinkPattern, "")
+		local linkless, replaces = string.gsub(msg, HYPERLINK_PATTERN, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
-			local itemLink = string.match(msg, hyperlinkPattern) -- retrieve itemLink from the message
+			local itemLink = string.match(msg, HYPERLINK_PATTERN) -- retrieve itemLink from the message
 			msg = string.gsub(msg, "x%d+", "") -- remove any "x2" or "x3"s from the string
 			if not msg then return end
 			local note = string.match(msg, "]|h|r%s*(.+)") -- take anything else after the link and any following spaces as the note value
@@ -1397,11 +1512,10 @@ function FARaidTools:parseChat(msg, author)
 				table.insert(table_nameAssociations, {itemLink, author})
 			end
 			if itemLink and note then
-				if debugOn then
-					print("itemLink: "..itemLink)
-					print("note: "..note)
-				end
-				FARaidTools:itemUpdate(itemLink, note)
+				local itemString = ItemLinkStrip(itemLink);
+				debug("itemString: "..itemString, 1);
+				debug("note: "..note, 1);
+				FARaidTools:itemUpdate(itemString, note)
 			end
 		end
 	end
@@ -1435,10 +1549,7 @@ function events:ADDON_LOADED(name)
 			history = {}
 		end
 		FA_RTscrollingtable2:SetData(history, true)
-		FARaidTools:RegisterComm("FA_RTreport")
-		FARaidTools:RegisterComm("FA_RTend")
-		FARaidTools:RegisterComm("FA_RTwho")
-		FARaidTools:RegisterComm("FA_RTupdate")
+		FARaidTools:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
 function events:PLAYER_LOGOUT(...)
@@ -1452,71 +1563,62 @@ function events:RAID_ROSTER_UPDATE(...)
 	FARaidTools:setAutoLoot()
 end
 function events:LOOT_OPENED(...)
-	if addonEnabled() then
-		local loot = {} -- create a temporary table to organize the loot on the mob
-		for i=1,GetNumLootItems() do -- loop through all items in the window
-			local sourceInfo = {GetLootSourceInfo(i)}
-			for j=1,#sourceInfo/2 do
-				local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
-				for k=1,#hasBeenLooted do
-					if hasBeenLooted[k] == mobID then
-						mobID = nil
-						break
-					end
+	if not addonEnabled() then
+		return;
+	end
+	local loot = {} -- create a temporary table to organize the loot on the mob
+	for i=1,GetNumLootItems() do -- loop through all items in the window
+		local sourceInfo = {GetLootSourceInfo(i)}
+		for j=1,#sourceInfo/2 do
+			local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
+			if mobID and not hasBeenLooted[mobID] then
+				if not loot[mobID] then
+					loot[mobID] = {};
 				end
-				if mobID then
-					local id
-					for k=1,#loot do
-						if loot[k][1] == mobID then
-							id = k
-							break
-						end
-					end
-					if not id then
-						table.insert(loot, {mobID}) -- create an entry in table for the mobID
-						id = #loot
-					end
-					
-					local link = GetLootSlotLink(i) -- retrieve link of item
-					if link and FARaidTools:checkFilters(link) then
-						for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
-							-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
-							-- GetLootSourceInfo may also return multiple quantity when there is actually only
-							-- one of the item, but there's not much we can do about that.
-							table.insert(loot[id], link)
-						end
+				
+				local link = GetLootSlotLink(i) -- retrieve link of item
+				if link and FARaidTools:checkFilters(link) then
+					for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
+						-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
+						-- GetLootSourceInfo may also return multiple quantity when there is actually only
+						-- one of the item, but there's not much we can do about that.
+						table.insert(loot[mobID], ItemLinkStrip(link));
 					end
 				end
 			end
 		end
-		
-		-- add an item count for each GUID so that other clients may verify data integrity
-		for i=1,#loot do
-			table.insert(loot[i], 2, 0) -- insert 0 as the second value in the table
-			loot[i][2] = #loot[i] -- set the second value in the table to the size of the table
+	end
+	
+	-- add an item count for each GUID so that other clients may verify data integrity
+	for i, v in pairs(loot) do
+		loot[i]["checkSum"] = #v;
+	end
+	
+	debug(loot, 2);
+	
+	-- check data integrity
+	for i, v in pairs(loot) do
+		if not (v["checkSum"] and v["checkSum"] == #v) then
+			debug("Loot data recieved via an addon message failed the integrity check.");
+			return;
 		end
-		
-		if #loot and debugOn then DevTools_Dump(loot) end
-		
-		for i=1,#loot do
-			FARaidTools:sendMessage("FA_RTreport", {ADDON_VERSION, loot[i]}, "RAID", nil, "BULK") -- send addon message to tell others to add this to their window
-
-			local data = loot[i]
-			if data[2] == #data then
-				table.remove(data, 2)
-				local mobID = table.remove(data, 1)
-				
-				-- we can assume that everything in the table is not on the HBL
-				
-				for j=1, #data do
-					if FARaidTools:checkFilters(data[j], true) then
-						FARaidTools:itemAdd(data[j])
-					end
-				end
-				
-				table.insert(hasBeenLooted, mobID)
+	end
+	
+	-- send addon message to tell others to add this to their window
+	FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+		["ADDON_VERSION"] = ADDON_VERSION,
+		["loot"] = loot,
+	}, "RAID", nil, "BULK");
+	
+	for i, v in pairs(loot) do
+		for j=1,#v do
+			-- we can assume that everything in the table is not on the HBL
+			
+			if FARaidTools:checkFilters(v[j], true) then
+				FARaidTools:itemAdd(v[j])
 			end
 		end
+		hasBeenLooted[i] = true;
 	end
 end
 function events:CHAT_MSG_RAID(msg, author)
@@ -1527,18 +1629,28 @@ function events:CHAT_MSG_RAID_LEADER(msg, author)
 end
 function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 	if channelName == "aspects" then
-		if not msg then return end
-		local itemLink = string.match(msg, hyperlinkPattern) 
-		if not itemLink then return end
-		local msg = string.match(msg, hyperlinkPattern.."(.+)") -- now remove the link
-		if msg == "" then return end
+		if not msg then
+			return;
+		end
+		local itemLink = string.match(msg, HYPERLINK_PATTERN);
+		if not itemLink then
+			return;
+		end
+		local itemString = ItemLinkStrip(itemLink);
+		local msg = string.match(msg, HYPERLINK_PATTERN.."(.+)"); -- now remove the link
+		if msg == "" then
+			return;
+		end
 		local msg = string.lower(msg) -- put in lower case
 		local msg = " "..string.gsub(msg, "[/,]", " ").." "
-		if string.match(msg, " de ") or string.match(msg, " disenchant ") then
+		if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-				FARaidTools:sendMessage("FA_RTend", {ADDON_VERSION, itemLink}, "RAID")
+				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+					["ADDON_VERSION"] = ADDON_VERSION,
+					["end"] = itemString,
+				}, "RAID")
 			end
-			FARaidTools:itemEnd(itemLink)
+			FARaidTools:itemEnd(itemString);
 		end
 	end
 end
@@ -1573,15 +1685,11 @@ for k, v in pairs(events) do
 end
 
 if debugOn then
-	--FARaidTools:itemAdd("\124cffa335ee\124Hitem:71472:0:0:0:0:0:0:0:0\124h[Flowform Choker]\124h\124r")
-	FARaidTools:itemAdd(select(2,GetItemInfo(71472)))
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71781:0:0:0:0:0:0:0:0\124h[Zoid's Firelit Greatsword]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71469:0:0:0:0:0:0:0:0\124h[Breastplate of Shifting Visions]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71475:0:0:0:0:0:0:0:0\124h[Treads of the Penitent Man]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71673:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Vanquisher]\124h\124r")
-	FARaidTools:itemAdd("\124cffa335ee\124Hitem:71687:0:0:0:0:0:0:0:0\124h[Shoulders of the Fiery Protector]\124h\124r")
-	FARaidTools:parseChat("\124cffa335ee\124Hitem:71466:0:0:0:0:0:0:0:0\124h[Fandral's Flamescythe]\124h\124r 30", UnitName("PLAYER"))
+	FARaidTools:itemAdd("96379:0")
+	FARaidTools:itemAdd("96753:0")
+	FARaidTools:itemAdd("96740:0")
+	FARaidTools:itemAdd("96373:0")
+	FARaidTools:itemAdd("96377:0")
+	FARaidTools:itemAdd("96384:0")
+	FARaidTools:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 end
