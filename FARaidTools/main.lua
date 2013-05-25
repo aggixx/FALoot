@@ -1,38 +1,25 @@
 --[[
-	DONE:
-	ItemLinkStrip()
-	ItemLinkAssemble()
-	generateIcons()
-	itemAdd()
-	itemTableUpdate()
-	itemEnd()
-	itemRemove()
-	parseChat()
-	itemBid()
-	checkBids()
-	OnCommRecieved()
-	
-	TODO:
-	slashparse()
-	
+	- slashparse()
+	- handling of saved variables
+	- autoloot
 -]]
 
 -- Declare strings
-local ADDON_NAME = "FARaidTools"
+local ADDON_NAME = "FA Loot"
 local ADDON_VERSION_FULL = "v4.0"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
 local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. ADDON_NAME .. ":|r ";
-local ADDON_MSG_PREFIX = "FA_RT";
+local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "http://tinyurl.com/FARaidTools"
 
 local HYPERLINK_PATTERN = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
 local THUNDERFORGED = " |cFF00FF00(TF)|r"
 
 -- Load the libraries
-FARaidTools = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
-LibStub("AceComm-3.0"):Embed(FARaidTools)
+FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
+LibStub("AceComm-3.0"):Embed(FALoot)
 
 local ScrollingTable = LibStub("ScrollingTable")
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0")
@@ -52,6 +39,7 @@ local hasBeenLooted = {}
 local expTime = 15 -- TODO: Add this as an option
 local cacheInterval = 200 -- this is how often we recheck for item data
 local lootSettings
+local maxIcons = 11
 
 local showAfterCombat
 local iconSelect
@@ -258,11 +246,11 @@ local function addonEnabled()
 	end
 end
 
-function FARaidTools:addonEnabled()
+function FALoot:addonEnabled()
 	return addonEnabled()
 end
 
-function FARaidTools:checkFilters(link, checkItemLevel)
+function FALoot:checkFilters(link, checkItemLevel)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	
 	if debugOn then
@@ -298,13 +286,13 @@ local function StaticDataSave(data)
 	promptBidValue = data
 end
 
-function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needsCompress)
+function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompress)
 	--serialize
 	local serialized, msg = libSerialize:Serialize(text)
 	if serialized then
 		text = serialized
 	else
-		print("RT: Serialization of data failed!")
+		debug("Serialization of data failed!");
 		return
 	end
 	--compress
@@ -313,7 +301,7 @@ function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needs
 		if compressed then
 			text = compressed
 		else
-			print("RT: Compression of data failed!")
+			debug("Compression of data failed!");
 			return
 		end
 	end
@@ -322,15 +310,15 @@ function FARaidTools:sendMessage(prefix, text, distribution, target, prio, needs
 	if encoded then
 		text = encoded
 	else
-		print("RT: Encoding of data failed!")
+		debug("Encoding of data failed!");
 		return
 	end
 	
-	FARaidTools:SendCommMessage(prefix, text, distribution, target, prio)
+	FALoot:SendCommMessage(prefix, text, distribution, target, prio)
 end
 
-function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
-	if prefix ~= ADDON_MSG_PREFIX or not text or sender == UnitName("PLAYER") then
+function FALoot:OnCommReceived(prefix, text, distribution, sender)
+	if prefix ~= ADDON_MSG_PREFIX or not text --[[or sender == UnitName("PLAYER")--]] then
 		return;
 	end
 	debug("Recieved addon message.", 1);
@@ -343,7 +331,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 	if success then
 		t = deserialized
 	else
-		if debugOn then print("RT: Deserialization of data failed: "..t) end
+		debug("Deserialization of data failed: "..t);
 		return
 	end
 	
@@ -368,8 +356,8 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			for i, v in pairs(loot) do
 				if not hasBeenLooted[i] then
 					for j=1,#v do
-						if FARaidTools:checkFilters(v[j], true) then
-							FARaidTools:itemAdd(v[j])
+						if FALoot:checkFilters(v[j], true) then
+							FALoot:itemAdd(v[j])
 						end
 					end
 					hasBeenLooted[i] = true;
@@ -377,7 +365,7 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 		end
 	elseif t["end"] then
-		FARaidTools:itemEnd(t["end"])
+		FALoot:itemEnd(t["end"])
 	elseif t["who"] then
 		if distribution == "WHISPER" then
 			local version = t["who"]
@@ -393,29 +381,42 @@ function FARaidTools:OnCommReceived(prefix, text, distribution, sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
-			FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["who"] = ADDON_VERSION_FULL,
 			}, "WHISPER", sender)
 		end
 	elseif t["update"] then
 		if distribution == "WHISPER" then
 			if not updateMsg then
-				print("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.");
+				print("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..downloadUrl.." to update.");
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
 			local version = t["update"]
 			if version < ADDON_VERSION_FULL then
-				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["update"] = true,
 				}, "WHISPER", sender)
 			elseif not updateMsg then
 				if ADDON_VERSION_FULL < version then
-					debug("Your current version of FARaidTools is not up to date! Please go to "..downloadUrl.." to update.");
+					debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..downloadUrl.." to update.");
 					updateMsg = true
 				end
 			end
 		end
+	elseif t["winAmount"] and t["itemString"] then
+		if table_items[t["itemString"]] then
+			for i, v in pairs(table_items[t["itemString"]]["winners"]) do
+				for j=1,#v do
+					if v[j] == sender then
+						table.remove(table_items[t["itemString"]]["winners"][i], j);
+						break
+					end
+				end
+			end
+		end
+		table.insert(table_items[t["itemString"]]["winners"][t["winAmount"]], sender);
+		FALoot:itemTableUpdate();
 	end
 end
 
@@ -476,33 +477,33 @@ window:EnableResize(false);
 
 local frame = window.frame;
 
-FA_RTicons = CreateFrame("frame", "FA_RTicons", frame)
-FA_RTicons:SetHeight(40)
-FA_RTicons:SetWidth(500)
-FA_RTicons:SetPoint("TOP", frame, "TOP", 0, -30)
-FA_RTicons:Show()
+local iconFrame = CreateFrame("frame", "FALootIcons", frame)
+iconFrame:SetHeight(40)
+iconFrame:SetWidth(500)
+iconFrame:SetPoint("TOP", frame, "TOP", 0, -30)
+iconFrame:Show()
 
-FA_RTscrollingtable = ScrollingTable:CreateST(cols, 8, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, frame)
-FA_RTscrollingtable:EnableSelection(true)
-FA_RTscrollingtable.frame:SetPoint("TOP", FA_RTicons, "BOTTOM", 0, -20)
-FA_RTscrollingtable.frame:SetScale(1.1)
+local scrollingTable = ScrollingTable:CreateST(cols, 8, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, frame)
+scrollingTable:EnableSelection(true)
+scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20)
+scrollingTable.frame:SetScale(1.1)
 
-for i=1,13 do
-	table_icons[i] = CreateFrame("frame", "FA_RTicon"..tostring(i), FA_RTicons)
+for i=1,maxIcons do
+	table_icons[i] = CreateFrame("frame", "FALootIcon"..tostring(i), iconFrame)
 	table_icons[i]:SetWidth(40)
 	table_icons[i]:SetHeight(40)
 	table_icons[i]:Hide()
 end
 
-function FARaidTools:isThunderforged(iLevel)
+function FALoot:isThunderforged(iLevel)
 	return iLevel == 541 or iLevel == 528
 end
 
-function FARaidTools:generateIcons()
+function FALoot:generateIcons()
 	local lasticon = nil -- reference value for anchoring to the most recently constructed icon
 	local firsticon = nil -- reference value for anchoring the first constructed icon
 	local k = 0 -- this variable contains the number of the icon we're currently constructing, necessary because we need to be able to create multiple icons per entry in the table
-	for i=1,13 do -- loop through the table of icons and reset everything
+	for i=1,maxIcons do -- loop through the table of icons and reset everything
 		table_icons[i]:Hide()
 		table_icons[i]:ClearAllPoints()
 		table_icons[i]:SetBackdrop({
@@ -522,8 +523,8 @@ function FARaidTools:generateIcons()
 					local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
 					
 					--table select stuff
-					iconSelect = FA_RTscrollingtable:GetSelection() or 0 -- store what row was selected so we can restore it later
-					FA_RTscrollingtable:SetSelection(iconNum) -- select the row that correlates to the icon
+					iconSelect = scrollingTable:GetSelection() or 0 -- store what row was selected so we can restore it later
+					scrollingTable:SetSelection(iconNum) -- select the row that correlates to the icon
 					
 					--tooltip stuff
 					GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
@@ -532,7 +533,7 @@ function FARaidTools:generateIcons()
 					end)
 				table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
 					--table select stuff
-					FA_RTscrollingtable:SetSelection(iconSelect) -- restore the row that was selected before we mousedover this icon
+					scrollingTable:SetSelection(iconSelect) -- restore the row that was selected before we mousedover this icon
 					iconSelect = nil
 					
 					--tooltip stuff
@@ -569,20 +570,20 @@ function FARaidTools:generateIcons()
 								j = j + 1;
 								if j == iconNum then
 									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-										StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
+										StaticPopupDialogs["FALOOT_END_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
 									else
-										StaticPopupDialogs["FA_RTEND_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
+										StaticPopupDialogs["FALOOT_END_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
 									end
-									StaticPopup_Show("FA_RTEND_CONFIRM")
+									StaticPopup_Show("FALOOT_END_CONFIRM")
 									coroutine.yield()
 									debug("Ending item "..v["itemLink"]..".", 1);
 									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-										FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+										FALoot:sendMessage(ADDON_MSG_PREFIX, {
 											["ADDON_VERSION"] = ADDON_VERSION, 
 											["end"] = i,
 										}, "RAID")
 									end
-									FARaidTools:itemEnd(i)
+									FALoot:itemEnd(i)
 									break
 								end
 							end
@@ -598,10 +599,12 @@ function FARaidTools:generateIcons()
 			end
 		end
 	end
-	table_icons[1]:SetPoint("LEFT", FA_RTicons, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
+	table_icons[1]:SetPoint("LEFT", iconFrame, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
 end
 	
-SLASH_RT1 = "/rt"
+SLASH_RT1 = "/rt";
+SLASH_FALOOT1 = "/faloot";
+SLASH_FA1 = "/fa";
 local function slashparse(msg, editbox)
 	if msg == "" then
 		frame:Show()
@@ -614,18 +617,18 @@ local function slashparse(msg, editbox)
 				elseif msg[2]:lower() == "false" then
 					debugOn = false
 				else
-					print("Invalid syntax for /rt "..msg[1]:lower()..". Invalid value for parameter #2.")
+					print("Invalid syntax for "..msg[1]:lower()..". Invalid value for parameter #2.")
 				end
 			else
-				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
+				print("Invalid syntax for "..msg[1]:lower()..". Incorrect number of parameters.")
 			end
 		elseif msg[1]:lower() == "who" then
 			if #msg == 1 then
-				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["who"] = "query",
 				}, "GUILD")
 			else
-				print("Invalid syntax for /rt "..msg[1]:lower()..". Incorrect number of parameters.")
+				print("Invalid syntax for "..msg[1]:lower()..". Incorrect number of parameters.")
 			end
 		elseif msg[1]:lower() == "alias" then
 			if msg[2]:lower() == "add" then
@@ -633,7 +636,7 @@ local function slashparse(msg, editbox)
 					table.insert(table_aliases, msg[3]:lower())
 					print(msg[3].." added as an alias.")
 				else
-					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
 				end
 			elseif msg[2]:lower() == "remove" then
 				if #msg == 3 then
@@ -650,7 +653,7 @@ local function slashparse(msg, editbox)
 						print(msg[3].." is not currently an alias.")
 					end
 				else
-					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
 				end
 			elseif msg[2]:lower() == "list" then
 				if #msg == 2 then
@@ -663,28 +666,31 @@ local function slashparse(msg, editbox)
 					end
 					print("Current aliases are: "..list)
 				else
-					print("Invalid syntax for /rt "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
+					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
 				end
 			else
-				print("Invalid subcommand for /rt "..msg[1]:lower()..".")
+				print("Invalid subcommand for "..msg[1]:lower()..".")
 			end
 		elseif msg[1]:lower() == "resetpos" then
 			frame:ClearAllPoints()
 			frame:SetPoint("CENTER")
 		else
-			print("The following are valid commands for /rt:")
-			print("/rt debug <true/false> -- set status of debug mode")
-			print("/rt who -- see who is running the addon and what version")
-			print("/rt alias add <name> -- add an alias for award detection")
-			print("/rt alias remove <name> -- remove an alias for award detection")
-			print("/rt alias list -- list aliases for award detection")
-			print("/rt resetpos -- resets the position of the RT window")
+			print("The following are valid slash commands:")
+			print("/faloot debug <true/false> -- set status of debug mode")
+			print("/faloot who -- see who is running the addon and what version")
+			print("/faloot alias add <name> -- add an alias for award detection")
+			print("/faloot alias remove <name> -- remove an alias for award detection")
+			print("/faloot alias list -- list aliases for award detection")
+			print("/faloot resetpos -- resets the position of the RT window")
 		end
 	end
 end
 SlashCmdList["RT"] = slashparse
+SlashCmdList["FALOOT"] = slashparse
+SlashCmdList["FA"] = slashparse
+
 SLASH_FAROLL1 = "/faroll"
-local function faRoll(value)
+local function FARoll(value)
 	value = tonumber(value)
 	if value % 2 ~= 0 then
 		print("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
@@ -701,9 +707,9 @@ local function faRoll(value)
 		print("Invalid roll value!")
 	end
 end
-SlashCmdList["FAROLL"] = faRoll
+SlashCmdList["FAROLL"] = FARoll
 
-StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
+StaticPopupDialogs["FALOOT_BID"] = {
 	text = "How much would you like to bid?",
 	button1 = "Bid",
 	button2 = CANCEL,
@@ -722,7 +728,7 @@ StaticPopupDialogs["BID_AMOUNT_QUERY"] = {
 }
 
 window:SetCallback("OnClick", function(self, event)
-	local id = FA_RTscrollingtable:GetSelection()
+	local id = scrollingTable:GetSelection()
 	local j, itemLink, itemString = 0;
 	for i, v in pairs(table_items) do
 		j = j + 1;
@@ -731,8 +737,8 @@ window:SetCallback("OnClick", function(self, event)
 		end
 	end
 	bidPrompt = coroutine.create( function(self)
-		StaticPopupDialogs["BID_AMOUNT_QUERY"]["text"] = "How much would you like to bid for "..itemLink.."?"
-		StaticPopup_Show("BID_AMOUNT_QUERY")
+		StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?"
+		StaticPopup_Show("FALOOT_BID")
 		debug("Querying for bid, coroutine paused.", 1);
 		coroutine.yield()
 		debug("Bid recieved, resuming coroutine.", 1)
@@ -748,13 +754,13 @@ window:SetCallback("OnClick", function(self, event)
 			end
 			debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
 		end
-		debug("Passed info onto FARaidTools:itemBid().", 1);
-		FARaidTools:itemBid(itemString, bid)
+		debug("Passed info onto FALoot:itemBid().", 1);
+		FALoot:itemBid(itemString, bid)
 	end)
 	coroutine.resume(bidPrompt)
 end) 
 
-StaticPopupDialogs["FA_RTEND_CONFIRM"] = {
+StaticPopupDialogs["FALOOT_END"] = {
 	text = "Are you sure you want to manually end this item for all players in the raid?",
 	button1 = YES,
 	button2 = CANCEL,
@@ -766,7 +772,7 @@ StaticPopupDialogs["FA_RTEND_CONFIRM"] = {
 	end,
 	enterClicksFirstButton = 1
 }
-StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
+StaticPopupDialogs["FALOOT_EDIT"] = {
 	text = "",
 	button1 = ACCEPT,
 	button2 = CANCEL,
@@ -775,16 +781,16 @@ StaticPopupDialogs["FA_RTTEXT_EDIT"] = {
 	hideOnEscape = true,
 	hasEditBox = true,
 	OnShow = function(self)
-		self.editBox:SetText(table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][3]["value"] or "")
+		self.editBox:SetText(table_mainData[scrollingTable:GetSelection()]["cols"][3]["value"] or "")
 	end,
 	OnAccept = function(self)
-		table_mainData[FA_RTscrollingtable:GetSelection()]["cols"][3]["value"] = self.editBox:GetText()
-		FA_RTscrollingtable:SetData(table_mainData, false)
+		table_mainData[scrollingTable:GetSelection()]["cols"][3]["value"] = self.editBox:GetText()
+		scrollingTable:SetData(table_mainData, false)
 	end,
 	enterClicksFirstButton = 1
 }
 
-function FARaidTools:itemAdd(itemString, checkCache)
+function FALoot:itemAdd(itemString, checkCache)
 	debug("itemAdd(), itemString = "..itemString, 1);
 	-- itemString must be a string!
 	if type(itemString) ~= "string" then
@@ -816,7 +822,7 @@ function FARaidTools:itemAdd(itemString, checkCache)
 		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
 		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
 		local displayName = itemLink
-		if FARaidTools:isThunderforged(iLevel) then
+		if FALoot:isThunderforged(iLevel) then
 			displayName = displayName .. THUNDERFORGED;
 		end
 		if table_items[itemString]["quantity"] > 1 then
@@ -826,7 +832,7 @@ function FARaidTools:itemAdd(itemString, checkCache)
 	else
 		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
 		local displayName = itemLink
-		if FARaidTools:isThunderforged(iLevel) then
+		if FALoot:isThunderforged(iLevel) then
 			displayName = displayName .. THUNDERFORGED;
 		end
 		table_items[itemString] = {
@@ -841,7 +847,7 @@ function FARaidTools:itemAdd(itemString, checkCache)
 	
 	debug(table_items, 2);
 	
-	FARaidTools:itemTableUpdate();
+	FALoot:itemTableUpdate();
 	
 	if not frame:IsShown() then
 		if UnitAffectingCombat("PLAYER") then
@@ -853,10 +859,11 @@ function FARaidTools:itemAdd(itemString, checkCache)
 	end
 end
 
-function FARaidTools:itemTableUpdate()
+function FALoot:itemTableUpdate()
 	local t = {};
 	
 	for i, v in pairs(table_items) do
+		-- create status string
 		local statusString, statusColor = "", {["r"] = 1, ["g"] = 1, ["b"] = 1, ["a"] = 1};
 		if v["status"] == "Ended" then
 			statusString = v["status"];
@@ -871,6 +878,8 @@ function FARaidTools:itemTableUpdate()
 			statusString = v["currentValue"];
 			statusColor = {["r"] = 0.5, ["g"] = 0.5, ["b"] = 0.5, ["a"] = 1};
 		end
+		
+		-- create winner string
 		local winnerString = "";
 		for j, w in pairs(v["winners"]) do
 			if winnerString ~= "" then
@@ -885,6 +894,8 @@ function FARaidTools:itemTableUpdate()
 			end
 			winnerString = winnerString .. subString .. " (" .. j .. ")";
 		end
+		
+		-- insert assembled data into table
 		table.insert(t, {
 			["cols"] = {
 				{
@@ -915,99 +926,64 @@ function FARaidTools:itemTableUpdate()
 		})
 	end
 
-	FA_RTscrollingtable:SetData(t, false)
-	FARaidTools:generateIcons()
-	
-	--[[
-	local id
-	for i=1,#table_mainData do
-		local match = string.match(table_mainData[i]["cols"][1]["value"], HYPERLINK_PATTERN)
-		if match == nil then
-			print("Error: match returned nil. i="..i)
-			DevTools_Dump(table_mainData[i])
-			return
-		end
-		local link1 = ItemLinkStrip(match)
-		local link2 = ItemLinkStrip(itemLink)
-		if link1 == link2 then
-			id = i
-			if debugOn then print("addToLootWindow(): Found match in data table. ID #"..id) end
-			break
-		end
-	end
-	if id then
-		local name = table_mainData[id]["cols"][1]["value"]
-		local quantity = tonumber(string.match(name, "]\124h\124rx(%d+)")) or 1
-		local thunderforged = ""
-		if string.match(name, "Thunderforged") then
-			thunderforged = " |cFF00FF00(Thunderforged)|r"
-		end
-		table_mainData[id]["cols"][1]["value"] = string.match(table_mainData[id]["cols"][1]["value"], HYPERLINK_PATTERN).."x"..tostring(quantity+1)..thunderforged
-	else
-		local thunderforged = ""
-		if FARaidTools:isThunderforged(iLevel) then
-			thunderforged = " |cFF00FF00(Thunderforged)|r"
-		end
-		
-		local name = itemLink..thunderforged
-	
-		
-	end
-	FA_RTscrollingtable:SetData(t, false)
-	FARaidTools:generateIcons()
-	--]]
+	scrollingTable:SetData(t, false)
+	FALoot:generateIcons()
 end
 
-function FARaidTools:itemBid(itemString, bid)
+function FALoot:itemBid(itemString, bid)
 	bid = tonumber(bid)
-	debug("FARaidTools:itemBid("..itemString..", "..bid..")", 1)
+	debug("FALoot:itemBid("..itemString..", "..bid..")", 1)
 	if not table_items[itemString] then
 		debug("Item not found! Aborting.", 1);
 		return;
 	end
 	
 	table_items[itemString]["bid"] = bid;
-	table_items[itemString]["bidStatus"] = "Waiting to bid...";
-	debug("FARaidTools:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
+	table_items[itemString]["bidStatus"] = "Bid";
+	debug("FALoot:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
 	
-	FARaidTools:checkBids();
+	FALoot:checkBids();
 end
 
-function FARaidTools:itemEnd(itemString) -- itemLink or ID
+function FALoot:itemEnd(itemString) -- itemLink or ID
 	if table_items[itemString] then
 		table_items[itemString]["status"] = "Ended";
 		table_items[itemString]["expirationTime"] = GetTime();
+		FALoot:itemTableUpdate();
+		FALoot:generateStatusText();
 	end
-	FARaidTools:itemTableUpdate();
 end
 
-function FARaidTools:itemRemove(itemString)
+function FALoot:itemRemove(itemString)
 	table_items[itemString] = nil;
-	FARaidTools:itemTableUpdate();
+	FALoot:itemTableUpdate();
 end
 
-function FARaidTools:checkBids()
+function FALoot:checkBids()
 	for itemString, v in pairs(table_items) do
 		if table_items[itemString]["bidStatus"] and table_items[itemString]["host"] and ((v["currentValue"] == 30 and v["bid"] >= 30) or v["currentValue"] == v["bid"]) then
-			if v["bidStatus"] == "Waiting to bid..." and v["status"] == "Tells" then
+			if v["bidStatus"] == "Bid" and v["status"] == "Tells" then
 				SendChatMessage(tostring(bid), "WHISPER", nil, v["host"]);
-				table_items[itemString]["bidStatus"] = "Waiting to roll...";
-				debug("FARaidTools:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
-			elseif v["bidStatus"] == "Waiting to roll..." and v["status"] == "Rolls" then
-				faRoll(bid);
+				table_items[itemString]["bidStatus"] = "Roll";
+				debug("FALoot:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
+			elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
+				FARoll(bid);
 				table_items[itemString]["bidStatus"] = nil;
-				debug("FARaidTools:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
+				debug("FALoot:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
 			end
 		end
 	end
-	
+	FALoot:generateStatusText();
+end
+
+function FALoot:generateStatusText()
 	local bidding, rolling, only = 0, 0;
 	for itemString, v in pairs(table_items) do
-		if table_items[itemString]["bidStatus"] then
+		if table_items[itemString]["bidStatus"] and table_items[itemString]["status"] ~= "Ended" then
 			only = itemString;
-			if table_items[itemString]["bidStatus"] == "Waiting to bid..." then
+			if table_items[itemString]["bidStatus"] == "Bid" then
 				bidding = bidding + 1;
-			elseif table_items[itemString]["bidStatus"] == "Waiting to roll..." then
+			elseif table_items[itemString]["bidStatus"] == "Roll" then
 				rolling = rolling + 1;
 			end
 		end
@@ -1048,18 +1024,18 @@ local function onUpdate(self,elapsed)
 	for i, v in pairs(table_items) do
 		if v["expirationTime"] and v["expirationTime"] + expTime <= currentTime then
 			debug(v["itemLink"].." has expired, removing.", 1);
-			FARaidTools:itemRemove(i);
+			FALoot:itemRemove(i);
 		end
 	end
 	
 	--enable/disable buttons
-	if (iconSelect and iconSelect > 0) or (FA_RTscrollingtable:GetSelection() and FA_RTscrollingtable:GetSelection() > 0 and not iconSelect) then
+	if (iconSelect and iconSelect > 0) or (scrollingTable:GetSelection() and scrollingTable:GetSelection() > 0 and not iconSelect) then
 		window:SetDisabled(false);
 	else
 		window:SetDisabled(true);
 	end
 	
-	-- /rt who stuff
+	-- who stuff
 	if table_who and table_who["time"] and table_who["time"]+1 <= currentTime then
 		for i=1,#table_who do
 			local s = table_who[i]..": "
@@ -1083,24 +1059,28 @@ local function saveLootSettings()
 	return lootSettings
 end
 
-function FARaidTools:restoreLootSettings()
+function FALoot:restoreLootSettings()
 	SetCVar("autoLootDefault", lootSettings[1])
 	SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
 end
 
-function FARaidTools:setAutoLoot(suppress)
+function FALoot:setAutoLoot(suppress)
 	if (GetLootMethod() == "freeforall" and addonEnabled()) or debugOn then
 		--if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
 			if GetCVar("autoLootDefault") == "1" then
 				SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
 				SetCVar("autoLootDefault", 0)
-				if not suppress then print("RT: Autoloot is now off.") end
+				if not suppress then
+					debug("Autoloot is now off.");
+				end
 			end
 		--end
 	else
 		if GetCVar("autoLootDefault") == "0" then
-			FARaidTools:restoreLootSettings()
-			if not suppress then print("RT: Autoloot has been restored to your previous settings.") end
+			FALoot:restoreLootSettings()
+			if not suppress then
+				debug("Autoloot has been restored to your previous settings.");
+			end
 		end
 	end
 end
@@ -1117,7 +1097,7 @@ local function setGeneralVis() -- currently not used
 	end
 end
 
-function FARaidTools:parseChat(msg, author)
+function FALoot:parseChat(msg, author)
 	if not debugOn then
 		for i=1,40 do
 			local name, rank_ = GetRaidRosterInfo(i)
@@ -1179,27 +1159,42 @@ function FARaidTools:parseChat(msg, author)
 						end
 						
 						local cost;
-						if table_items[itemString]["currentValue"] == 30 then
-							cost = "30+"
-						else
-							cost = tostring(table_items[itemString]["currentValue"]);
-						end
-						if not table_items[itemString]["winners"][cost] then
-							table_items[itemString]["winners"][cost] = {};
-						end
-						table.insert(table_items[itemString]["winners"][cost], winners[i]);
-						
 						if string.match(winners[i], UnitName("player"):lower()) then -- if the player is one of the winners
 							debug("The player won an item!", 1)
 							LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
+							if table_items[itemString]["bid"] then
+								cost = table_items[itemString]["bid"];
+								local t = {
+									["winAmount"] = cost,
+									["itemString"] = itemString,
+								}
+								debug(t, 1);
+								FALoot:sendMessage(ADDON_MSG_PREFIX, t, "RAID")
+							end
 						else
 							for j=1,#table_aliases do
 								if string.match(winners[i], table_aliases[j]) then
 									debug("The player won an item!", 1)
 									LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
+									if table_items[itemString]["bid"] then
+										cost = table_items[itemString]["bid"];
+									end
+									break;
 								end
 							end
 						end
+						
+						if not cost then
+							if table_items[itemString]["currentValue"] == 30 then
+								cost = table_items[itemString]["bid"] or "30+";
+							else
+								cost = tostring(table_items[itemString]["currentValue"]);
+							end
+						end
+						if not table_items[itemString]["winners"][cost] then
+							table_items[itemString]["winners"][cost] = {};
+						end
+						table.insert(table_items[itemString]["winners"][cost], winners[i]);
 						
 						local numWinners = 0;
 						for j, v in pairs(table_items[itemString]["winners"]) do
@@ -1207,19 +1202,19 @@ function FARaidTools:parseChat(msg, author)
 						end
 						debug("numWinners = "..numWinners, 1);
 						if numWinners >= table_items[itemString]["quantity"] then
-							FARaidTools:itemEnd(itemString);
+							FALoot:itemEnd(itemString);
 							break;
 						end
 					end
 				end
-				FARaidTools:itemTableUpdate();
-				FARaidTools:checkBids();
+				FALoot:itemTableUpdate();
+				FALoot:checkBids();
 			end
 		end
 	end
 end
 
-function FARaidTools:dataDump(name)
+function FALoot:dataDump(name)
 	if name == "hasBeenLooted" then
 		DevTools_Dump(hasBeenLooted)
 	elseif name == "itemQuery" then
@@ -1238,18 +1233,18 @@ function events:ADDON_LOADED(name)
 			saveLootSettings()
 			history = {}
 		end
-		FARaidTools:RegisterComm(ADDON_MSG_PREFIX);
+		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
 function events:PLAYER_LOGOUT(...)
-	FARaidTools:restoreLootSettings()
+	FALoot:restoreLootSettings()
 	table_options = {lootSettings, table_aliases}
 end
 function events:PLAYER_ENTERING_WORLD(...)
-	FARaidTools:setAutoLoot(1)
+	FALoot:setAutoLoot(1)
 end
 function events:RAID_ROSTER_UPDATE(...)
-	FARaidTools:setAutoLoot()
+	FALoot:setAutoLoot()
 end
 function events:LOOT_OPENED(...)
 	if not addonEnabled() then
@@ -1266,7 +1261,7 @@ function events:LOOT_OPENED(...)
 				end
 				
 				local link = GetLootSlotLink(i) -- retrieve link of item
-				if link and FARaidTools:checkFilters(link) then
+				if link and FALoot:checkFilters(link) then
 					for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
 						-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
 						-- GetLootSourceInfo may also return multiple quantity when there is actually only
@@ -1294,7 +1289,7 @@ function events:LOOT_OPENED(...)
 	end
 	
 	-- send addon message to tell others to add this to their window
-	FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+	FALoot:sendMessage(ADDON_MSG_PREFIX, {
 		["ADDON_VERSION"] = ADDON_VERSION,
 		["loot"] = loot,
 	}, "RAID", nil, "BULK");
@@ -1303,18 +1298,18 @@ function events:LOOT_OPENED(...)
 		for j=1,#v do
 			-- we can assume that everything in the table is not on the HBL
 			
-			if FARaidTools:checkFilters(v[j], true) then
-				FARaidTools:itemAdd(v[j])
+			if FALoot:checkFilters(v[j], true) then
+				FALoot:itemAdd(v[j])
 			end
 		end
 		hasBeenLooted[i] = true;
 	end
 end
 function events:CHAT_MSG_RAID(msg, author)
-	FARaidTools:parseChat(msg, author)
+	FALoot:parseChat(msg, author)
 end
 function events:CHAT_MSG_RAID_LEADER(msg, author)
-	FARaidTools:parseChat(msg, author)
+	FALoot:parseChat(msg, author)
 end
 function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 	if channelName == "aspects" then
@@ -1334,18 +1329,18 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		local msg = " "..string.gsub(msg, "[/,]", " ").." "
 		if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-				FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["ADDON_VERSION"] = ADDON_VERSION,
 					["end"] = itemString,
 				}, "RAID")
 			end
-			FARaidTools:itemEnd(itemString);
+			FALoot:itemEnd(itemString);
 		end
 	end
 end
 function events:GROUP_JOINED()
 	if IsInRaid() then
-		FARaidTools:sendMessage(ADDON_MSG_PREFIX, {
+		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["update"] = ADDON_VERSION_FULL,
 		}, "RAID", nil, "BULK")
 	end
@@ -1365,7 +1360,7 @@ end
 function events:GET_ITEM_INFO_RECEIVED()
 	local limit = #table_itemQuery
 	for i=0,limit-1 do
-		FARaidTools:itemAdd(table_itemQuery[limit-i], true)
+		FALoot:itemAdd(table_itemQuery[limit-i], true)
 	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
@@ -1376,11 +1371,11 @@ for k, v in pairs(events) do
 end
 
 if debugOn then
-	FARaidTools:itemAdd("96379:0")
-	FARaidTools:itemAdd("96753:0")
-	FARaidTools:itemAdd("96740:0")
-	FARaidTools:itemAdd("96373:0")
-	FARaidTools:itemAdd("96377:0")
-	FARaidTools:itemAdd("96384:0")
-	FARaidTools:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+	FALoot:itemAdd("96379:0")
+	FALoot:itemAdd("96753:0")
+	FALoot:itemAdd("96740:0")
+	FALoot:itemAdd("96373:0")
+	FALoot:itemAdd("96377:0")
+	FALoot:itemAdd("96384:0")
+	FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 end
