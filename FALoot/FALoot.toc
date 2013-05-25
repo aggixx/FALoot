@@ -3,7 +3,7 @@
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
 ## Version: v4.0
 ## Author: Pawkets
-## SavedVariables: table_options, history
+## SavedVariables: FALoot_options
 
 # Libraries
 embeds.xml

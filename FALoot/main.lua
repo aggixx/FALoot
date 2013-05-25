@@ -29,27 +29,29 @@ local libEncode = libCompress:GetAddonEncodeTable()
 local AceGUI = LibStub("AceGUI-3.0");
 
 -- Declare local variables
+
+-- SavedVariables options
+local debugOn = 0		-- Debug threshold
+local expTime = 15		-- Amount of time before an ended item is removed from the window, in seconds.
+local cacheInterval = 200	-- Amount of time between attempts to check for item data, in milliseconds.
+local table_aliases = {};
+
+-- Hard-coded options
+local maxIcons = 11
+
+-- Session Variables
+local _
 local table_items = {}
 local table_itemQuery = {}
 local table_icons = {}
 local table_who = {}
-local table_aliases = {}
-
-local debugOn = 2
 local hasBeenLooted = {}
-local expTime = 15 -- TODO: Add this as an option
-local cacheInterval = 200 -- this is how often we recheck for item data
-local lootSettings
-local maxIcons = 11
-
 local showAfterCombat
 local iconSelect
 local endPrompt
 local bidPrompt
 local promptBidValue
-local updateMsg = nil
-
-local _
+local updateMsg
 
 --helper functions
 
@@ -604,83 +606,75 @@ SLASH_RT1 = "/rt";
 SLASH_FALOOT1 = "/faloot";
 SLASH_FA1 = "/fa";
 local function slashparse(msg, editbox)
+	local msgLower = string.lower(msg);
 	if msg == "" then
-		frame:Show()
-	else
-		local msg = str_split(" ", msg)
-		if msg[1]:lower() == "debug" then
-			if #msg == 2 then
-				if msg[2]:lower() == "true" then
-					debugOn = true
-				elseif msg[2]:lower() == "false" then
-					debugOn = false
-				else
-					print("Invalid syntax for "..msg[1]:lower()..". Invalid value for parameter #2.")
-				end
-			else
-				print("Invalid syntax for "..msg[1]:lower()..". Incorrect number of parameters.")
-			end
-		elseif msg[1]:lower() == "who" then
-			if #msg == 1 then
-				FALoot:sendMessage(ADDON_MSG_PREFIX, {
-					["who"] = "query",
-				}, "GUILD")
-			else
-				print("Invalid syntax for "..msg[1]:lower()..". Incorrect number of parameters.")
-			end
-		elseif msg[1]:lower() == "alias" then
-			if msg[2]:lower() == "add" then
-				if #msg == 3 then
-					table.insert(table_aliases, msg[3]:lower())
-					print(msg[3].." added as an alias.")
-				else
-					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
-				end
-			elseif msg[2]:lower() == "remove" then
-				if #msg == 3 then
-					local removed = false
-					for i=1,#table_aliases do
-						if table_aliases[i]:lower() == msg[3]:lower() then
-							table.remove(table_aliases, i)
-							print("Alias "..msg[3].." removed.")
-							removed = true
-							break
-						end
-					end
-					if not removed then
-						print(msg[3].." is not currently an alias.")
-					end
-				else
-					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
-				end
-			elseif msg[2]:lower() == "list" then
-				if #msg == 2 then
-					local list = ""
-					for i=1,#table_aliases do
-						if i > 1 then
-							list = list..", "
-						end
-						list = list..table_aliases[i]
-					end
-					print("Current aliases are: "..list)
-				else
-					print("Invalid syntax for "..msg[1]:lower().." "..msg[2]:lower()..". Incorrect number of parameters.")
-				end
-			else
-				print("Invalid subcommand for "..msg[1]:lower()..".")
-			end
-		elseif msg[1]:lower() == "resetpos" then
-			frame:ClearAllPoints()
-			frame:SetPoint("CENTER")
-		else
-			print("The following are valid slash commands:")
-			print("/faloot debug <true/false> -- set status of debug mode")
-			print("/faloot who -- see who is running the addon and what version")
-			print("/faloot alias add <name> -- add an alias for award detection")
-			print("/faloot alias remove <name> -- remove an alias for award detection")
-			print("/faloot alias list -- list aliases for award detection")
-			print("/faloot resetpos -- resets the position of the RT window")
+		frame:Show();
+		return;
+	elseif string.match(msg, "^dump .+") then
+		msg = string.match(msg, "^dump (.+)");
+		if msg == "table_items" then
+			debug(table_items);
+		elseif msg == "table_itemQuery" then
+			debug(table_itemQuery);
+		elseif msg == "hasBeenLooted" then
+			debug(hasBeenLooted);
 		end
+		return;
+	elseif string.match(msg, "^debug %d") then
+		debugOn = tonumber(string.match(msg, "^debug (%d)"));
+		if debugOn > 0 then
+			debug("Debug is now ON ("..debugOn..").");
+		else
+			debug("Debug is now OFF.");
+		end
+		return;
+	elseif msgLower == "who" or msgLower == "vc" or msgLower == "versioncheck" then
+		FALoot:sendMessage(ADDON_MSG_PREFIX, {
+			["who"] = "query",
+		}, "GUILD");
+		return;
+	elseif string.match(msgLower, "^alias add .+") then
+		local alias = string.match(msgLower, "^alias add (.+)");
+		table.insert(table_aliases, alias);
+		debug(alias.." added as an alias.");
+		return;
+	elseif string.match(msgLower, "^alias remove .+") then
+		local alias = string.match(msgLower, "^alias remove (.+)");
+		for i=1,#table_aliases do
+			if table_aliases[i] == alias then
+				table.remove(table_aliases, i)
+				debug('Alias "'..alias..'" removed.')
+				return;
+			end
+		end
+		debug(alias.." is not currently an alias.");
+		return;
+	elseif string.match(msgLower, "^alias list") then
+		if #table_aliases == 0 then
+			debug("You currently have no aliases.");
+			return;
+		end
+		local s = "";
+		for i=1,#table_aliases do
+			if i > 1 then
+				s = s..", ";
+			end
+			s = s .. table_aliases[i];
+		end
+		debug("Current aliases are: "..s);
+		return;
+	elseif msgLower == "resetpos" then
+		frame:ClearAllPoints()
+		frame:SetPoint("CENTER")
+		return;
+	else
+		debug("The following are valid slash commands:");
+		print("/faloot debug <threshold> -- set debugging threshold");
+		print("/faloot who -- see who is running the addon and what version");
+		print("/faloot alias add <name> -- add an alias for award detection");
+		print("/faloot alias remove <name> -- remove an alias for award detection");
+		print("/faloot alias list -- list aliases for award detection");
+		print("/faloot resetpos -- resets the position of the RT window");
 	end
 end
 SlashCmdList["RT"] = slashparse
@@ -1200,32 +1194,26 @@ function FALoot:parseChat(msg, author)
 		end
 	end
 end
-
-function FALoot:dataDump(name)
-	if name == "hasBeenLooted" then
-		DevTools_Dump(hasBeenLooted)
-	elseif name == "itemQuery" then
-		DevTools_Dump(table_itemQuery)
-	end
-end
 	
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
 	if name == ADDON_NAME then
-		if table_options then -- if options loaded, then load into local variables
-			lootSettings = table_options[1] or saveLootSettings()
-			history = history or {}
-			table_aliases = table_options[2] or table_aliases
-		else -- if not, set to default values
-			saveLootSettings()
-			history = {}
-		end
+		FALoot_options = FALoot_options or {};
+		debugOn = FALoot_options["debugOn"] or debugOn;
+		expTime = FALoot_options["expTime"] or expTime;
+		cacheInterval = FALoot_options["cacheInterval"] or cacheInterval;
+		table_aliases = FALoot_options["table_aliases"] or table_aliases;
+		
 		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
 function events:PLAYER_LOGOUT(...)
-	FALoot:restoreLootSettings()
-	table_options = {lootSettings, table_aliases}
+	FALoot_options = {
+		["debugOn"]       = debugOn,
+		["expTime"]       = expTime,
+		["cacheInterval"] = cacheInterval,
+		["table_aliases"] = table_aliases,
+	};
 end
 function events:PLAYER_ENTERING_WORLD(...)
 	FALoot:setAutoLoot(1)
