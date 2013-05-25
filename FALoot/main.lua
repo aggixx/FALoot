@@ -567,15 +567,7 @@ function FALoot:generateIcons()
 							end
 						end
 					elseif button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
-						--remove command stuff
 						endPrompt = coroutine.create( function()
-							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-								StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
-							else
-								StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
-							end
-							StaticPopup_Show("FALOOT_END")
-							coroutine.yield()
 							debug("Ending item "..v["itemLink"]..".", 1);
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FALoot:sendMessage(ADDON_MSG_PREFIX, {
@@ -585,7 +577,12 @@ function FALoot:generateIcons()
 							end
 							FALoot:itemEnd(i)
 						end)
-						coroutine.resume(endPrompt)
+						if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+							StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
+						else
+							StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
+						end
+						StaticPopup_Show("FALOOT_END")
 					end
 				end)
 				if lasticon then -- if this isn't the first icon then anchor it to the previous icon
@@ -734,10 +731,6 @@ window:SetCallback("OnClick", function(self, event)
 		end
 	end
 	bidPrompt = coroutine.create( function(self)
-		StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?"
-		StaticPopup_Show("FALOOT_BID")
-		debug("Querying for bid, coroutine paused.", 1);
-		coroutine.yield()
 		debug("Bid recieved, resuming coroutine.", 1)
 		bid = tonumber(promptBidValue)
 		if bid < 30 and bid ~= 10 and bid ~= 20 then
@@ -754,7 +747,9 @@ window:SetCallback("OnClick", function(self, event)
 		debug("Passed info onto FALoot:itemBid().", 1);
 		FALoot:itemBid(itemString, bid)
 	end)
-	coroutine.resume(bidPrompt)
+	StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
+	StaticPopup_Show("FALOOT_BID");
+	debug("Querying for bid, coroutine paused.", 1);
 end) 
 
 StaticPopupDialogs["FALOOT_END"] = {
