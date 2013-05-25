@@ -2,6 +2,7 @@
 	- slashparse()
 	- handling of saved variables
 	- autoloot
+	- fix icon -> row relation when there are items of quantity > 1
 -]]
 
 -- Declare strings
@@ -520,73 +521,69 @@ function FALoot:generateIcons()
 					bgFile = v["texture"],
 				})
 				table_icons[k]:SetScript("OnEnter", function(self, button) -- set code that triggers on mouse enter
-					local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
+					-- store what row was selected so we can restore it later
+					iconSelect = scrollingTable:GetSelection() or 0
 					
-					--table select stuff
-					iconSelect = scrollingTable:GetSelection() or 0 -- store what row was selected so we can restore it later
-					scrollingTable:SetSelection(iconNum) -- select the row that correlates to the icon
+					-- retrieve the row id that corresponds to the icon we're mousedover
+					local row = 0;
+					for l, w in pairs(table_items) do
+						row = row + 1;
+						if i == l then
+							-- select the row that correlates to the icon
+							scrollingTable:SetSelection(row);
+							break;
+						end
+					end
 					
 					--tooltip stuff
 					GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 					GameTooltip:SetHyperlink(v["itemLink"])
 					GameTooltip:Show()
-					end)
+				end)
 				table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
-					--table select stuff
-					scrollingTable:SetSelection(iconSelect) -- restore the row that was selected before we mousedover this icon
-					iconSelect = nil
+					-- restore the row that was selected before we mousedover this icon
+					scrollingTable:SetSelection(iconSelect);
+					iconSelect = nil;
 					
-					--tooltip stuff
 					GameTooltip:Hide()
 				end)
 				table_icons[k]:SetScript("OnMouseUp", function(self, button) -- set code that triggers on clicks
 					if button == "LeftButton" then -- left click: Selects the clicked row
-						-- retrieve the row id that corresponds to the icon we're mousedover
-						local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
-						if IsModifiedClick("CHATLINK") or IsModifiedClick("DRESSUP") then
-							local j = 0;
-							for i, v in pairs(table_items) do
-								j = j + 1;
-								if j == iconNum then
-									if IsModifiedClick("CHATLINK") then
-										ChatEdit_InsertLink(v["itemLink"])
-									elseif IsModifiedClick("DRESSUP") then
-										DressUpItemLink(v["itemLink"])
-									end
-									break
+						if IsModifiedClick("CHATLINK") then
+							ChatEdit_InsertLink(v["itemLink"])
+						elseif IsModifiedClick("DRESSUP") then
+							DressUpItemLink(v["itemLink"])
+						else
+							-- retrieve the row id that corresponds to the icon we're mousedover
+							local row = 0;
+							for l, w in pairs(table_items) do
+								row = row + 1;
+								if i == l then
+									-- set iconSelect so that after the user finishes mousing over icons
+									-- the row corresponding to this one gets selected
+									iconSelect = row;
+									break;
 								end
 							end
-						else
-							-- set iconSelect so that after the user finishes mousing over icons
-							-- the row corresponding to this one gets selected
-							iconSelect = iconNum
 						end
 					elseif button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
 						--remove command stuff
 						endPrompt = coroutine.create( function()
-							local iconNum = tonumber(string.match(self:GetName(), "%d+$"))
-							local j = 0;
-							for i, v in pairs(table_items) do
-								j = j + 1;
-								if j == iconNum then
-									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-										StaticPopupDialogs["FALOOT_END_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
-									else
-										StaticPopupDialogs["FALOOT_END_CONFIRM"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
-									end
-									StaticPopup_Show("FALOOT_END_CONFIRM")
-									coroutine.yield()
-									debug("Ending item "..v["itemLink"]..".", 1);
-									if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-										FALoot:sendMessage(ADDON_MSG_PREFIX, {
-											["ADDON_VERSION"] = ADDON_VERSION, 
-											["end"] = i,
-										}, "RAID")
-									end
-									FALoot:itemEnd(i)
-									break
-								end
+							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+								StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
+							else
+								StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
 							end
+							StaticPopup_Show("FALOOT_END")
+							coroutine.yield()
+							debug("Ending item "..v["itemLink"]..".", 1);
+							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+								FALoot:sendMessage(ADDON_MSG_PREFIX, {
+									["ADDON_VERSION"] = ADDON_VERSION, 
+									["end"] = i,
+								}, "RAID")
+							end
+							FALoot:itemEnd(i)
 						end)
 						coroutine.resume(endPrompt)
 					end
@@ -769,23 +766,6 @@ StaticPopupDialogs["FALOOT_END"] = {
 	hideOnEscape = true,
 	OnAccept = function()
 		coroutine.resume(endPrompt)
-	end,
-	enterClicksFirstButton = 1
-}
-StaticPopupDialogs["FALOOT_EDIT"] = {
-	text = "",
-	button1 = ACCEPT,
-	button2 = CANCEL,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	hasEditBox = true,
-	OnShow = function(self)
-		self.editBox:SetText(table_mainData[scrollingTable:GetSelection()]["cols"][3]["value"] or "")
-	end,
-	OnAccept = function(self)
-		table_mainData[scrollingTable:GetSelection()]["cols"][3]["value"] = self.editBox:GetText()
-		scrollingTable:SetData(table_mainData, false)
 	end,
 	enterClicksFirstButton = 1
 }
@@ -1373,6 +1353,7 @@ end
 if debugOn then
 	FALoot:itemAdd("96379:0")
 	FALoot:itemAdd("96753:0")
+	FALoot:itemAdd("96740:0")
 	FALoot:itemAdd("96740:0")
 	FALoot:itemAdd("96373:0")
 	FALoot:itemAdd("96377:0")
