@@ -138,7 +138,7 @@ local function ItemLinkStrip(itemLink)
 			debug(s, 3);
 			return s;
 		end
-	elseif debugOn then
+	else
 		debug("ItemLinkStrip was passed a nil value!", 1);
 		return;
 	end
@@ -228,8 +228,8 @@ local function isMainRaid()
 	end
 end
 
-local function addonEnabled()
-	if debugOn then
+function FALoot:addonEnabled()
+	if debugOn > 0 then
 		return 1
 	end
 	
@@ -248,10 +248,6 @@ local function addonEnabled()
 	else
 		return 1
 	end
-end
-
-function FALoot:addonEnabled()
-	return addonEnabled()
 end
 
 function FALoot:checkFilters(link, checkItemLevel)
@@ -1152,6 +1148,25 @@ function FALoot:parseChat(msg, author)
 		end
 	end
 end
+
+function FALoot:setAutoLoot()
+	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
+	if FALoot:addonEnabled() then
+		if not (toggle == "0" and key == "NONE") then
+			SetCVar("autoLootDefault", 0);
+			SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
+			debug("Your autoloot has been disabled.");
+		end
+	else
+		if autoLootToggle and autoLootKey then
+			if toggle == "0" and key == "NONE" then
+				SetCVar("autoLootDefault", autoLootToggle);
+				SetModifiedClick("AUTOLOOTTOGGLE", autoLootKey);
+				debug("Your loot settings have been restored.");
+			end
+		end
+	end
+end
 	
 local frame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
@@ -1164,42 +1179,49 @@ function events:ADDON_LOADED(name)
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
 		
-		if not (autolootToggle and autolootKey) then
-			local toggle;
-			if GetCVar("autoLootDefault") == "1" then
-				toggle = "On";
-			else
-				toggle = "Off";
-			end
-			local key;
-			if GetModifiedClick("AUTOLOOTTOGGLE") == "CTRL" then
-				key = "Control";
-			elseif GetModifiedClick("AUTOLOOTTOGGLE") == "SHIFT" then
-				key = "Shift";
-			elseif GetModifiedClick("AUTOLOOTTOGGLE") == "ALT" then
-				key = "Alt";
-			else
-				key = "None";
-			end
-			StaticPopupDialogs["FALOOT_AUTOLOOT"] = {
-				text = "Would you like to save these settings as your default loot settings?\n|cFFFFD100Auto Loot:|r "..toggle.."\n|cFFFFD100Auto Loot Key:|r "..key,
-				button1 = YES,
-				button2 = NO,
-				timeout = 0,
-				whileDead = true,
-				hideOnEscape = true,
-				enterClicksFirstButton = true,
-				OnAccept = function(self)
-					StaticDataSave(self.editBox:GetText())
-					coroutine.resume(bidPrompt)
-				end,
-				preferredIndex = STATICPOPUPS_NUMDIALOGS,
-			}
-			StaticPopup_Show("FALOOT_AUTOLOOT");
+		if debugOn == 0 then
+			window:Hide();
 		end
 		
 		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
+end
+function events:PLAYER_LOGIN()
+	if not (autolootToggle and autolootKey) then
+		local toggle;
+		if GetCVar("autoLootDefault") == "1" then
+			toggle = "On";
+		else
+			toggle = "Off";
+		end
+		local key;
+		if GetModifiedClick("AUTOLOOTTOGGLE") == "CTRL" then
+			key = "Control";
+		elseif GetModifiedClick("AUTOLOOTTOGGLE") == "SHIFT" then
+			key = "Shift";
+		elseif GetModifiedClick("AUTOLOOTTOGGLE") == "ALT" then
+			key = "Alt";
+		else
+			key = "None";
+		end
+		StaticPopupDialogs["FALOOT_AUTOLOOT"] = {
+			text = "Would you like to save these settings as your default loot settings?\n|cFFFFD100Auto Loot:|r "..toggle.."\n|cFFFFD100Auto Loot Key:|r "..key,
+			button1 = YES,
+			button2 = NO,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			enterClicksFirstButton = true,
+			OnAccept = function(self)
+				autolootKey = GetModifiedClick("AUTOLOOTTOGGLE");
+				autolootToggle = GetCVar("autoLootDefault");
+			end,
+			preferredIndex = STATICPOPUPS_NUMDIALOGS,
+		}
+		StaticPopup_Show("FALOOT_AUTOLOOT");
+	end
+	
+	FALoot:setAutoLoot();
 end
 function events:PLAYER_LOGOUT(...)
 	FALoot_options = {
@@ -1309,6 +1331,12 @@ function events:GROUP_JOINED()
 			["update"] = ADDON_VERSION_FULL,
 		}, "RAID", nil, "BULK")
 	end
+end
+function events:GROUP_ROSTER_UPDATE()
+	FALoot:setAutoLoot();
+end
+function events:RAID_ROSTER_UPDATE()
+	FALoot:setAutoLoot();
 end
 function events:PLAYER_REGEN_ENABLED()
 	if showAfterCombat then
