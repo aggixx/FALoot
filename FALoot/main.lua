@@ -257,7 +257,7 @@ end
 function FALoot:checkFilters(link, checkItemLevel)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	
-	if debugOn then
+	if debugOn > 0 then
 		return true
 	end
 	
@@ -266,20 +266,20 @@ function FALoot:checkFilters(link, checkItemLevel)
 	
 	-- check if the quality of the item is high enough
 	if quality ~= 4 then -- TODO: Add customizable quality filters
-		if debugOn then print("Quality of "..link.." is too low.") end
+		debug("Quality of "..link.." is too low.", 1);
 		return false
 	end
 		
 	-- check if the class of the item is appropriate
 	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
-		if debugOn then print("Class of "..link.." is incorrect.") end
+		debug("Class of "..link.." is incorrect.", 1)
 		return false
 	end
 	
 	-- check if the item level of the item is high enough
 	local playerTotal = GetAverageItemLevel()
 	if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-		if debugOn then print("Item Level of "..link.." is too low.") end
+		debug("Item Level of "..link.." is too low.", 1);
 		return false
 	end
 	
@@ -380,7 +380,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			
 			table_who = table_who or {}
 			if version then
-				if debugOn then print("Who response recieved from "..sender..".") end
+				debug("Who response recieved from "..sender..".", 1);
 				if not table_who[version] then
 					table_who[version] = {}
 					table.insert(table_who, version)
@@ -1037,7 +1037,7 @@ local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
 function FALoot:parseChat(msg, author)
-	if not debugOn then
+	if debugOn == 0 then
 		for i=1,40 do
 			local name, rank_ = GetRaidRosterInfo(i)
 			if name == author then
@@ -1046,7 +1046,7 @@ function FALoot:parseChat(msg, author)
 			end
 		end
 	end
-	if debugOn or (rank and rank > 0) then
+	if debugOn > 0 or (rank and rank > 0) then
 		local linkless, replaces = string.gsub(msg, HYPERLINK_PATTERN, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
 			local itemLink = string.match(msg, HYPERLINK_PATTERN); -- retrieve itemLink from the message
@@ -1329,7 +1329,7 @@ for k, v in pairs(events) do
 	frame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end
 
-if debugOn then
+if debugOn > 0 then
 	FALoot:itemAdd("96379:0")
 	FALoot:itemAdd("96753:0")
 	FALoot:itemAdd("96740:0")
