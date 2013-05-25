@@ -319,7 +319,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompr
 end
 
 function FALoot:OnCommReceived(prefix, text, distribution, sender)
-	if prefix ~= ADDON_MSG_PREFIX or not text --[[or sender == UnitName("PLAYER")--]] then
+	if prefix ~= ADDON_MSG_PREFIX or not text then
 		return;
 	end
 	debug("Recieved addon message.", 1);
@@ -334,6 +334,10 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	else
 		debug("Deserialization of data failed: "..t);
 		return
+	end
+	
+	if sender == UnitName("player") and not t["who"] then
+		return;
 	end
 	
 	debug(t, 2);
@@ -709,16 +713,23 @@ StaticPopupDialogs["FALOOT_BID"] = {
 	button2 = CANCEL,
 	timeout = 0,
 	whileDead = true,
-	hideOnEscape = true,
-	enterClicksFirstButton = 1,
-	OnShow = function (self, data)
-		self.editBox:SetText("")
-	end,
-	OnAccept = function (self2, data, data2)
-		StaticDataSave(self2.editBox:GetText())
+	OnAccept = function(self)
+		StaticDataSave(self.editBox:GetText())
 		coroutine.resume(bidPrompt)
 	end,
-	hasEditBox = true
+	OnShow = function(self)
+		self.editBox:SetText("")
+		self.editBox:SetScript("OnEnterPressed", function(self)
+			StaticDataSave(self:GetText())
+			coroutine.resume(bidPrompt)
+			StaticPopup_Hide("FALOOT_BID");
+		end);
+		self.editBox:SetScript("OnEscapePressed", function(self)
+			StaticPopup_Hide("FALOOT_BID");
+		end);
+	end,
+	hasEditBox = true,
+	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
 
 window:SetCallback("OnClick", function(self, event)
@@ -762,7 +773,8 @@ StaticPopupDialogs["FALOOT_END"] = {
 	OnAccept = function()
 		coroutine.resume(endPrompt)
 	end,
-	enterClicksFirstButton = 1
+	enterClicksFirstButton = 1,
+	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
 
 function FALoot:itemAdd(itemString, checkCache)
