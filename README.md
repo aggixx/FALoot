@@ -26,4 +26,4 @@ https://github.com/aggixx/FALoot.git/trunk/FALoot
 - Customizable loot filters instead of hardcoded ones (potentially spec/class based).
 
 ### Known Bugs ###
-- Pressing enter doesn't submit the bid amount form. (maybe not fixable?)
+None
