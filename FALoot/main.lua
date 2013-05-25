@@ -1,17 +1,16 @@
 --[[
-	- slashparse()
-	- handling of saved variables
-	- autoloot
-	- fix icon -> row relation when there are items of quantity > 1
+	autoloot
+	 - autoloot variables aren't acessible on ADDON_LOADED
+	   need to find some other time to check them.
 -]]
 
 -- Declare strings
-local ADDON_NAME = "FA Loot"
+local ADDON_NAME = "FALoot"
 local ADDON_VERSION_FULL = "v4.0"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
-local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. ADDON_NAME .. ":|r ";
+local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "http://tinyurl.com/FARaidTools"
 
@@ -35,6 +34,8 @@ local debugOn = 0		-- Debug threshold
 local expTime = 15		-- Amount of time before an ended item is removed from the window, in seconds.
 local cacheInterval = 200	-- Amount of time between attempts to check for item data, in milliseconds.
 local table_aliases = {};
+local autolootToggle;
+local autolootKey;
 
 -- Hard-coded options
 local maxIcons = 11
@@ -1035,49 +1036,6 @@ end
 local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
-local function saveLootSettings()
-	lootSettings = {GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE")}
-	return lootSettings
-end
-
-function FALoot:restoreLootSettings()
-	SetCVar("autoLootDefault", lootSettings[1])
-	SetModifiedClick("AUTOLOOTTOGGLE", lootSettings[2])
-end
-
-function FALoot:setAutoLoot(suppress)
-	if (GetLootMethod() == "freeforall" and addonEnabled()) or debugOn then
-		--if not UnitIsGroupAssistant("PLAYER") and not UnitIsGroupLeader("PLAYER") then
-			if GetCVar("autoLootDefault") == "1" then
-				SetModifiedClick("AUTOLOOTTOGGLE", "NONE")
-				SetCVar("autoLootDefault", 0)
-				if not suppress then
-					debug("Autoloot is now off.");
-				end
-			end
-		--end
-	else
-		if GetCVar("autoLootDefault") == "0" then
-			FALoot:restoreLootSettings()
-			if not suppress then
-				debug("Autoloot has been restored to your previous settings.");
-			end
-		end
-	end
-end
-
-local function setGeneralVis() -- currently not used
-	if addonEnabled() then
-		if IsResting() == false then
-			ChatFrame_RemoveChannel(DEFAULT_CHAT_FRAME, "General")
-		else
-			ChatFrame_AddChannel(DEFAULT_CHAT_FRAME, "General")
-		end
-	else
-		ChatFrame_AddChannel(DEFAULT_CHAT_FRAME, "General")
-	end
-end
-
 function FALoot:parseChat(msg, author)
 	if not debugOn then
 		for i=1,40 do
@@ -1203,23 +1161,55 @@ function events:ADDON_LOADED(name)
 		expTime = FALoot_options["expTime"] or expTime;
 		cacheInterval = FALoot_options["cacheInterval"] or cacheInterval;
 		table_aliases = FALoot_options["table_aliases"] or table_aliases;
+		autolootToggle = FALoot_options["autolootToggle"];
+		autolootKey = FALoot_options["autolootKey"];
+		
+		if not (autolootToggle and autolootKey) then
+			local toggle;
+			if GetCVar("autoLootDefault") == "1" then
+				toggle = "On";
+			else
+				toggle = "Off";
+			end
+			local key;
+			if GetModifiedClick("AUTOLOOTTOGGLE") == "CTRL" then
+				key = "Control";
+			elseif GetModifiedClick("AUTOLOOTTOGGLE") == "SHIFT" then
+				key = "Shift";
+			elseif GetModifiedClick("AUTOLOOTTOGGLE") == "ALT" then
+				key = "Alt";
+			else
+				key = "None";
+			end
+			StaticPopupDialogs["FALOOT_AUTOLOOT"] = {
+				text = "Would you like to save these settings as your default loot settings?\n|cFFFFD100Auto Loot:|r "..toggle.."\n|cFFFFD100Auto Loot Key:|r "..key,
+				button1 = YES,
+				button2 = NO,
+				timeout = 0,
+				whileDead = true,
+				hideOnEscape = true,
+				enterClicksFirstButton = true,
+				OnAccept = function(self)
+					StaticDataSave(self.editBox:GetText())
+					coroutine.resume(bidPrompt)
+				end,
+				preferredIndex = STATICPOPUPS_NUMDIALOGS,
+			}
+			StaticPopup_Show("FALOOT_AUTOLOOT");
+		end
 		
 		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
 function events:PLAYER_LOGOUT(...)
 	FALoot_options = {
-		["debugOn"]       = debugOn,
-		["expTime"]       = expTime,
-		["cacheInterval"] = cacheInterval,
-		["table_aliases"] = table_aliases,
+		["debugOn"]        = debugOn,
+		["expTime"]        = expTime,
+		["cacheInterval"]  = cacheInterval,
+		["table_aliases"]  = table_aliases,
+		["autolootToggle"] = autolootToggle,
+		["autolootKey"]    = autolootKey,
 	};
-end
-function events:PLAYER_ENTERING_WORLD(...)
-	FALoot:setAutoLoot(1)
-end
-function events:RAID_ROSTER_UPDATE(...)
-	FALoot:setAutoLoot()
 end
 function events:LOOT_OPENED(...)
 	if not addonEnabled() then
@@ -1318,12 +1308,6 @@ function events:GROUP_JOINED()
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["update"] = ADDON_VERSION_FULL,
 		}, "RAID", nil, "BULK")
-	end
-end
-function events:CVAR_UPDATE(glStr, value)
-	if glStr == "AUTO_LOOT_DEFAULT_TEXT" and not addonEnabled() then
-		if debugOn then print("Autoloot settings saved.") end
-		saveLootSettings()
 	end
 end
 function events:PLAYER_REGEN_ENABLED()
