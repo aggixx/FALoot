@@ -1,7 +1,5 @@
 --[[
-	autoloot
-	 - autoloot variables aren't acessible on ADDON_LOADED
-	   need to find some other time to check them.
+	
 -]]
 
 -- Declare strings
@@ -345,8 +343,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		return;
 	end
 	
-	if t["loot"] then -- FIXME
-		if addonEnabled() then
+	if t["loot"] then
+		if FALoot:addonEnabled() then
 			local loot = t["loot"]
 			
 			-- check data integrity
@@ -1234,7 +1232,7 @@ function events:PLAYER_LOGOUT(...)
 	};
 end
 function events:LOOT_OPENED(...)
-	if not addonEnabled() then
+	if not FALoot:addonEnabled() then
 		return;
 	end
 	local loot = {} -- create a temporary table to organize the loot on the mob
