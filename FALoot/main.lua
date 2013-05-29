@@ -259,8 +259,8 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	local itemLink = ItemLinkAssemble(itemString);
 	
 	if not itemLink then
-		debug("checkFilters: Unable to retrieve itemLink!", 1);
-		return;
+		debug("checkFilters: Unable to retrieve itemLink! itemString = "..itemString..", itemLink = "..(itemLink or ""), 1);
+		return false;
 	end
 	
 	if debugOn > 0 then
@@ -804,7 +804,6 @@ function FALoot:itemAdd(itemString, checkCache)
 			debug("Item is not cached, requesting item info from server.")
 			table.insert(table_itemQuery, itemString);
 		else
-			
 			debug("Item is not cached, aborting.")
 		end
 		return;
@@ -1267,13 +1266,14 @@ function events:LOOT_OPENED(...)
 					loot[mobID] = {};
 				end
 				
-				local link = GetLootSlotLink(i) -- retrieve link of item
-				if link and FALoot:checkFilters(link) then
+				local itemLink = GetLootSlotLink(i) -- retrieve link of item
+				local itemString = ItemLinkStrip(itemLink);
+				if itemString and FALoot:checkFilters(itemString) then
 					for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
 						-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
 						-- GetLootSourceInfo may also return multiple quantity when there is actually only
 						-- one of the item, but there's not much we can do about that.
-						table.insert(loot[mobID], ItemLinkStrip(link));
+						table.insert(loot[mobID], itemString);
 					end
 				end
 			end
