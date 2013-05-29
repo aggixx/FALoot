@@ -1266,8 +1266,7 @@ function events:LOOT_OPENED(...)
 					loot[mobID] = {};
 				end
 				
-				local itemLink = GetLootSlotLink(i) -- retrieve link of item
-				local itemString = ItemLinkStrip(itemLink);
+				local itemString = ItemLinkStrip(GetLootSlotLink(i));
 				if itemString and FALoot:checkFilters(itemString) then
 					for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
 						-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
@@ -1288,6 +1287,7 @@ function events:LOOT_OPENED(...)
 	debug(loot, 2);
 	
 	-- check data integrity
+	local count = 0;
 	for i, v in pairs(loot) do
 		if not (v["checkSum"] and v["checkSum"] == #v) then
 			debug("Loot data recieved via an addon message failed the integrity check.");
@@ -1296,9 +1296,11 @@ function events:LOOT_OPENED(...)
 		if #v == 0 then
 			loot[i] = nil;
 		end
+		count = count + 1;
 	end
 	
-	if #loot == 0 then
+	if count == 0 then
+		debug("There is no loot on this mob!", 1);
 		return;
 	end
 	
