@@ -10,7 +10,7 @@ local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 local ADDON_COLOR = "FFF9CC30";
 local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
-local ADDON_DOWNLOAD_URL = "http://tinyurl.com/FARaidTools"
+local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot"
 
 local HYPERLINK_PATTERN = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
 local THUNDERFORGED = " |cFF00FF00(TF)|r"
