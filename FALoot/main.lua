@@ -1286,6 +1286,13 @@ function events:LOOT_OPENED(...)
 			debug("Loot data recieved via an addon message failed the integrity check.");
 			return;
 		end
+		if #v == 0 then
+			loot[i] = nil;
+		end
+	end
+	
+	if #loot == 0 then
+		return;
 	end
 	
 	-- send addon message to tell others to add this to their window
