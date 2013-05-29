@@ -226,8 +226,8 @@ local function isMainRaid()
 	end
 end
 
-function FALoot:addonEnabled()
-	if debugOn > 0 then
+function FALoot:addonEnabled(overrideDebug)
+	if not overrideDebug and debugOn > 0 then
 		return 1
 	end
 	
@@ -1168,20 +1168,16 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
-	debug(toggle, 3)
-	debug(key, 3)
-	debug(autolootToggle, 3)
-	debug(autolootKey, 3)
-	if FALoot:addonEnabled() then
+	if FALoot:addonEnabled(true) then
 		if not (toggle == "0" and key == "NONE") then
 			SetCVar("autoLootDefault", 0);
 			SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
 			debug("Your autoloot has been disabled.");
 		end
-	elseif autoLootToggle and autoLootKey then
+	elseif autolootToggle and autolootKey then
 		if toggle == "0" and key == "NONE" then
-			SetCVar("autoLootDefault", autoLootToggle);
-			SetModifiedClick("AUTOLOOTTOGGLE", autoLootKey);
+			SetCVar("autoLootDefault", autolootToggle);
+			SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
 			debug("Your loot settings have been restored.");
 		end
 	end
@@ -1234,13 +1230,14 @@ function events:PLAYER_LOGIN()
 			OnAccept = function(self)
 				autolootKey = GetModifiedClick("AUTOLOOTTOGGLE");
 				autolootToggle = GetCVar("autoLootDefault");
+				FALoot:setAutoLoot();
 			end,
 			preferredIndex = STATICPOPUPS_NUMDIALOGS,
 		}
 		StaticPopup_Show("FALOOT_AUTOLOOT");
+	else
+		FALoot:setAutoLoot();
 	end
-	
-	FALoot:setAutoLoot();
 end
 function events:PLAYER_LOGOUT(...)
 	FALoot_options = {
