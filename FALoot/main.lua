@@ -1192,11 +1192,20 @@ function events:ADDON_LOADED(name)
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
 		
-		if debugOn == 0 then
+		FALoot:RegisterComm(ADDON_MSG_PREFIX);
+
+		if debugOn > 0 then
+			FALoot:itemAdd("96379:0")
+			FALoot:itemAdd("96753:0")
+			FALoot:itemAdd("96740:0")
+			FALoot:itemAdd("96740:0")
+			FALoot:itemAdd("96373:0")
+			FALoot:itemAdd("96377:0")
+			FALoot:itemAdd("96384:0")
+			FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+		else
 			window:Hide();
 		end
-		
-		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
 function events:PLAYER_LOGIN()
@@ -1376,15 +1385,4 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 for k, v in pairs(events) do
 	frame:RegisterEvent(k) -- Register all events for which handlers have been defined
-end
-
-if debugOn > 0 then
-	FALoot:itemAdd("96379:0")
-	FALoot:itemAdd("96753:0")
-	FALoot:itemAdd("96740:0")
-	FALoot:itemAdd("96740:0")
-	FALoot:itemAdd("96373:0")
-	FALoot:itemAdd("96377:0")
-	FALoot:itemAdd("96384:0")
-	FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 end
