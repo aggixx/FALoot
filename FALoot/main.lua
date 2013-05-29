@@ -353,8 +353,6 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		if FALoot:addonEnabled() then
 			local loot = t["loot"]
 			
-			debug({["loot"] = loot}, 2);
-			
 			-- check data integrity
 			for i, v in pairs(loot) do
 				if not (v["checkSum"] and v["checkSum"] == #v) then
