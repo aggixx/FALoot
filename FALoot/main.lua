@@ -836,8 +836,6 @@ function FALoot:itemAdd(itemString, checkCache)
 		}
 	end
 	
-	debug(table_items, 2);
-	
 	FALoot:itemTableUpdate();
 	
 	if not frame:IsShown() then
@@ -1324,7 +1322,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		end
 		local itemString = ItemLinkStrip(itemLink);
 		local msg = string.match(msg, HYPERLINK_PATTERN.."(.+)"); -- now remove the link
-		if msg == "" then
+		if not msg or msg == "" then
 			return;
 		end
 		local msg = string.lower(msg) -- put in lower case
