@@ -405,7 +405,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	elseif t["update"] then
 		if distribution == "WHISPER" then
 			if not updateMsg then
-				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..downloadUrl.." to update.");
+				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
@@ -415,7 +415,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 					["update"] = true,
 				}, "WHISPER", sender)
 			elseif not updateMsg and ADDON_VERSION_FULL < version then
-				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..downloadUrl.." to update.");
+				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
 		end
