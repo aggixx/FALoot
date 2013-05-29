@@ -259,8 +259,8 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	local itemLink = ItemLinkAssemble(itemString);
 	
 	if not itemLink then
-		debug("checkFilters: Unable to retrieve itemLink!", 1)
-		return
+		debug("checkFilters: Unable to retrieve itemLink!", 1);
+		return;
 	end
 	
 	if debugOn > 0 then
@@ -268,24 +268,24 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	end
 	
 	-- check properties of item
-	local _, _, quality, ilevel, _, class, subClass = GetItemInfo(link)
+	local _, _, quality, ilevel, _, class, subClass = GetItemInfo(itemLink)
 	
 	-- check if the quality of the item is high enough
 	if quality ~= 4 then -- TODO: Add customizable quality filters
-		debug("Quality of "..link.." is too low.", 1);
+		debug("Quality of "..itemLink.." is too low.", 1);
 		return false
 	end
 		
 	-- check if the class of the item is appropriate
 	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
-		debug("Class of "..link.." is incorrect.", 1)
+		debug("Class of "..itemLink.." is incorrect.", 1)
 		return false
 	end
 	
 	-- check if the item level of the item is high enough
 	local playerTotal = GetAverageItemLevel()
 	if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-		debug("Item Level of "..link.." is too low.", 1);
+		debug("Item Level of "..itemLink.." is too low.", 1);
 		return false
 	end
 	
