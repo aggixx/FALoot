@@ -791,6 +791,7 @@ function FALoot:itemAdd(itemString, checkCache)
 	
 	-- caching stuff
 	if itemLink then
+		debug("Item is cached, continuing.", 1);
 		for i=1,#table_itemQuery do
 			if table_itemQuery[i] == itemString then
 				table.remove(table_itemQuery, i)
@@ -799,10 +800,10 @@ function FALoot:itemAdd(itemString, checkCache)
 		end
 	else
 		if not checkCache then
-			debug("Item is not cached, requesting item info from server.")
+			debug("Item is not cached, requesting item info from server.", 1);
 			table.insert(table_itemQuery, itemString);
 		else
-			debug("Item is not cached, aborting.")
+			debug("Item is not cached, aborting.", 1);
 		end
 		return;
 	end
