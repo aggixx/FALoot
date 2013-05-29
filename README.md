@@ -1,7 +1,7 @@
 **FA Loot** is a loot and raid utility addon for \<Forgotten Aspects\> of Hyjal-US developed by Pawkets aka Fearmonger aka aggixx.
 
 ### How to Use (READ THIS!!!)###
-Click the link below and save the zip file. Open the zip file with your favorite archiving program and extract the folder named "FARaidTools" (NOT FARaidTools-master) into the Interface/Addons/ folder in your WoW install.
+Click the link below and save the zip file. Open the zip file with your favorite archiving program and extract the folder named "FALoot" (NOT FALoot-master) into the Interface/Addons/ folder in your WoW install.
 
 Download here:
 https://codeload.github.com/aggixx/FALoot/zip/master
@@ -22,7 +22,6 @@ https://github.com/aggixx/FALoot.git/trunk/FALoot
 
 ### Upcoming Features ###
 - Button that automates taking tells on an item. A fixed timer along with a addon command could be used so that others using the addon could see the progress of the item. Also potentially add a way for people to "stall" the timer of an item by request.
-- Add item expiration time as an option.
 - Customizable loot filters instead of hardcoded ones (potentially spec/class based).
 
 ### Known Bugs ###
