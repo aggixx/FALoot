@@ -249,6 +249,12 @@ function FALoot:addonEnabled()
 end
 
 function FALoot:checkFilters(itemString, checkItemLevel)
+	-- itemString must be a string!
+	if type(itemString) ~= "string" then
+		debug("checkFilters was passed a non-string value!", 1);
+		return;
+	end
+
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
 	local itemLink = ItemLinkAssemble(itemString);
 	
@@ -366,12 +372,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			for i, v in pairs(loot) do
 				if not hasBeenLooted[i] then
 					for j=1,#v do
-						if FALoot:checkFilters(v[j], true) then
-							debug("Added "..v[j].."to the loot window via addon message.", 2);
-							FALoot:itemAdd(v[j])
-						else
-							debug(v[j].." did not pass the item filter.", 2);
-						end
+						debug("Added "..v[j].."to the loot window via addon message.", 2);
+						FALoot:itemAdd(v[j])
 					end
 					hasBeenLooted[i] = true;
 				else
@@ -786,6 +788,7 @@ function FALoot:itemAdd(itemString, checkCache)
 		debug("itemAdd was passed a non-string value!", 1);
 		return;
 	end
+	
 	local itemLink = ItemLinkAssemble(itemString);
 	
 	-- caching stuff
@@ -804,6 +807,12 @@ function FALoot:itemAdd(itemString, checkCache)
 			
 			debug("Item is not cached, aborting.")
 		end
+		return;
+	end
+	
+	-- check if item passes the filter
+	if not FALoot:checkFilters(itemString) then
+		debug(itemString.." did not pass the item filter.", 2);
 		return;
 	end
 	
@@ -1302,10 +1311,7 @@ function events:LOOT_OPENED(...)
 	for i, v in pairs(loot) do
 		for j=1,#v do
 			-- we can assume that everything in the table is not on the HBL
-			
-			if FALoot:checkFilters(v[j], true) then
-				FALoot:itemAdd(v[j])
-			end
+			FALoot:itemAdd(v[j])
 		end
 		hasBeenLooted[i] = true;
 	end
