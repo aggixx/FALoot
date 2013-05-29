@@ -1149,19 +1149,21 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
+	debug(toggle, 3)
+	debug(key, 3)
+	debug(autolootToggle, 3)
+	debug(autolootKey, 3)
 	if FALoot:addonEnabled() then
 		if not (toggle == "0" and key == "NONE") then
 			SetCVar("autoLootDefault", 0);
 			SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
 			debug("Your autoloot has been disabled.");
 		end
-	else
-		if autoLootToggle and autoLootKey then
-			if toggle == "0" and key == "NONE" then
-				SetCVar("autoLootDefault", autoLootToggle);
-				SetModifiedClick("AUTOLOOTTOGGLE", autoLootKey);
-				debug("Your loot settings have been restored.");
-			end
+	elseif autoLootToggle and autoLootKey then
+		if toggle == "0" and key == "NONE" then
+			SetCVar("autoLootDefault", autoLootToggle);
+			SetModifiedClick("AUTOLOOTTOGGLE", autoLootKey);
+			debug("Your loot settings have been restored.");
 		end
 	end
 end
