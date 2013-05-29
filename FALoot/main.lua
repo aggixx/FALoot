@@ -248,8 +248,14 @@ function FALoot:addonEnabled()
 	end
 end
 
-function FALoot:checkFilters(link, checkItemLevel)
+function FALoot:checkFilters(itemString, checkItemLevel)
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
+	local itemLink = ItemLinkAssemble(itemString);
+	
+	if not itemLink then
+		debug("checkFilters: Unable to retrieve itemLink!", 1)
+		return
+	end
 	
 	if debugOn > 0 then
 		return true
@@ -347,6 +353,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		if FALoot:addonEnabled() then
 			local loot = t["loot"]
 			
+			debug({["loot"] = loot}, 2);
+			
 			-- check data integrity
 			for i, v in pairs(loot) do
 				if not (v["checkSum"] and v["checkSum"] == #v) then
@@ -355,14 +363,21 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				end
 			end
 			
+			debug("Loot data is valid.", 2);
+			
 			for i, v in pairs(loot) do
 				if not hasBeenLooted[i] then
 					for j=1,#v do
 						if FALoot:checkFilters(v[j], true) then
+							debug("Added "..v[j].."to the loot window via addon message.", 2);
 							FALoot:itemAdd(v[j])
+						else
+							debug(v[j].." did not pass the item filter.", 2);
 						end
 					end
 					hasBeenLooted[i] = true;
+				else
+					debug(i.." has already been looted.", 2);
 				end
 			end
 		end
