@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1d"
+local ADDON_VERSION_FULL = "v4.1e"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
@@ -12,8 +12,8 @@ local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot"
 
-local HYPERLINK_PATTERN = "\124%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
-local THUNDERFORGED = " |cFF00FF00(TF)|r"
+local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
+local THUNDERFORGED_COLOR = "FFFF8000"
 
 -- Load the libraries
 FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
@@ -819,7 +819,7 @@ function FALoot:itemAdd(itemString, checkCache)
 		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
 		local displayName = itemLink
 		if FALoot:isThunderforged(iLevel) then
-			displayName = displayName .. THUNDERFORGED;
+			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
 		end
 		if table_items[itemString]["quantity"] > 1 then
 			displayName = displayName .. " x" .. table_items[itemString]["quantity"];
@@ -829,7 +829,7 @@ function FALoot:itemAdd(itemString, checkCache)
 		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
 		local displayName = itemLink
 		if FALoot:isThunderforged(iLevel) then
-			displayName = displayName .. THUNDERFORGED;
+			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
 		end
 		table_items[itemString] = {
 			["quantity"] = 1,
