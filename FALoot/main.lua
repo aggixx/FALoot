@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1b"
+local ADDON_VERSION_FULL = "v4.1c"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
@@ -1174,10 +1174,12 @@ function FALoot:setAutoLoot()
 			debug("Your autoloot has been disabled.");
 		end
 	elseif autolootToggle and autolootKey then
-		if toggle == "0" and key == "NONE" then
-			SetCVar("autoLootDefault", autolootToggle);
-			SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
+		if key == "NONE" then
 			debug("Your loot settings have been restored.");
+			SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
+			if toggle == "0" then
+				SetCVar("autoLootDefault", autolootToggle);
+			end
 		end
 	end
 end
