@@ -51,6 +51,7 @@ local endPrompt
 local bidPrompt
 local promptBidValue
 local updateMsg
+local oldSelectStatus = 0
 
 --helper functions
 
@@ -503,6 +504,26 @@ scrollingTable:EnableSelection(true)
 scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20)
 scrollingTable.frame:SetScale(1.1)
 
+local tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+tellsButton:SetScript("OnClick", function(self, event)
+	local id = scrollingTable:GetSelection()
+	local j, itemLink, itemString = 0;
+	for i, v in pairs(table_items) do
+		j = j + 1;
+		if j == id then
+			itemLink, itemString = v["itemLink"], i;
+			break;
+		end
+	end
+	debug("This functionality is not yet implemented.");
+end)
+tellsButton:SetPoint("BOTTOM", window.bidbutton, "TOP");
+tellsButton:SetHeight(20);
+tellsButton:SetWidth(80);
+tellsButton:SetText("Take Tells");
+tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
+tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
+
 for i=1,maxIcons do
 	table_icons[i] = CreateFrame("frame", "FALootIcon"..tostring(i), iconFrame)
 	table_icons[i]:SetWidth(40)
@@ -511,7 +532,7 @@ for i=1,maxIcons do
 end
 
 function FALoot:isThunderforged(iLevel)
-	return iLevel == 541 or iLevel == 528
+	return iLevel == 541 or iLevel == 528;
 end
 
 function FALoot:generateIcons()
@@ -536,7 +557,7 @@ function FALoot:generateIcons()
 				})
 				table_icons[k]:SetScript("OnEnter", function(self, button) -- set code that triggers on mouse enter
 					-- store what row was selected so we can restore it later
-					iconSelect = scrollingTable:GetSelection() or 0
+					iconSelect = scrollingTable:GetSelection() or 0;
 					
 					-- retrieve the row id that corresponds to the icon we're mousedover
 					local row = 0;
@@ -629,12 +650,14 @@ local function slashparse(msg, editbox)
 		end
 		return;
 	elseif string.match(msg, "^debug %d") then
-		debugOn = tonumber(string.match(msg, "^debug (%d)"));
+		debugOn = tonumber(string.match(msg, "^debug (%d+)"));
 		if debugOn > 0 then
 			debug("Debug is now ON ("..debugOn..").");
 		else
 			debug("Debug is now OFF.");
 		end
+		
+		FALoot:setLeaderUIVisibility();
 		return;
 	elseif msgLower == "who" or msgLower == "vc" or msgLower == "versioncheck" then
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
@@ -741,6 +764,7 @@ window:SetCallback("OnClick", function(self, event)
 		j = j + 1;
 		if j == id then
 			itemLink, itemString = v["itemLink"], i;
+			break;
 		end
 	end
 	bidPrompt = coroutine.create( function(self)
@@ -922,6 +946,14 @@ function FALoot:itemTableUpdate()
 
 	scrollingTable:SetData(t, false)
 	FALoot:generateIcons()
+	
+	if #t >= 8 then
+		tellsButton:ClearAllPoints();
+		tellsButton:SetPoint("TOP", window.bidbutton, "BOTTOM");
+	else
+		tellsButton:ClearAllPoints();
+		tellsButton:SetPoint("BOTTOM", window.bidbutton, "TOP");
+	end
 end
 
 function FALoot:itemBid(itemString, bid)
@@ -1011,6 +1043,38 @@ function FALoot:generateStatusText()
 	end
 end
 
+function FALoot:setLeaderUIVisibility()
+	-- enable/disable UI elements
+	if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or debugOn > 0 then
+		tellsButton:Show();
+	else
+		tellsButton:Hide();
+	end
+end
+
+function FALoot:onTableSelect(id)
+	window:SetDisabled(false);
+	
+	local j = 0;
+	for i, v in pairs(table_items) do
+		j = j + 1;
+		if j == id then
+			if not v["status"] or v["status"] == "" then
+				--debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
+				tellsButton:Enable();
+			else
+				tellsButton:Disable();
+			end
+			break;
+		end
+	end
+end
+
+function FALoot:onTableDeselect()
+	window:SetDisabled(true);
+	tellsButton:Disable();
+end
+
 local function onUpdate(self,elapsed)
 	local currentTime = GetTime() -- get the time and put it in a variable so we don't have to call it a billion times throughout this function
 	
@@ -1022,11 +1086,37 @@ local function onUpdate(self,elapsed)
 		end
 	end
 	
+	--[[
 	--enable/disable buttons
 	if (iconSelect and iconSelect > 0) or (scrollingTable:GetSelection() and scrollingTable:GetSelection() > 0 and not iconSelect) then
 		window:SetDisabled(false);
+		tellsButton:Enable();
 	else
 		window:SetDisabled(true);
+		tellsButton:Disable();
+	end
+	--]]
+	
+	-- trigger select events
+	local selectStatus;
+	if iconSelect then
+		if iconSelect > 0 then
+			selectStatus = iconSelect;
+		end
+	else
+		local realSelect = scrollingTable:GetSelection();
+		if realSelect and realSelect > 0 then
+			selectStatus = realSelect;
+		end
+	end
+	if selectStatus ~= oldSelectStatus then
+		--debug("New selectStatus value is "..(selectStatus or "nil")..".", 1);
+		if selectStatus then
+			FALoot:onTableSelect(selectStatus);
+		else
+			FALoot:onTableDeselect();
+		end
+		oldSelectStatus = selectStatus;
 	end
 	
 	-- who stuff
@@ -1248,6 +1338,8 @@ function events:PLAYER_LOGIN()
 	else
 		FALoot:setAutoLoot();
 	end
+	
+	FALoot:setLeaderUIVisibility();
 end
 function events:PLAYER_LOGOUT(...)
 	FALoot_options = {
@@ -1367,9 +1459,11 @@ function events:GROUP_JOINED()
 end
 function events:GROUP_ROSTER_UPDATE()
 	FALoot:setAutoLoot();
+	FALoot:setLeaderUIVisibility();
 end
 function events:RAID_ROSTER_UPDATE()
 	FALoot:setAutoLoot();
+	FALoot:setLeaderUIVisibility();
 end
 function events:PLAYER_REGEN_ENABLED()
 	if showAfterCombat then
