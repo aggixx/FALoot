@@ -9,7 +9,6 @@
 	<Include file="libs\AceAddon-3.0\AceAddon-3.0.xml"/>
 	<Include file="libs\AceGUI-3.0\AceGUI-3.0.xml"/>
 	<Include file="AceGUIContainer-FALootWindow.lua" />
-	<Include file="Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml"/>
 </Ui>
 
 
