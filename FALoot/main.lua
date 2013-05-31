@@ -1,10 +1,10 @@
 --[[
-	
+	Fix setLoot on login
 -]]
 
 -- Declare strings
 local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1f"
+local ADDON_VERSION_FULL = "v4.1e"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
@@ -28,30 +28,38 @@ local AceGUI = LibStub("AceGUI-3.0");
 -- Declare local variables
 
 -- SavedVariables options
-local debugOn = 0		-- Debug threshold
-local expTime = 15		-- Amount of time before an ended item is removed from the window, in seconds.
-local cacheInterval = 200	-- Amount of time between attempts to check for item data, in milliseconds.
+local debugOn = 0;		-- Debug threshold
+local expTime = 15;		-- Amount of time before an ended item is removed from the window, in seconds.
+local cacheInterval = 200;	-- Amount of time between attempts to check for item data, in milliseconds.
 local table_aliases = {};
 local autolootToggle;
 local autolootKey;
 
 -- Hard-coded options
-local maxIcons = 11
+local maxIcons = 11;
 
 -- Session Variables
-local _
-local table_items = {}
-local table_itemQuery = {}
-local table_icons = {}
-local table_who = {}
-local hasBeenLooted = {}
-local showAfterCombat
-local iconSelect
-local endPrompt
-local bidPrompt
-local promptBidValue
-local updateMsg
-local oldSelectStatus = 0
+local _;
+local table_items = {};
+local table_itemQuery = {};
+local table_icons = {};
+local table_who = {};
+local hasBeenLooted = {};
+local showAfterCombat;
+local iconSelect;
+local endPrompt;
+local bidPrompt;
+local promptBidValue;
+local updateMsg;
+local oldSelectStatus = 0;
+
+-- GUI elements
+local frame;
+local iconFrame;
+local scrollingTable;
+local tellsButton;
+local closeButton;
+local bidButton;
 
 --helper functions
 
@@ -436,99 +444,198 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	end
 end
 
---Create GUI elements
-local cols = {
-	{
-		["name"] = "Item",
-		["width"] = 207,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "asc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Status",
-		["width"] = 60,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	},
-	{
-		["name"] = "Winner(s)",
-		["width"] = 140,
-		["align"] = "LEFT",
-		["color"] = { 
-			["r"] = 1.0, 
-			["g"] = 1.0, 
-			["b"] = 1.0, 
-			["a"] = 1.0 
-		},
-		["colorargs"] = nil,
-		["defaultsort"] = "dsc",
-		["DoCellUpdate"] = nil,
-	}
-}
+function FALoot:createGUI()
+	-- Create the main frame
+	frame = CreateFrame("frame", "FALoot", UIParent)
+	frame:EnableMouse(true);
+	frame:SetMovable(true);
+	frame:SetFrameStrata("FULLSCREEN_DIALOG");
+	frame:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true, tileSize = 32, edgeSize = 32,
+		insets = { left = 8, right = 8, top = 8, bottom = 8 }
+	});
+	frame:SetBackdropColor(0, 0, 0, 1);
+	frame:SetToplevel(true);
+	frame:SetWidth(500);
+	frame:SetHeight(270);
+	frame:SetPoint("CENTER");
 
--- GUI
--- Create a container frame
-local window = AceGUI:Create("FALootFrame");
-window:SetTitle("FA Loot");
-window:SetStatusText("");
-window:SetWidth(500);
-window:SetHeight(270);
-window:EnableResize(false);
-
-local frame = window.frame;
-
-local iconFrame = CreateFrame("frame", "FALootIcons", frame)
-iconFrame:SetHeight(40)
-iconFrame:SetWidth(500)
-iconFrame:SetPoint("TOP", frame, "TOP", 0, -30)
-iconFrame:Show()
-
-local scrollingTable = ScrollingTable:CreateST(cols, 8, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, frame)
-scrollingTable:EnableSelection(true)
-scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20)
-scrollingTable.frame:SetScale(1.1)
-
-local tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-tellsButton:SetScript("OnClick", function(self, event)
-	local id = scrollingTable:GetSelection()
-	local j, itemLink, itemString = 0;
-	for i, v in pairs(table_items) do
-		j = j + 1;
-		if j == id then
-			itemLink, itemString = v["itemLink"], i;
-			break;
-		end
+	-- Create the frame that holds the icons
+	iconFrame = CreateFrame("frame", "FALootIcons", frame);
+	iconFrame:SetHeight(40);
+	iconFrame:SetWidth(500);
+	iconFrame:SetPoint("TOP", frame, "TOP", 0, -30);
+	iconFrame:Show();
+	
+	-- Populate the iconFrame with icons
+	for i=1,maxIcons do
+		table_icons[i] = CreateFrame("frame", "FALootIcon"..tostring(i), iconFrame)
+		table_icons[i]:SetWidth(40)
+		table_icons[i]:SetHeight(40)
+		table_icons[i]:Hide()
 	end
-	debug("This functionality is not yet implemented.");
-end)
-tellsButton:SetPoint("BOTTOM", window.bidbutton, "TOP");
-tellsButton:SetHeight(20);
-tellsButton:SetWidth(80);
-tellsButton:SetText("Take Tells");
-tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
-tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
 
-for i=1,maxIcons do
-	table_icons[i] = CreateFrame("frame", "FALootIcon"..tostring(i), iconFrame)
-	table_icons[i]:SetWidth(40)
-	table_icons[i]:SetHeight(40)
-	table_icons[i]:Hide()
+	-- Create the scrollingTable
+	scrollingTable = ScrollingTable:CreateST({
+		{
+			["name"] = "Item",
+			["width"] = 207,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+			["defaultsort"] = "asc",
+		},
+		{
+			["name"] = "Status",
+			["width"] = 60,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+			["defaultsort"] = "dsc",
+		},
+		{
+			["name"] = "Winner(s)",
+			["width"] = 140,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+			["defaultsort"] = "dsc",
+		}
+	}, 8, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, frame);
+	scrollingTable:EnableSelection(true);
+	scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20);
+	scrollingTable.frame:SetScale(1.1);
+
+	-- Create the "Close" button
+	closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	closeButton:SetPoint("BOTTOMRIGHT", -27, 17)
+	closeButton:SetHeight(20)
+	closeButton:SetWidth(80)
+	closeButton:SetText(CLOSE)
+	closeButton:SetScript("OnClick", function()
+		frame:Hide();
+	end);
+	
+	-- Create the "Bid" button
+	bidButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	bidButton:SetPoint("BOTTOMRIGHT", closeButton, "BOTTOMLEFT", -5, 0)
+	bidButton:SetHeight(20)
+	bidButton:SetWidth(80)
+	bidButton:SetText("Bid")
+	bidButton:SetScript("OnClick", function(self, event)
+		local id = scrollingTable:GetSelection()
+		local j, itemLink, itemString = 0;
+		for i, v in pairs(table_items) do
+			j = j + 1;
+			if j == id then
+				itemLink, itemString = v["itemLink"], i;
+				break;
+			end
+		end
+		bidPrompt = coroutine.create(function(self)
+			debug("Bid recieved, resuming coroutine.", 1)
+			local bid = tonumber(promptBidValue)
+			if bid < 30 and bid ~= 10 and bid ~= 20 then
+				debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
+				return
+			end
+			if bid % 2 ~= 0 then
+				bid = math.floor(bid)
+				if bid % 2 == 1 then
+					bid = bid - 1
+				end
+				debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
+			end
+			debug("Passed info onto FALoot:itemBid().", 1);
+			FALoot:itemBid(itemString, bid)
+		end)
+		StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
+		StaticPopup_Show("FALOOT_BID");
+		debug("Querying for bid, coroutine paused.", 1);
+	end);
+
+	-- Create the "Take Tells" button
+	tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
+	tellsButton:SetScript("OnClick", function(self, event)
+		local id = scrollingTable:GetSelection()
+		local j, itemLink, itemString = 0;
+		for i, v in pairs(table_items) do
+			j = j + 1;
+			if j == id then
+				itemLink, itemString = v["itemLink"], i;
+				break;
+			end
+		end
+		debug("This functionality is not yet implemented.");
+	end)
+	tellsButton:SetPoint("BOTTOM", bidButton, "TOP");
+	tellsButton:SetHeight(20);
+	tellsButton:SetWidth(80);
+	tellsButton:SetText("Take Tells");
+	tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
+	tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
+
+	-- Create the background of the Status Bar
+	local statusbg = CreateFrame("Button", nil, frame)
+	statusbg:SetPoint("BOTTOMLEFT", 15, 15)
+	statusbg:SetPoint("BOTTOMRIGHT", -197, 15)
+	statusbg:SetHeight(24)
+	statusbg:SetBackdrop({
+		bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 16, edgeSize = 16,
+		insets = { left = 3, right = 3, top = 5, bottom = 3 }
+	})
+	statusbg:SetBackdropColor(0.1,0.1,0.1)
+	statusbg:SetBackdropBorderColor(0.4,0.4,0.4)
+
+	-- Create the text of the Status Bar
+	local statustext = statusbg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	statustext:SetPoint("TOPLEFT", 7, -2)
+	statustext:SetPoint("BOTTOMRIGHT", -7, 2)
+	statustext:SetHeight(20)
+	statustext:SetJustifyH("LEFT")
+	statustext:SetText("")
+
+	-- Create the background of the title
+	local titlebg = frame:CreateTexture(nil, "OVERLAY")
+	titlebg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	titlebg:SetTexCoord(0.31, 0.67, 0, 0.63)
+	titlebg:SetPoint("TOP", 0, 12)
+	titlebg:SetHeight(40)
+
+	-- Create the title frame
+	local title = CreateFrame("Frame", nil, frame)
+	title:EnableMouse(true)
+	title:SetScript("OnMouseDown", function(frame)
+		frame:GetParent():StartMoving()
+	end)
+	title:SetScript("OnMouseUp", function(frame)
+		frame:GetParent():StopMovingOrSizing()
+	end)
+	title:SetAllPoints(titlebg)
+
+	-- Create the text of the title
+	local titletext = title:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	titletext:SetPoint("TOP", titlebg, "TOP", 0, -14)
+	titletext:SetText("FA Loot");
+	
+	titlebg:SetWidth((titletext:GetWidth() or 0) + 10)
+
+	-- Create the title background left edge
+	local titlebg_l = frame:CreateTexture(nil, "OVERLAY")
+	titlebg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	titlebg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
+	titlebg_l:SetPoint("RIGHT", titlebg, "LEFT")
+	titlebg_l:SetWidth(30)
+	titlebg_l:SetHeight(40)
+
+	-- Create the title background right edge
+	local titlebg_r = frame:CreateTexture(nil, "OVERLAY")
+	titlebg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	titlebg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
+	titlebg_r:SetPoint("LEFT", titlebg, "RIGHT")
+	titlebg_r:SetWidth(30)
+	titlebg_r:SetHeight(40)
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -757,37 +864,7 @@ StaticPopupDialogs["FALOOT_BID"] = {
 	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
 
-window:SetCallback("OnClick", function(self, event)
-	local id = scrollingTable:GetSelection()
-	local j, itemLink, itemString = 0;
-	for i, v in pairs(table_items) do
-		j = j + 1;
-		if j == id then
-			itemLink, itemString = v["itemLink"], i;
-			break;
-		end
-	end
-	bidPrompt = coroutine.create( function(self)
-		debug("Bid recieved, resuming coroutine.", 1)
-		local bid = tonumber(promptBidValue)
-		if bid < 30 and bid ~= 10 and bid ~= 20 then
-			debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
-			return
-		end
-		if bid % 2 ~= 0 then
-			bid = math.floor(bid)
-			if bid % 2 == 1 then
-				bid = bid - 1
-			end
-			debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
-		end
-		debug("Passed info onto FALoot:itemBid().", 1);
-		FALoot:itemBid(itemString, bid)
-	end)
-	StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
-	StaticPopup_Show("FALOOT_BID");
-	debug("Querying for bid, coroutine paused.", 1);
-end) 
+--[[window:SetCallback("OnClick", ) -]]
 
 StaticPopupDialogs["FALOOT_END"] = {
 	text = "Are you sure you want to manually end this item for all players in the raid?",
@@ -918,42 +995,31 @@ function FALoot:itemTableUpdate()
 			["cols"] = {
 				{
 					["value"] = v["displayName"],
-					["args"] = nil,
-					["color"] = {["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0},
-					["colorargs"] = nil,
-					["DoCellUpdate"] = nil,
+					["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
 				},
 				{
 					["value"] = statusString,
-					["args"] = nil,
 					["color"] = statusColor,
-					["colorargs"] = nil,
-					["DoCellUpdate"] = nil,
 				},
 				{
 					["value"] = winnerString,
-					["args"] = nil,
-					["color"] = {["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0},
-					["colorargs"] = wnil,
-					["DoCellUpdate"] = nil,
+					["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
 				},
 			},
-			["color"] = {["r"] = 1.0, ["g"] = 0.0, ["b"] = 0.0, ["a"] = 1.0},
-			["colorargs"] = nil,
-			["DoCellUpdate"] = nil,
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
 		})
 	end
 
 	scrollingTable:SetData(t, false)
 	FALoot:generateIcons()
 	
-	if #t >= 8 then
+	--[[if #t >= 8 then
 		tellsButton:ClearAllPoints();
-		tellsButton:SetPoint("TOP", window.bidbutton, "BOTTOM");
+		tellsButton:SetPoint("TOP", window.bidButton, "BOTTOM");
 	else
 		tellsButton:ClearAllPoints();
-		tellsButton:SetPoint("BOTTOM", window.bidbutton, "TOP");
-	end
+		tellsButton:SetPoint("BOTTOM", window.bidButton, "TOP");
+	end--]]
 end
 
 function FALoot:itemBid(itemString, bid)
@@ -1003,7 +1069,9 @@ function FALoot:checkBids()
 end
 
 function FALoot:generateStatusText()
-	local bidding, rolling, only = 0, 0;
+	return;
+	
+	--[[local bidding, rolling, only = 0, 0;
 	for itemString, v in pairs(table_items) do
 		if table_items[itemString]["bidStatus"] and table_items[itemString]["status"] ~= "Ended" then
 			only = itemString;
@@ -1040,7 +1108,7 @@ function FALoot:generateStatusText()
 		else
 			window:SetStatusText("Waiting to roll on " .. rolling .. " items.");
 		end
-	end
+	end--]]
 end
 
 function FALoot:setLeaderUIVisibility()
@@ -1053,7 +1121,7 @@ function FALoot:setLeaderUIVisibility()
 end
 
 function FALoot:onTableSelect(id)
-	window:SetDisabled(false);
+	--window:SetDisabled(false);
 	
 	local j = 0;
 	for i, v in pairs(table_items) do
@@ -1071,7 +1139,7 @@ function FALoot:onTableSelect(id)
 end
 
 function FALoot:onTableDeselect()
-	window:SetDisabled(true);
+	--window:SetDisabled(true);
 	tellsButton:Disable();
 end
 
@@ -1287,19 +1355,6 @@ function events:ADDON_LOADED(name)
 		autolootKey = FALoot_options["autolootKey"];
 		
 		FALoot:RegisterComm(ADDON_MSG_PREFIX);
-
-		if debugOn > 0 then
-			FALoot:itemAdd("96379:0")
-			FALoot:itemAdd("96753:0")
-			FALoot:itemAdd("96740:0")
-			FALoot:itemAdd("96740:0")
-			FALoot:itemAdd("96373:0")
-			FALoot:itemAdd("96377:0")
-			FALoot:itemAdd("96384:0")
-			FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
-		else
-			window:Hide();
-		end
 	end
 end
 function events:PLAYER_LOGIN()
@@ -1340,7 +1395,21 @@ function events:PLAYER_LOGIN()
 		FALoot:setAutoLoot();
 	end
 	
+	FALoot:createGUI();
 	FALoot:setLeaderUIVisibility();
+
+	if debugOn > 0 then
+		FALoot:itemAdd("96379:0")
+		FALoot:itemAdd("96753:0")
+		FALoot:itemAdd("96740:0")
+		FALoot:itemAdd("96740:0")
+		FALoot:itemAdd("96373:0")
+		FALoot:itemAdd("96377:0")
+		FALoot:itemAdd("96384:0")
+		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+	else
+		window:Hide();
+	end
 end
 function events:PLAYER_LOGOUT(...)
 	FALoot_options = {
