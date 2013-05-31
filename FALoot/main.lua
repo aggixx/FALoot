@@ -507,11 +507,13 @@ function FALoot:createGUI()
 
 	-- Create the "Close" button
 	closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	--closeButton:SetScript("OnClick", CloseButton_OnClick)
 	closeButton:SetPoint("BOTTOMRIGHT", -27, 17)
 	closeButton:SetHeight(20)
 	closeButton:SetWidth(80)
 	closeButton:SetText(CLOSE)
+	closeButton:SetScript("OnClick", function()
+		frame:Hide();
+	end);
 	
 	-- Create the "Bid" button
 	bidButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
