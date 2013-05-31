@@ -989,11 +989,11 @@ function FALoot:checkBids()
 	for itemString, v in pairs(table_items) do
 		if table_items[itemString]["bidStatus"] and table_items[itemString]["host"] and ((v["currentValue"] == 30 and v["bid"] >= 30) or v["currentValue"] == v["bid"]) then
 			if v["bidStatus"] == "Bid" and v["status"] == "Tells" then
-				SendChatMessage(tostring(bid), "WHISPER", nil, v["host"]);
+				SendChatMessage(tostring(v["bid"]), "WHISPER", nil, v["host"]);
 				table_items[itemString]["bidStatus"] = "Roll";
 				debug("FALoot:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
 			elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
-				FARoll(bid);
+				FARoll(v["bid"]);
 				table_items[itemString]["bidStatus"] = nil;
 				debug("FALoot:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
 			end
