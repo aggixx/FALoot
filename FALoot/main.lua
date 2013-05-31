@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1e"
+local ADDON_VERSION_FULL = "v4.1f"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
@@ -769,7 +769,7 @@ window:SetCallback("OnClick", function(self, event)
 	end
 	bidPrompt = coroutine.create( function(self)
 		debug("Bid recieved, resuming coroutine.", 1)
-		bid = tonumber(promptBidValue)
+		local bid = tonumber(promptBidValue)
 		if bid < 30 and bid ~= 10 and bid ~= 20 then
 			debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
 			return
@@ -1139,11 +1139,12 @@ local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
 function FALoot:parseChat(msg, author)
+	local rank;
 	if debugOn == 0 then
 		for i=1,40 do
-			local name, rank_ = GetRaidRosterInfo(i)
+			local name, currentRank = GetRaidRosterInfo(i)
 			if name == author then
-				rank = rank_
+				rank = currentRank
 				break
 			end
 		end
@@ -1184,7 +1185,7 @@ function FALoot:parseChat(msg, author)
 					value = string.gsub(value, "%s?/%s?", ", ")
 					value = string.gsub(value, "%s?\+%s?", ", ")
 					
-					winners = str_split(", ", value);
+					local winners = str_split(", ", value);
 					debug(winners, 1);
 					for i=1, #winners do
 						local closestMatch, closestMatchId = math.huge;
