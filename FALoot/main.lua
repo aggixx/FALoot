@@ -1322,7 +1322,7 @@ function FALoot:setAutoLoot()
 	end
 end
 	
-local frame, events = CreateFrame("Frame"), {}
+local eventFrame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
 	if name == ADDON_NAME then
 		FALoot_options = FALoot_options or {};
@@ -1530,9 +1530,9 @@ function events:GET_ITEM_INFO_RECEIVED()
 		FALoot:itemTableUpdate();
 	end
 end
-frame:SetScript("OnEvent", function(self, event, ...)
+eventFrame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
 end)
 for k, v in pairs(events) do
-	frame:RegisterEvent(k) -- Register all events for which handlers have been defined
+	eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end
