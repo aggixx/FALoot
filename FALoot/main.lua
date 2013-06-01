@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1f"
+local ADDON_VERSION_FULL = "v4.1g"
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
 
 local ADDON_COLOR = "FFF9CC30";
