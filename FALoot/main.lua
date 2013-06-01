@@ -1,5 +1,6 @@
 --[[
 	Fix setLoot on login
+	Fix status text
 -]]
 
 -- Declare strings
@@ -13,6 +14,9 @@ local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot"
 
 local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
+-- |c COLOR    |H linkType : itemId : enchantId : gemId1 : gemId2 : gemId3 : gemId4 : suffixId : uniqueId  : linkLevel : reforgeId :      :      :      :      :      |h itemName            |h|r
+-- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    :? %d*      :? %d*      :? %d* :? %d* :? %d* :? %d* :? %d* |h .-                  |h|r"
+-- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
 local THUNDERFORGED_COLOR = "FFFF8000"
 
 -- Load the libraries
@@ -141,6 +145,11 @@ local function ItemLinkStrip(itemLink)
 		local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
 		string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
 		if itemId and suffixId then
+			suffixId = tonumber(suffixId);
+			-- super hacky workaround for blizzard's weird suffixId system
+			if suffixId > 60000 then
+				suffixId = suffixId - 65536;
+			end
 			local s = itemId..":"..suffixId;
 			debug(s, 3);
 			return s;
@@ -1400,11 +1409,11 @@ function events:PLAYER_LOGIN()
 
 	if debugOn > 0 then
 		FALoot:itemAdd("96379:0")
-		FALoot:itemAdd("96753:0")
 		FALoot:itemAdd("96740:0")
 		FALoot:itemAdd("96740:0")
 		FALoot:itemAdd("96373:0")
-		FALoot:itemAdd("96377:0")
+		FALoot:itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
+		FALoot:itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
 		FALoot:itemAdd("96384:0")
 		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 	else
