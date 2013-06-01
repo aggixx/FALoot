@@ -1,6 +1,7 @@
 --[[
 	Fix setLoot on login
 	Fix status text
+	Reevaluate usage of itemTableUpdate
 -]]
 
 -- Declare strings
@@ -391,13 +392,15 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				if not hasBeenLooted[i] then
 					for j=1,#v do
 						debug("Added "..v[j].."to the loot window via addon message.", 2);
-						FALoot:itemAdd(v[j])
+						itemAdd(v[j])
 					end
 					hasBeenLooted[i] = true;
 				else
 					debug(i.." has already been looted.", 2);
 				end
 			end
+			
+			FALoot:itemTableUpdate();
 		end
 	elseif t["end"] then
 		FALoot:itemEnd(t["end"])
@@ -889,7 +892,7 @@ StaticPopupDialogs["FALOOT_END"] = {
 	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
 
-function FALoot:itemAdd(itemString, checkCache)
+local function itemAdd(itemString, checkCache)
 	debug("itemAdd(), itemString = "..itemString, 1);
 	-- itemString must be a string!
 	if type(itemString) ~= "string" then
@@ -951,8 +954,6 @@ function FALoot:itemAdd(itemString, checkCache)
 		}
 	end
 	
-	FALoot:itemTableUpdate();
-	
 	if not frame:IsShown() then
 		if UnitAffectingCombat("PLAYER") then
 			showAfterCombat = true
@@ -961,6 +962,11 @@ function FALoot:itemAdd(itemString, checkCache)
 			frame:Show()
 		end
 	end
+end
+
+function FALoot:itemAdd(itemString, checkCache)
+	itemAdd(itemString, checkCache);
+	FALoot:itemTableUpdate();
 end
 
 function FALoot:itemTableUpdate()
@@ -1408,13 +1414,13 @@ function events:PLAYER_LOGIN()
 	FALoot:setLeaderUIVisibility();
 
 	if debugOn > 0 then
-		FALoot:itemAdd("96379:0")
-		FALoot:itemAdd("96740:0")
-		FALoot:itemAdd("96740:0")
-		FALoot:itemAdd("96373:0")
-		FALoot:itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
-		FALoot:itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
-		FALoot:itemAdd("96384:0")
+		itemAdd("96379:0")
+		itemAdd("96740:0")
+		itemAdd("96740:0")
+		itemAdd("96373:0")
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
+		itemAdd("96384:0")
 		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 	else
 		window:Hide();
@@ -1491,10 +1497,12 @@ function events:LOOT_OPENED(...)
 	for i, v in pairs(loot) do
 		for j=1,#v do
 			-- we can assume that everything in the table is not on the HBL
-			FALoot:itemAdd(v[j])
+			itemAdd(v[j])
 		end
 		hasBeenLooted[i] = true;
 	end
+	
+	FALoot:itemTableUpdate();
 end
 function events:CHAT_MSG_RAID(msg, author)
 	FALoot:parseChat(msg, author)
@@ -1553,7 +1561,10 @@ end
 function events:GET_ITEM_INFO_RECEIVED()
 	local limit = #table_itemQuery
 	for i=0,limit-1 do
-		FALoot:itemAdd(table_itemQuery[limit-i], true)
+		itemAdd(table_itemQuery[limit-i], true)
+	end
+	if limit > 0 then
+		FALoot:itemTableUpdate();
 	end
 end
 frame:SetScript("OnEvent", function(self, event, ...)
