@@ -1,6 +1,5 @@
 --[[
 	Fix setLoot on login
-	Fix status text
 -]]
 
 -- Declare strings
@@ -35,7 +34,6 @@ local AceGUI = LibStub("AceGUI-3.0");
 local debugOn = 0;		-- Debug threshold
 local expTime = 15;		-- Amount of time before an ended item is removed from the window, in seconds.
 local cacheInterval = 200;	-- Amount of time between attempts to check for item data, in milliseconds.
-local table_aliases = {};
 local autolootToggle;
 local autolootKey;
 
@@ -243,6 +241,35 @@ local function isMainRaid()
 	else
 		return false
 	end
+end
+
+function FALoot:findClosestGroupMember(name)
+	local closestMatch, closestMatchName, groupType, numGroupMembers = math.huge;
+	if IsInRaid() then
+		groupType = "raid";
+		numGroupMembers = GetNumGroupMembers();
+	elseif GetNumGroupMembers() > 0 then
+		groupType = "party";
+		numGroupMembers = GetNumGroupMembers() + 1;
+	else
+		groupType = "player"
+		numGroupMembers = GetNumGroupMembers() + 1;
+	end
+	for i=1,numGroupMembers do
+		local unitId;
+		if UnitExists(groupType..i) then
+			unitId = groupType..i;
+		else
+			unitId = "player"
+		end
+		local name2 = UnitName(unitId)
+		local distance = string.levenshtein(name, name2:lower())
+		if distance and distance < closestMatch then
+			closestMatch = distance;
+			closestMatchName = name2;
+		end
+	end
+	return closestMatchName or name;
 end
 
 function FALoot:addonEnabled(overrideDebug)
@@ -783,48 +810,12 @@ local function slashparse(msg, editbox)
 			["who"] = "query",
 		}, "GUILD");
 		return;
-	elseif string.match(msgLower, "^alias add .+") then
-		local alias = string.match(msgLower, "^alias add (.+)");
-		table.insert(table_aliases, alias);
-		debug(alias.." added as an alias.");
-		return;
-	elseif string.match(msgLower, "^alias remove .+") then
-		local alias = string.match(msgLower, "^alias remove (.+)");
-		for i=1,#table_aliases do
-			if table_aliases[i] == alias then
-				table.remove(table_aliases, i)
-				debug('Alias "'..alias..'" removed.')
-				return;
-			end
-		end
-		debug(alias.." is not currently an alias.");
-		return;
-	elseif string.match(msgLower, "^alias list") then
-		if #table_aliases == 0 then
-			debug("You currently have no aliases.");
-			return;
-		end
-		local s = "";
-		for i=1,#table_aliases do
-			if i > 1 then
-				s = s..", ";
-			end
-			s = s .. table_aliases[i];
-		end
-		debug("Current aliases are: "..s);
-		return;
-	elseif msgLower == "resetpos" then
-		frame:ClearAllPoints()
-		frame:SetPoint("CENTER")
-		return;
 	else
 		debug("The following are valid slash commands:");
-		print("/faloot debug <threshold> -- set debugging threshold");
-		print("/faloot who -- see who is running the addon and what version");
-		print("/faloot alias add <name> -- add an alias for award detection");
-		print("/faloot alias remove <name> -- remove an alias for award detection");
-		print("/faloot alias list -- list aliases for award detection");
-		print("/faloot resetpos -- resets the position of the RT window");
+		print("/fa debug <threshold> -- set debugging threshold");
+		print("/fa who -- see who is running the addon and what version");
+		print("/fa -- shows the loot window");
+		print("/faroll <value> -- does a FA roll for the designated DKP amount");
 	end
 end
 SlashCmdList["RT"] = slashparse
@@ -1269,44 +1260,26 @@ function FALoot:parseChat(msg, author)
 					local winners = str_split(", ", value);
 					debug(winners, 1);
 					for i=1, #winners do
-						local closestMatch, closestMatchId = math.huge;
-						for j=1,GetNumGroupMembers() do
-							local distance = string.levenshtein(winners[i], UnitName("raid"..j):lower())
-							if distance and distance < closestMatch then
-								closestMatch = distance;
-								closestMatchId = j;
-							end
-						end
-						if closestMatchId then
-							winners[i] = UnitName("raid"..closestMatchId);
-						end
+						winners[i] = FALoot:findClosestGroupMember(winners[i]);
 						
+						-- check if the player was the winner of the item
+						-- and if they are retrieve the amount of DKP they spent on it
 						local cost;
-						if string.match(winners[i], UnitName("player"):lower()) then -- if the player is one of the winners
+						if winners[i] == UnitName("player"):lower() then
 							debug("The player won an item!", 1)
-							LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
 							if table_items[itemString]["bid"] then
 								cost = table_items[itemString]["bid"];
-								local t = {
+								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, cost.." DKP");
+								FALoot:sendMessage(ADDON_MSG_PREFIX, {
 									["winAmount"] = cost,
 									["itemString"] = itemString,
-								}
-								debug(t, 1);
-								FALoot:sendMessage(ADDON_MSG_PREFIX, t, "RAID")
-							end
-						else
-							for j=1,#table_aliases do
-								if string.match(winners[i], table_aliases[j]) then
-									debug("The player won an item!", 1)
-									LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, (table_items[itemString]["bid"] or "??").." DKP")
-									if table_items[itemString]["bid"] then
-										cost = table_items[itemString]["bid"];
-									end
-									break;
-								end
+								}, "RAID")
+							else
+								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1);
 							end
 						end
 						
+						-- if the player didn't win or if we don't know what they bid then create a placeholder value
 						if not cost then
 							if table_items[itemString]["currentValue"] == 30 then
 								cost = table_items[itemString]["bid"] or "30+";
@@ -1314,16 +1287,21 @@ function FALoot:parseChat(msg, author)
 								cost = tostring(table_items[itemString]["currentValue"]);
 							end
 						end
+						
+						-- create a table entry for that pricepoint
 						if not table_items[itemString]["winners"][cost] then
 							table_items[itemString]["winners"][cost] = {};
 						end
+						
+						-- insert this event into the winners table
 						table.insert(table_items[itemString]["winners"][cost], winners[i]);
 						
+						-- if # of winners >= item quantity then auto end the item
 						local numWinners = 0;
 						for j, v in pairs(table_items[itemString]["winners"]) do
 							numWinners = numWinners + #v;
 						end
-						debug("numWinners = "..numWinners, 1);
+						debug("numWinners = "..numWinners, 3);
 						if numWinners >= table_items[itemString]["quantity"] then
 							FALoot:itemEnd(itemString);
 							break;
@@ -1363,7 +1341,6 @@ function events:ADDON_LOADED(name)
 		debugOn = FALoot_options["debugOn"] or debugOn;
 		expTime = FALoot_options["expTime"] or expTime;
 		cacheInterval = FALoot_options["cacheInterval"] or cacheInterval;
-		table_aliases = FALoot_options["table_aliases"] or table_aliases;
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
 		
@@ -1429,7 +1406,6 @@ function events:PLAYER_LOGOUT(...)
 		["debugOn"]        = debugOn,
 		["expTime"]        = expTime,
 		["cacheInterval"]  = cacheInterval,
-		["table_aliases"]  = table_aliases,
 		["autolootToggle"] = autolootToggle,
 		["autolootKey"]    = autolootKey,
 	};
