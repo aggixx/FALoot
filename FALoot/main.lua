@@ -1,7 +1,6 @@
 --[[
 	Fix setLoot on login
 	Fix status text
-	Reevaluate usage of itemTableUpdate
 -]]
 
 -- Declare strings
@@ -65,6 +64,7 @@ local scrollingTable;
 local tellsButton;
 local closeButton;
 local bidButton;
+local statusText;
 
 --helper functions
 
@@ -601,12 +601,12 @@ function FALoot:createGUI()
 	statusbg:SetBackdropBorderColor(0.4,0.4,0.4)
 
 	-- Create the text of the Status Bar
-	local statustext = statusbg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	statustext:SetPoint("TOPLEFT", 7, -2)
-	statustext:SetPoint("BOTTOMRIGHT", -7, 2)
-	statustext:SetHeight(20)
-	statustext:SetJustifyH("LEFT")
-	statustext:SetText("")
+	statusText = statusbg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	statusText:SetPoint("TOPLEFT", 7, -2)
+	statusText:SetPoint("BOTTOMRIGHT", -7, 2)
+	statusText:SetHeight(20)
+	statusText:SetJustifyH("LEFT")
+	statusText:SetText("")
 
 	-- Create the background of the title
 	local titlebg = frame:CreateTexture(nil, "OVERLAY")
@@ -1084,9 +1084,7 @@ function FALoot:checkBids()
 end
 
 function FALoot:generateStatusText()
-	return;
-	
-	--[[local bidding, rolling, only = 0, 0;
+	local bidding, rolling, only = 0, 0;
 	for itemString, v in pairs(table_items) do
 		if table_items[itemString]["bidStatus"] and table_items[itemString]["status"] ~= "Ended" then
 			only = itemString;
@@ -1099,7 +1097,7 @@ function FALoot:generateStatusText()
 	end
 	
 	if bidding + rolling == 0 then
-		window:SetStatusText("");
+		statusText:SetText("");
 	elseif bidding + rolling == 1 then
 		local verb = "";
 		if bidding > 0 then
@@ -1107,7 +1105,7 @@ function FALoot:generateStatusText()
 		else
 			verb = "roll"
 		end
-		window:SetStatusText("Waiting to " .. verb .. " on " .. table_items[only]["displayName"] .. ".")
+		statusText:SetText("Waiting to " .. verb .. " on " .. table_items[only]["displayName"] .. ".")
 	else
 		if bidding > 0 and rolling > 0 then
 			local plural1, plural2 = "", "";
@@ -1117,13 +1115,13 @@ function FALoot:generateStatusText()
 			if rolling > 1 then
 				plural2 = "s";
 			end
-			window:SetStatusText("Waiting to bid on " .. bidding .. " item" .. plural1 .. " and roll on " .. rolling .. " item" .. plural2 .. ".");
+			statusText:SetText("Waiting to bid on " .. bidding .. " item" .. plural1 .. " and roll on " .. rolling .. " item" .. plural2 .. ".");
 		elseif bidding > 0 then
-			window:SetStatusText("Waiting to bid on " .. bidding .. " items.");
+			statusText:SetText("Waiting to bid on " .. bidding .. " items.");
 		else
-			window:SetStatusText("Waiting to roll on " .. rolling .. " items.");
+			statusText:SetText("Waiting to roll on " .. rolling .. " items.");
 		end
-	end--]]
+	end
 end
 
 function FALoot:setLeaderUIVisibility()
