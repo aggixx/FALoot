@@ -1,5 +1,5 @@
 --[[
-	Fix setLoot on login
+	Fix setLoot on login (confirm)
 -]]
 
 -- Declare strings
@@ -1304,7 +1304,8 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
-	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 1)
+	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 1);
+	debug({FALoot:addonEnabled(true)}, 1);
 	if FALoot:addonEnabled(true) then
 		if not (toggle == "0" and key == "NONE") then
 			SetCVar("autoLootDefault", 0);
@@ -1362,6 +1363,9 @@ function events:PLAYER_LOGOUT(...)
 	};
 end
 function events:PLAYER_ENTERING_WORLD()
+	FALoot:setAutoLoot();
+end
+function events:VARIABLES_LOADED()
 	if autolootToggle and autolootKey then
 		FALoot:setAutoLoot();
 	else
