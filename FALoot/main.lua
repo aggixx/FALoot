@@ -3,29 +3,29 @@
 -]]
 
 -- Declare strings
-local ADDON_NAME = "FALoot"
-local ADDON_VERSION_FULL = "v4.1g"
-local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "")
+local ADDON_NAME = "FALoot";
+local ADDON_VERSION_FULL = "v4.1g";
+local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
 local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
-local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot"
+local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
-local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r"
+local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r";
 -- |c COLOR    |H linkType : itemId : enchantId : gemId1 : gemId2 : gemId3 : gemId4 : suffixId : uniqueId  : linkLevel : reforgeId :      :      :      :      :      |h itemName            |h|r
 -- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    :? %d*      :? %d*      :? %d* :? %d* :? %d* :? %d* :? %d* |h .-                  |h|r"
 -- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
-local THUNDERFORGED_COLOR = "FFFF8000"
+local THUNDERFORGED_COLOR = "FFFF8000";
 
 -- Load the libraries
-FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME)
-LibStub("AceComm-3.0"):Embed(FALoot)
+FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME);
+LibStub("AceComm-3.0"):Embed(FALoot);
 
-local ScrollingTable = LibStub("ScrollingTable")
-local libSerialize = LibStub:GetLibrary("AceSerializer-3.0")
-local libCompress = LibStub:GetLibrary("LibCompress")
-local libEncode = libCompress:GetAddonEncodeTable()
+local ScrollingTable = LibStub("ScrollingTable");
+local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
+local libCompress = LibStub:GetLibrary("LibCompress");
+local libEncode = libCompress:GetAddonEncodeTable();
 local AceGUI = LibStub("AceGUI-3.0");
 
 -- Declare local variables
@@ -1304,8 +1304,8 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
-	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 1);
-	debug({FALoot:addonEnabled(true)}, 1);
+	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 3);
+	debug({FALoot:addonEnabled(true)}, 3);
 	if FALoot:addonEnabled(true) then
 		if not (toggle == "0" and key == "NONE") then
 			SetCVar("autoLootDefault", 0);
