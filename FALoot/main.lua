@@ -867,8 +867,6 @@ StaticPopupDialogs["FALOOT_BID"] = {
 	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
 
---[[window:SetCallback("OnClick", ) -]]
-
 StaticPopupDialogs["FALOOT_END"] = {
 	text = "Are you sure you want to manually end this item for all players in the raid?",
 	button1 = YES,
@@ -1019,13 +1017,13 @@ function FALoot:itemTableUpdate()
 	scrollingTable:SetData(t, false)
 	FALoot:generateIcons()
 	
-	--[[if #t >= 8 then
+	if #t >= 8 then
 		tellsButton:ClearAllPoints();
-		tellsButton:SetPoint("TOP", window.bidButton, "BOTTOM");
+		tellsButton:SetPoint("TOP", bidButton, "BOTTOM");
 	else
 		tellsButton:ClearAllPoints();
-		tellsButton:SetPoint("BOTTOM", window.bidButton, "TOP");
-	end--]]
+		tellsButton:SetPoint("BOTTOM", bidButton, "TOP");
+	end
 end
 
 function FALoot:itemBid(itemString, bid)
@@ -1157,17 +1155,6 @@ local function onUpdate(self,elapsed)
 			FALoot:itemRemove(i);
 		end
 	end
-	
-	--[[
-	--enable/disable buttons
-	if (iconSelect and iconSelect > 0) or (scrollingTable:GetSelection() and scrollingTable:GetSelection() > 0 and not iconSelect) then
-		window:SetDisabled(false);
-		tellsButton:Enable();
-	else
-		window:SetDisabled(true);
-		tellsButton:Disable();
-	end
-	--]]
 	
 	-- trigger select events
 	local selectStatus;
@@ -1317,6 +1304,7 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
+	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 1)
 	if FALoot:addonEnabled(true) then
 		if not (toggle == "0" and key == "NONE") then
 			SetCVar("autoLootDefault", 0);
@@ -1348,7 +1336,35 @@ function events:ADDON_LOADED(name)
 	end
 end
 function events:PLAYER_LOGIN()
-	if not (autolootToggle and autolootKey) then
+	FALoot:createGUI();
+	FALoot:setLeaderUIVisibility();
+
+	if debugOn > 0 then
+		itemAdd("96379:0")
+		itemAdd("96740:0")
+		itemAdd("96740:0")
+		itemAdd("96373:0")
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
+		itemAdd("96384:0")
+		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+	else
+		window:Hide();
+	end
+end
+function events:PLAYER_LOGOUT(...)
+	FALoot_options = {
+		["debugOn"]        = debugOn,
+		["expTime"]        = expTime,
+		["cacheInterval"]  = cacheInterval,
+		["autolootToggle"] = autolootToggle,
+		["autolootKey"]    = autolootKey,
+	};
+end
+function events:PLAYER_ENTERING_WORLD()
+	if autolootToggle and autolootKey then
+		FALoot:setAutoLoot();
+	else
 		local toggle;
 		if GetCVar("autoLootDefault") == "1" then
 			toggle = "On";
@@ -1381,34 +1397,7 @@ function events:PLAYER_LOGIN()
 			preferredIndex = STATICPOPUPS_NUMDIALOGS,
 		}
 		StaticPopup_Show("FALOOT_AUTOLOOT");
-	else
-		FALoot:setAutoLoot();
 	end
-	
-	FALoot:createGUI();
-	FALoot:setLeaderUIVisibility();
-
-	if debugOn > 0 then
-		itemAdd("96379:0")
-		itemAdd("96740:0")
-		itemAdd("96740:0")
-		itemAdd("96373:0")
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
-		itemAdd("96384:0")
-		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
-	else
-		window:Hide();
-	end
-end
-function events:PLAYER_LOGOUT(...)
-	FALoot_options = {
-		["debugOn"]        = debugOn,
-		["expTime"]        = expTime,
-		["cacheInterval"]  = cacheInterval,
-		["autolootToggle"] = autolootToggle,
-		["autolootKey"]    = autolootKey,
-	};
 end
 function events:LOOT_OPENED(...)
 	if not FALoot:addonEnabled() then
