@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1g";
+local ADDON_VERSION_FULL = "v4.1h";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -1350,7 +1350,7 @@ function events:PLAYER_LOGIN()
 		itemAdd("96384:0")
 		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
 	else
-		window:Hide();
+		frame:Hide();
 	end
 end
 function events:PLAYER_LOGOUT(...)
