@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1j";
+local ADDON_VERSION_FULL = "v4.1k";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -342,6 +342,87 @@ local function StaticDataSave(data)
 	promptBidValue = data
 end
 
+-- Main Code
+
+local function itemAdd(itemString, checkCache)
+	debug("itemAdd(), itemString = "..itemString, 1);
+	-- itemString must be a string!
+	if type(itemString) ~= "string" then
+		debug("itemAdd was passed a non-string value!", 1);
+		return;
+	end
+	
+	local itemLink = ItemLinkAssemble(itemString);
+	
+	-- caching stuff
+	if itemLink then
+		debug("Item is cached, continuing.", 1);
+		for i=1,#table_itemQuery do
+			if table_itemQuery[i] == itemString then
+				table.remove(table_itemQuery, i)
+				break
+			end
+		end
+	else
+		if not checkCache then
+			debug("Item is not cached, requesting item info from server.", 1);
+			table.insert(table_itemQuery, itemString);
+		else
+			debug("Item is not cached, aborting.", 1);
+		end
+		return;
+	end
+	
+	-- check if item passes the filter
+	if not FALoot:checkFilters(itemString) then
+		debug(itemString.." did not pass the item filter.", 2);
+		return;
+	end
+	
+	if table_items[itemString] then
+		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
+		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
+		local displayName = itemLink
+		if FALoot:isThunderforged(iLevel) then
+			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
+		end
+		if table_items[itemString]["quantity"] > 1 then
+			displayName = displayName .. " x" .. table_items[itemString]["quantity"];
+		end
+		table_items[itemString]["displayName"] = displayName;
+	else
+		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
+		local displayName = itemLink
+		if FALoot:isThunderforged(iLevel) then
+			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
+		end
+		table_items[itemString] = {
+			["quantity"] = 1,
+			["displayName"] = displayName,
+			["itemLink"] = itemLink,
+			["texture"] = texture,
+			["currentValue"] = 30,
+			["winners"] = {},
+		}
+	end
+	
+	if not frame:IsShown() then
+		if UnitAffectingCombat("PLAYER") then
+			showAfterCombat = true
+			debug(itemLink.." was found but the player is in combat.");
+		else
+			frame:Show()
+		end
+	end
+	
+	return true
+end
+
+function FALoot:itemAdd(itemString, checkCache)
+	itemAdd(itemString, checkCache);
+	FALoot:itemTableUpdate();
+end
+
 function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompress)
 	--serialize
 	local serialized, msg = libSerialize:Serialize(text)
@@ -419,7 +500,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				if not hasBeenLooted[i] then
 					for j=1,#v do
 						debug("Added "..v[j].." to the loot window via addon message.", 2);
-						FALoot:itemAdd(v[j]);
+						itemAdd(v[j]);
 					end
 					hasBeenLooted[i] = true;
 				else
@@ -880,83 +961,6 @@ StaticPopupDialogs["FALOOT_END"] = {
 	enterClicksFirstButton = 1,
 	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
-
-local function itemAdd(itemString, checkCache)
-	debug("itemAdd(), itemString = "..itemString, 1);
-	-- itemString must be a string!
-	if type(itemString) ~= "string" then
-		debug("itemAdd was passed a non-string value!", 1);
-		return;
-	end
-	
-	local itemLink = ItemLinkAssemble(itemString);
-	
-	-- caching stuff
-	if itemLink then
-		debug("Item is cached, continuing.", 1);
-		for i=1,#table_itemQuery do
-			if table_itemQuery[i] == itemString then
-				table.remove(table_itemQuery, i)
-				break
-			end
-		end
-	else
-		if not checkCache then
-			debug("Item is not cached, requesting item info from server.", 1);
-			table.insert(table_itemQuery, itemString);
-		else
-			debug("Item is not cached, aborting.", 1);
-		end
-		return;
-	end
-	
-	-- check if item passes the filter
-	if not FALoot:checkFilters(itemString) then
-		debug(itemString.." did not pass the item filter.", 2);
-		return;
-	end
-	
-	if table_items[itemString] then
-		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
-		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
-		local displayName = itemLink
-		if FALoot:isThunderforged(iLevel) then
-			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
-		end
-		if table_items[itemString]["quantity"] > 1 then
-			displayName = displayName .. " x" .. table_items[itemString]["quantity"];
-		end
-		table_items[itemString]["displayName"] = displayName;
-	else
-		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
-		local displayName = itemLink
-		if FALoot:isThunderforged(iLevel) then
-			displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
-		end
-		table_items[itemString] = {
-			["quantity"] = 1,
-			["displayName"] = displayName,
-			["itemLink"] = itemLink,
-			["texture"] = texture,
-			["currentValue"] = 30,
-			["winners"] = {},
-		}
-	end
-	
-	if not frame:IsShown() then
-		if UnitAffectingCombat("PLAYER") then
-			showAfterCombat = true
-			debug(itemLink.." was found but the player is in combat.");
-		else
-			frame:Show()
-		end
-	end
-end
-
-function FALoot:itemAdd(itemString, checkCache)
-	itemAdd(itemString, checkCache);
-	FALoot:itemTableUpdate();
-end
 
 function FALoot:itemTableUpdate()
 	local t = {};
@@ -1432,6 +1436,19 @@ function events:LOOT_OPENED(...)
 		end
 	end
 	
+	-- prune enemies with no loot
+	for i, v in pairs(loot) do
+		if #v == 0 then
+			loot[i] = nil;
+		end
+	end
+	
+	-- stop now if there's no loot
+	if loot == {} then
+		debug("There is no loot on this mob!", 1);
+		return;
+	end
+	
 	-- add an item count for each GUID so that other clients may verify data integrity
 	for i, v in pairs(loot) do
 		loot[i]["checkSum"] = #v;
@@ -1440,21 +1457,14 @@ function events:LOOT_OPENED(...)
 	debug(loot, 2);
 	
 	-- check data integrity
-	local count = 0;
 	for i, v in pairs(loot) do
 		if not (v["checkSum"] and v["checkSum"] == #v) then
-			debug("Loot data recieved via an addon message failed the integrity check.");
+			debug("Self assembled loot data failed the integrity check.");
 			return;
 		end
 		if #v == 0 then
 			loot[i] = nil;
 		end
-		count = count + 1;
-	end
-	
-	if count == 0 then
-		debug("There is no loot on this mob!", 1);
-		return;
 	end
 	
 	-- send addon message to tell others to add this to their window
@@ -1528,11 +1538,14 @@ function events:PLAYER_REGEN_ENABLED()
 	end
 end
 function events:GET_ITEM_INFO_RECEIVED()
-	local limit = #table_itemQuery
+	local limit, itemAdded = #table_itemQuery;
 	for i=0,limit-1 do
-		itemAdd(table_itemQuery[limit-i], true)
+		local result = itemAdd(table_itemQuery[limit-i], true);
+		if result and not itemAdded then
+			itemAdded = result;
+		end
 	end
-	if limit > 0 then
+	if itemAdded then
 		FALoot:itemTableUpdate();
 	end
 end
