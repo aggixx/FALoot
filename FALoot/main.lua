@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1h";
+local ADDON_VERSION_FULL = "v4.1i";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -1306,18 +1306,20 @@ function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
 	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 3);
 	debug({FALoot:addonEnabled(true)}, 3);
-	if FALoot:addonEnabled(true) then
-		if not (toggle == "0" and key == "NONE") then
-			SetCVar("autoLootDefault", 0);
-			SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
-			debug("Your autoloot has been disabled.");
-		end
-	elseif autolootToggle and autolootKey then
-		if key == "NONE" then
-			debug("Your loot settings have been restored.");
-			SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
-			if toggle == "0" then
-				SetCVar("autoLootDefault", autolootToggle);
+	if autolootToggle and autolootKey then
+		if FALoot:addonEnabled(true) then
+			if not (toggle == "0" and key == "NONE") and not (autolootToggle == "0" and autolootKey == "NONE") then
+				SetCVar("autoLootDefault", 0);
+				SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
+				debug("Your autoloot has been disabled.");
+			end
+		else
+			if key == "NONE" then
+				debug("Your loot settings have been restored.");
+				SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
+				if toggle == "0" then
+					SetCVar("autoLootDefault", autolootToggle);
+				end
 			end
 		end
 	end
