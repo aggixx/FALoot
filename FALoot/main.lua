@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1i";
+local ADDON_VERSION_FULL = "v4.1j";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -418,8 +418,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			for i, v in pairs(loot) do
 				if not hasBeenLooted[i] then
 					for j=1,#v do
-						debug("Added "..v[j].."to the loot window via addon message.", 2);
-						itemAdd(v[j])
+						debug("Added "..v[j].." to the loot window via addon message.", 2);
+						FALoot:itemAdd(v[j]);
 					end
 					hasBeenLooted[i] = true;
 				else
