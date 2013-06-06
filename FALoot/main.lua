@@ -4,7 +4,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1k";
+local ADDON_VERSION_FULL = "v4.1l";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -26,7 +26,6 @@ local ScrollingTable = LibStub("ScrollingTable");
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
 local libCompress = LibStub:GetLibrary("LibCompress");
 local libEncode = libCompress:GetAddonEncodeTable();
-local AceGUI = LibStub("AceGUI-3.0");
 
 -- Declare local variables
 
