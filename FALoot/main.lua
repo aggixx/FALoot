@@ -1,6 +1,5 @@
 --[[
 	Announce winners to aspects chat when session ends
-	Sort table by roll
 -]]
 
 -- Declare strings
@@ -409,6 +408,11 @@ local function itemAdd(itemString, checkCache)
 		return;
 	end
 	
+	-- Workaround for random suffix items with broken item links
+	local tooltipItemLink = itemLink;
+	itemString = string.gsub(itemString, "%-?%d+$", "0");
+	itemLink = ItemLinkAssemble(itemString);
+	
 	if table_items[itemString] then
 		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
 		local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
@@ -433,6 +437,7 @@ local function itemAdd(itemString, checkCache)
 			["texture"] = texture,
 			["currentValue"] = 30,
 			["winners"] = {},
+			["tooltipItemLink"] = tooltipItemLink,
 		}
 	end
 	
@@ -973,7 +978,7 @@ function FALoot:generateIcons()
 					
 					--tooltip stuff
 					GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-					GameTooltip:SetHyperlink(v["itemLink"])
+					GameTooltip:SetHyperlink(v["tooltipItemLink"])
 					GameTooltip:Show()
 				end)
 				table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
@@ -1246,7 +1251,9 @@ function FALoot:tellsTableUpdate()
 						return false;
 					end
 				end
-			else
+			elseif (tonumber(a[4]) or 0) ~= (tonumber(b[4]) or 0) then
+				return (tonumber(a[4]) or 0) > (tonumber(b[4]) or 0);
+			else				
 				return a[3] > b[3];
 			end
 		end)
@@ -1358,7 +1365,7 @@ function FALoot:tellsTableUpdate()
 					-- Find the yellow threshold
 					for j=1,#t["tells"] do
 						if t["tells"][j][1] == tellsByRank[i][itemsLeft] then
-							tellsYellowThreshold = t["tells"][j][3] - 58;
+							tellsYellowThreshold = max(t["tells"][j][3] - 58, t["currentValue"]);
 							break;
 						end
 					end
