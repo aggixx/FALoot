@@ -1,5 +1,6 @@
 --[[
 	Announce winners to aspects chat when session ends
+	Sort table by roll
 -]]
 
 -- Declare strings
@@ -1253,13 +1254,13 @@ function FALoot:tellsTableUpdate()
 		-- Make a copy of the item entry so we can make our modifications without affecting the original
 		local t = deepcopy(table_items[tellsInProgress]);
 		
-		-- Purge any entries that are lower than what we want to display right now
+		--[[-- Purge any entries that are lower than what we want to display right now
 		local limit = #t["tells"];
 		for i=0,limit-1 do
 			if t["tells"][limit-i][3] < t["currentValue"] then
 				table.remove(t["tells"], limit-i);
 			end
-		end
+		end--]]
 		
 		-- Set name color
 		for i=1,#t["tells"] do
@@ -1307,13 +1308,20 @@ function FALoot:tellsTableUpdate()
 			end
 		else
 			local tellsByRank, currentRank, j = {}, nil, 0;
-			for i=1,#t["tells"] do
-				if not currentRank or currentRank ~= t["tells"][i][2] then
-					currentRank = t["tells"][i][2];
-					j = j + 1;
-					tellsByRank[j] = {};
+			if t["currentValue"] > 10 then
+				for i=1,#t["tells"] do
+					if not currentRank or currentRank ~= t["tells"][i][2] then
+						currentRank = t["tells"][i][2];
+						j = j + 1;
+						tellsByRank[j] = {};
+					end
+					table.insert(tellsByRank[j], t["tells"][i][1]);
 				end
-				table.insert(tellsByRank[j], t["tells"][i][1]);
+			else
+				tellsByRank[1] = {}
+				for i=1,#t["tells"] do
+					table.insert(tellsByRank[1], t["tells"][i][1]);
+				end
 			end
 			
 			local itemsLeft = t["quantity"] - numWinners;
@@ -1381,7 +1389,7 @@ function FALoot:tellsTableUpdate()
 		tellsTable:SetData(t["tells"], true);
 		
 		-- Set button text and script
-		if isCompetition then
+		if isCompetition and table_items[tellsInProgress]["tells"][1][3] >= t["currentValue"] then
 			if tellsFrameActionButton:GetButtonState() ~= "DISABLED" then
 				tellsFrameActionButton:SetText("Roll!");
 				tellsFrameActionButton:SetScript("OnClick", function(self)
@@ -1399,7 +1407,16 @@ function FALoot:tellsTableUpdate()
 			else
 				tellsFrameActionButton:SetText("Disenchant");
 				tellsFrameActionButton:SetScript("OnClick", function()
-					SendChatMessage(table_items[tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, "aspects");
+					local channels, channelNum = {GetChannelList()};
+					for i=1,#channels do
+						if string.lower(channels[i]) == "aspects" then
+							channelNum = channels[i-1];
+							break;
+						end
+					end
+					if channelNum then
+						SendChatMessage(table_items[tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, channelNum);
+					end
 				end)
 			end
 		end
@@ -1750,7 +1767,7 @@ function FALoot:parseWhisper(msg, author)
 		end
 	end
 	if not bidUpdated then
-		table.insert(table_items[tellsInProgress]["tells"], {author, nil, bid});
+		table.insert(table_items[tellsInProgress]["tells"], {author, nil, bid, ""});
 		SendChatMessage("<FA Loot> Bid for "..table_items[tellsInProgress]["itemLink"].." accepted.", "WHISPER", nil, author);
 	end
 	FALoot:tellsTableUpdate();
@@ -1769,7 +1786,7 @@ function FALoot:parseRoll(msg, author)
 	for i=1,#table_items[tellsInProgress]["tells"] do
 		if table_items[tellsInProgress]["tells"][i][1] == author then
 			if table_items[tellsInProgress]["tells"][i][4] == "" and table_items[tellsInProgress]["tells"][i][3] >= table_items[tellsInProgress]["currentValue"] then
-				if (table_items[tellsInProgress]["tells"][i][3] == 30 and rollMin == 1 and rollMax == 30) or (rollMin + rollMax == table_items[tellsInProgress]["tells"][i][3] and rollMax - rollMin == 30) then
+				if (table_items[tellsInProgress]["tells"][i][3] <= 30 and rollMin == 1 and rollMax == table_items[tellsInProgress]["tells"][i][3]) or (rollMin + rollMax == table_items[tellsInProgress]["tells"][i][3] and rollMax - rollMin == 30) then
 					table_items[tellsInProgress]["tells"][i][4] = rollResult;
 					FALoot:tellsTableUpdate();
 				end
@@ -1834,9 +1851,9 @@ function events:PLAYER_LOGIN()
 		table_items[tellsInProgress]["tells"] = {
 			{"Dyrimar", nil, 30, ""},
 			{"Demonicblade", nil, 30, ""},
-			{"Pawkets", "Whelp", 118, ""},
+			{"Pawkets", nil, 10, ""},
 			{"Xaerlun", "Wyrm", 10, ""},
-			{"Unbrewable", nil, 100, ""},
+			{"Unbrewable", nil, 10, ""},
 		}
 		tellsFrame:Show();
 		FALoot:tellsTableUpdate();
