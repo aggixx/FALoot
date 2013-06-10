@@ -1,9 +1,9 @@
 ## Interface: 50300
 ## Title: FA Loot
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
-## Version: v4.1
+## Version: v4.2
 ## Author: Pawkets
-## SavedVariables: FALoot_options
+## SavedVariables: FALoot_options, FALoot_itemHistory
 
 # Libraries
 embeds.xml

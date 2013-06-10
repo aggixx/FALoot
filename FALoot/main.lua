@@ -1,10 +1,10 @@
 --[[
-	Fix setLoot on login (confirm)
+	Announce winners to aspects chat when session ends
 -]]
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.1l";
+local ADDON_VERSION_FULL = "v4.2a";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -43,6 +43,7 @@ local maxIcons = 11;
 local _;
 local table_items = {};
 local table_itemQuery = {};
+local table_itemHistory = {};
 local table_icons = {};
 local table_who = {};
 local hasBeenLooted = {};
@@ -53,6 +54,10 @@ local bidPrompt;
 local promptBidValue;
 local updateMsg;
 local oldSelectStatus = 0;
+local tellsInProgress;
+local tellsGreenThreshold;
+local tellsYellowThreshold;
+local tellsRankThreshold;
 
 -- GUI elements
 local frame;
@@ -63,11 +68,20 @@ local closeButton;
 local bidButton;
 local statusText;
 
+local tellsFrame;
+local tellsTitleText;
+local tellsTable;
+local tellsFrameAwardButton;
+local tellsFrameActionButton;
+local tellsTitleBg;
+
 --helper functions
 
 local function debug(msg, verbosity)
 	if (not verbosity or debugOn >= verbosity) then
-		if type(msg) == "string" or type(msg) == "number" then
+		if type(msg) == "string" or type(msg) == "number" or type(msg) == nil then
+			print(ADDON_CHAT_HEADER..(msg or "nil"));
+		elseif type(msg) == "boolean" then
 			print(ADDON_CHAT_HEADER..msg);
 		elseif type(msg) == "table" then
 			if not DevTools_Dump then
@@ -136,6 +150,21 @@ function string.levenshtein(str1, str2)
 	
         -- return the last value - this is the Levenshtein distance
 	return matrix[len1][len2]
+end
+
+local function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
 
 local function ItemLinkStrip(itemLink)
@@ -218,12 +247,12 @@ local function isMainRaid()
 	else
 		groupType = "party"
 	end
-	local aspects = 0
-	local drakes = 0
+	local aspects, drakes = 0, 0;
+	local showOffline = GetGuildRosterShowOffline();
+	SetGuildRosterShowOffline(false);
 	for i=1,40 do
 		if UnitExists(groupType..i) then
 			local name = GetRaidRosterInfo(i)
-			SetGuildRosterShowOffline(false)
 			local _, onlineguildies = GetNumGuildMembers()
 			for j=1,onlineguildies do
 				local _, rankName, rankIndex = GetGuildRosterInfo(j)
@@ -235,6 +264,7 @@ local function isMainRaid()
 			end
 		end
 	end
+	SetGuildRosterShowOffline(showOffline);
 	if aspects >= 2 and drakes >= 5 then
 		return true
 	else
@@ -420,6 +450,27 @@ end
 function FALoot:itemAdd(itemString, checkCache)
 	itemAdd(itemString, checkCache);
 	FALoot:itemTableUpdate();
+end
+
+function FALoot:itemTakeTells(itemString)
+	debug("itemTakeTells(), itemString = "..itemString, 1);
+	-- itemString must be a string!
+	if type(itemString) ~= "string" then
+		debug("itemTakeTells was passed a non-string value!", 1);
+		return;
+	end
+	
+	if table_items[itemString] and not table_items[itemString]["status"] then
+		table_items[itemString]["tells"] = {};
+		tellsInProgress = itemString;
+		tellsTitleText:SetText(table_items[itemString]["displayName"]);
+		tellsTitleBg:SetWidth((tellsTitleText:GetWidth() or 0) + 10);
+		FALoot:tellsTableUpdate();
+		SendChatMessage(table_items[itemString]["itemLink"].." 30", "RAID");
+		tellsButton:Disable();
+	else
+		debug("Item does not exist or is already in progress!", 1);
+	end
 end
 
 function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompress)
@@ -672,27 +723,6 @@ function FALoot:createGUI()
 		debug("Querying for bid, coroutine paused.", 1);
 	end);
 
-	-- Create the "Take Tells" button
-	tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
-	tellsButton:SetScript("OnClick", function(self, event)
-		local id = scrollingTable:GetSelection()
-		local j, itemLink, itemString = 0;
-		for i, v in pairs(table_items) do
-			j = j + 1;
-			if j == id then
-				itemLink, itemString = v["itemLink"], i;
-				break;
-			end
-		end
-		debug("This functionality is not yet implemented.");
-	end)
-	tellsButton:SetPoint("BOTTOM", bidButton, "TOP");
-	tellsButton:SetHeight(20);
-	tellsButton:SetWidth(80);
-	tellsButton:SetText("Take Tells");
-	tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
-	tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
-
 	-- Create the background of the Status Bar
 	local statusbg = CreateFrame("Button", nil, frame)
 	statusbg:SetPoint("BOTTOMLEFT", 15, 15)
@@ -755,6 +785,150 @@ function FALoot:createGUI()
 	titlebg_r:SetPoint("LEFT", titlebg, "RIGHT")
 	titlebg_r:SetWidth(30)
 	titlebg_r:SetHeight(40)
+	
+	-- //////////////////////
+	-- Creation of Tells Frame
+	-- //////////////////////
+	
+	-- Create the main tellsFrame
+	tellsFrame = CreateFrame("frame", "FALoot_Tells", UIParent)
+	tellsFrame:EnableMouse(true);
+	tellsFrame:SetMovable(true);
+	tellsFrame:SetFrameStrata("FULLSCREEN_DIALOG");
+	tellsFrame:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true, tileSize = 32, edgeSize = 32,
+		insets = { left = 8, right = 8, top = 8, bottom = 8 }
+	});
+	tellsFrame:SetBackdropColor(0, 0, 0, 1);
+	tellsFrame:SetToplevel(true);
+	tellsFrame:SetWidth(348);
+	tellsFrame:SetHeight(184);
+	tellsFrame:SetPoint("CENTER");
+	tellsFrame:Hide();
+
+	-- Create the background of the title
+	tellsTitleBg = tellsFrame:CreateTexture(nil, "OVERLAY")
+	tellsTitleBg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	tellsTitleBg:SetTexCoord(0.31, 0.67, 0, 0.63)
+	tellsTitleBg:SetPoint("TOP", 0, 12)
+	tellsTitleBg:SetHeight(40)
+	
+	-- Create the title frame
+	local tellsTitle = CreateFrame("Frame", nil, tellsFrame)
+	tellsTitle:EnableMouse(true)
+	tellsTitle:SetScript("OnMouseDown", function(frame)
+		frame:GetParent():StartMoving()
+	end)
+	tellsTitle:SetScript("OnMouseUp", function(frame)
+		frame:GetParent():StopMovingOrSizing()
+	end)
+	tellsTitle:SetAllPoints(tellsTitleBg)
+
+	-- Create the text of the title
+	tellsTitleText = tellsTitle:CreateFontString(nil, "OVERLAY", "GameFontNormal");
+	tellsTitleText:SetPoint("TOP", tellsTitleBg, "TOP", 0, -14);
+	
+	tellsTitleBg:SetWidth((tellsTitleText:GetWidth() or 0) + 10)
+
+	-- Create the title background left edge
+	local tellsTitleBg_l = tellsFrame:CreateTexture(nil, "OVERLAY")
+	tellsTitleBg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	tellsTitleBg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
+	tellsTitleBg_l:SetPoint("RIGHT", tellsTitleBg, "LEFT")
+	tellsTitleBg_l:SetWidth(30)
+	tellsTitleBg_l:SetHeight(40)
+
+	-- Create the title background right edge
+	local tellsTitleBg_r = tellsFrame:CreateTexture(nil, "OVERLAY")
+	tellsTitleBg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	tellsTitleBg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
+	tellsTitleBg_r:SetPoint("LEFT", tellsTitleBg, "RIGHT")
+	tellsTitleBg_r:SetWidth(30)
+	tellsTitleBg_r:SetHeight(40)
+	
+	-- Create the scrollingTable
+	tellsTable = ScrollingTable:CreateST({
+		{
+			["name"] = "Name",
+			["width"] = 90,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+		},
+		{
+			["name"] = "Rank",
+			["width"] = 60,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+		},
+		{
+			["name"] = "Bid",
+			["width"] = 40,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+		},
+		{
+			["name"] = "Roll",
+			["width"] = 40,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+		},
+		{
+			["name"] = "Flags",
+			["width"] = 40,
+			["align"] = "LEFT",
+			["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+		},
+	}, 6, nil, {["r"] = 0, ["g"] = 1, ["b"] = 0, ["a"] = 0.3}, tellsFrame);
+	tellsTable:EnableSelection(true);
+	tellsTable.frame:SetPoint("TOP", tellsTitleBg, "BOTTOM", 0, -10);
+	tellsTable.frame:SetScale(1.1);
+	
+	-- Create the Tell Window Award button
+	tellsFrameAwardButton = CreateFrame("Button", nil, tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameAwardButton:SetPoint("BOTTOMLEFT", 15, 15)
+	tellsFrameAwardButton:SetHeight(20)
+	tellsFrameAwardButton:SetWidth(154)
+	tellsFrameAwardButton:SetText("Award Item")
+	tellsFrameAwardButton:SetScript("OnClick", function(frame)
+		local selection = tellsTable:GetSelection();
+		if selection then
+			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["tells"][selection][1], "RAID");
+			table.remove(table_items[tellsInProgress]["tells"], selection);
+		end
+	end);
+	
+	-- Create the Tell Window Action button
+	tellsFrameActionButton = CreateFrame("Button", nil, tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameActionButton:SetPoint("BOTTOMRIGHT", -15, 15)
+	tellsFrameActionButton:SetHeight(20)
+	tellsFrameActionButton:SetWidth(154)
+	tellsFrameActionButton:SetText("Lower to 20")
+	tellsFrameActionButton:SetScript("OnClick", function(frame)
+		--frame:GetParent():Hide();
+	end);
+
+	-- Create the "Take Tells" button
+	tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
+	tellsButton:SetScript("OnClick", function(self, event)
+		local id = scrollingTable:GetSelection()
+		local j, itemLink, itemString = 0;
+		for i, v in pairs(table_items) do
+			j = j + 1;
+			if j == id then
+				FALoot:itemTakeTells(i);
+				break;
+			end
+		end
+	end)
+	tellsButton:SetPoint("BOTTOM", bidButton, "TOP");
+	tellsButton:SetHeight(20);
+	tellsButton:SetWidth(80);
+	tellsButton:SetText("Take Tells");
+	tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
+	tellsButton:Disable();
+	tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -906,7 +1080,7 @@ SLASH_FAROLL1 = "/faroll"
 local function FARoll(value)
 	value = tonumber(value)
 	if value % 2 ~= 0 then
-		print("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
+		debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
 		value = math.floor(value)
 		if value % 2 == 1 then
 			value = value - 1
@@ -917,7 +1091,7 @@ local function FARoll(value)
 	elseif value == 30 or value == 20 or value == 10 then
 		RandomRoll(1, value)
 	else
-		print("Invalid roll value!")
+		debug("Invalid roll value!")
 	end
 end
 SlashCmdList["FAROLL"] = FARoll
@@ -1029,6 +1203,214 @@ function FALoot:itemTableUpdate()
 	end
 end
 
+function FALoot:tellsTableUpdate()
+	if tellsInProgress and table_items[tellsInProgress] and table_items[tellsInProgress]["status"] ~= "Ended" then
+		-- Set rank data
+		GuildRoster()
+		local showOffline = GetGuildRosterShowOffline();
+		SetGuildRosterShowOffline(true);
+		
+		for i=1,#table_items[tellsInProgress]["tells"] do
+			local name, rank = table_items[tellsInProgress]["tells"][i][1], table_items[tellsInProgress]["tells"][i][2];
+			
+			if not rank then
+				table_items[tellsInProgress]["tells"][i][2] = "";
+				for j=1,GetNumGuildMembers() do
+					local currentName, rankName = GetGuildRosterInfo(j)
+					if currentName == name then
+						if rankName == "Aspect" or rankName == "Aspects" or rankName == "Dragon" or rankName == "Drake" then
+							table_items[tellsInProgress]["tells"][i][2] = "Drake";
+						elseif rankName == "Titan" or rankName == "Wyrm" then
+							table_items[tellsInProgress]["tells"][i][2] = "Wyrm";
+						end
+						break;
+					end
+				end
+			end
+		end
+		
+		SetGuildRosterShowOffline(showOffline);
+		
+		-- Sort table
+		table.sort(table_items[tellsInProgress]["tells"], function(a, b)
+			if a[2] ~= b[2] then
+				if a[2] == "Drake" then
+					return true;
+				elseif b[2] == "Drake" then
+					return false;
+				else
+					if a[2] == "Whelp" then
+						return true;
+					else
+						return false;
+					end
+				end
+			else
+				return a[3] > b[3];
+			end
+		end)
+		
+		-- Make a copy of the item entry so we can make our modifications without affecting the original
+		local t = deepcopy(table_items[tellsInProgress]);
+		
+		-- Purge any entries that are lower than what we want to display right now
+		local limit = #t["tells"];
+		for i=0,limit-1 do
+			if t["tells"][limit-i][3] < t["currentValue"] then
+				table.remove(t["tells"], limit-i);
+			end
+		end
+		
+		-- Set name color
+		for i=1,#t["tells"] do
+			if not string.match(t["tells"][i][1], "|c%x+.|r") then
+				local groupType;
+				if IsInRaid() then
+					groupType = "raid";
+				else
+					groupType = "party";
+				end
+				for j=1,GetNumGroupMembers() do
+					if t["tells"][i][1] == UnitName(groupType..j) then
+						local _, class = UnitClass(groupType..j);
+						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. t["tells"][i][1] .. "|r";
+						break;
+					end
+				end
+			end
+		end
+		
+		-- Count flags
+		local currentTime = time();
+		for i=1,#t["tells"] do
+			local flags = 0;
+			if table_itemHistory[t["tells"][i][1]] then
+				for j=1,#table_itemHistory[t["tells"][i][1]] do
+					if currentTime-table_itemHistory[t["tells"][i][1]][j][2] <= 60*60*12 then
+						flags = flags + 1;
+					end
+				end
+			end
+			table.insert(t["tells"][i], flags);
+		end
+		
+		local isCompetition;
+		local numWinners = 0;
+		for i, v in pairs(table_items[tellsInProgress]["winners"]) do
+			numWinners = numWinners + #v;
+		end
+		
+		-- Colorize bid values
+		if #t["tells"] <= t["quantity"] - numWinners then -- If there's enough items for everyone then just set everything to green
+			for i=1,#t["tells"] do
+				t["tells"][i][3] = "|cFF00FF00" .. t["tells"][i][3] .. "|r";
+			end
+		else
+			local tellsByRank, currentRank, j = {}, nil, 0;
+			for i=1,#t["tells"] do
+				if not currentRank or currentRank ~= t["tells"][i][2] then
+					currentRank = t["tells"][i][2];
+					j = j + 1;
+					tellsByRank[j] = {};
+				end
+				table.insert(tellsByRank[j], t["tells"][i][1]);
+			end
+			
+			local itemsLeft = t["quantity"] - numWinners;
+			for i=1,#tellsByRank do
+				if #tellsByRank[i] <= itemsLeft then
+					for j=1,#tellsByRank[i] do
+						for k=1,#t["tells"] do
+							if t["tells"][k][1] == tellsByRank[i][j] then
+								t["tells"][k][3] = "|cFF00FF00" .. t["tells"][k][3] .. "|r"
+								break;
+							end
+						end
+					end
+					
+					itemsLeft = itemsLeft - #tellsByRank[i];
+				elseif itemsLeft == 0 then
+					for j=1,#tellsByRank[i] do
+						for k=1,#t["tells"] do
+							if t["tells"][k][1] == tellsByRank[i][j] then
+								t["tells"][k][3] = "|cFFFF0000" .. t["tells"][k][3] .. "|r"
+								break;
+							end
+						end
+					end
+				else
+					-- Find the green threshold
+					for j=1,#t["tells"] do
+						if t["tells"][j][1] == tellsByRank[i][itemsLeft+1] then
+							tellsGreenThreshold = t["tells"][j][3] + 60;
+							break;
+						end
+					end
+					
+					-- Find the yellow threshold
+					for j=1,#t["tells"] do
+						if t["tells"][j][1] == tellsByRank[i][itemsLeft] then
+							tellsYellowThreshold = t["tells"][j][3] - 58;
+							break;
+						end
+					end
+					
+					-- Colorize items based on green and yellow thresholds
+					for j=1,#tellsByRank[i] do
+						for k=1,#t["tells"] do
+							if t["tells"][k][1] == tellsByRank[i][j] then
+								tellsRankThreshold = t["tells"][k][2];
+								if t["tells"][k][3] >= tellsGreenThreshold then
+									t["tells"][k][3] = "|cFF00FF00" .. t["tells"][k][3] .. "|r";
+								elseif t["tells"][k][3] >= tellsYellowThreshold then
+									t["tells"][k][3] = "|cFFFFFF00" .. t["tells"][k][3] .. "|r";
+									isCompetition = true;
+								else
+									t["tells"][k][3] = "|cFFFF0000" .. t["tells"][k][3] .. "|r";
+								end
+								break;
+							end
+						end
+					end
+					
+					itemsLeft = 0;
+				end
+			end
+		end
+		
+		tellsTable:SetData(t["tells"], true);
+		
+		-- Set button text and script
+		if isCompetition then
+			if tellsFrameActionButton:GetButtonState() ~= "DISABLED" then
+				tellsFrameActionButton:SetText("Roll!");
+				tellsFrameActionButton:SetScript("OnClick", function(self)
+					SendChatMessage(table_items[tellsInProgress]["itemLink"].." roll", "RAID");
+					self:SetText("Waiting for rolls...");
+					self:Disable();
+				end)
+			end
+		else
+			if table_items[tellsInProgress]["currentValue"] > 10 then
+				tellsFrameActionButton:SetText("Lower to "..table_items[tellsInProgress]["currentValue"]-10);
+				tellsFrameActionButton:SetScript("OnClick", function()
+					SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["currentValue"]-10, "RAID");
+				end)
+			else
+				tellsFrameActionButton:SetText("Disenchant");
+				tellsFrameActionButton:SetScript("OnClick", function()
+					SendChatMessage(table_items[tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, "aspects");
+				end)
+			end
+		end
+		
+		tellsFrame:Show()
+	else
+		tellsInProgress = nil
+		tellsFrame:Hide()
+	end
+end
+
 function FALoot:itemBid(itemString, bid)
 	bid = tonumber(bid)
 	debug("FALoot:itemBid("..itemString..", "..bid..")", 1)
@@ -1050,6 +1432,9 @@ function FALoot:itemEnd(itemString) -- itemLink or ID
 		table_items[itemString]["expirationTime"] = GetTime();
 		FALoot:itemTableUpdate();
 		FALoot:generateStatusText();
+		if itemString == tellsInProgress then
+			FALoot:tellsTableUpdate();
+		end
 	end
 end
 
@@ -1126,13 +1511,11 @@ function FALoot:setLeaderUIVisibility()
 end
 
 function FALoot:onTableSelect(id)
-	--window:SetDisabled(false);
-	
 	local j = 0;
 	for i, v in pairs(table_items) do
 		j = j + 1;
 		if j == id then
-			if not v["status"] or v["status"] == "" then
+			if (not v["status"] or v["status"] == "") and not tellsInProgress then
 				--debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
 				tellsButton:Enable();
 			else
@@ -1145,7 +1528,9 @@ end
 
 function FALoot:onTableDeselect()
 	--window:SetDisabled(true);
-	tellsButton:Disable();
+	if not tellsInProgress then
+		tellsButton:Disable();
+	end
 end
 
 local function onUpdate(self,elapsed)
@@ -1191,7 +1576,7 @@ local function onUpdate(self,elapsed)
 				end
 				s = s..table_who[table_who[i]][j]
 			end
-			print(s)
+			debug(s)
 		end
 		table_who = {}
 	end
@@ -1233,6 +1618,8 @@ function FALoot:parseChat(msg, author)
 			if table_items[itemString] then
 				if not table_items[itemString]["host"] then
 					table_items[itemString]["host"] = author;
+				elseif tellsInProgress and tellsInProgress == itemString and table_items[itemString]["host"] ~= author then
+					tellsInProgress = nil;
 				end
 				
 				if string.match(value, "roll") then
@@ -1298,9 +1685,96 @@ function FALoot:parseChat(msg, author)
 						end
 					end
 				end
+				
 				FALoot:itemTableUpdate();
 				FALoot:checkBids();
+				if tellsInProgress and tellsInProgress == itemString then
+					FALoot:tellsTableUpdate();
+				end
 			end
+		end
+	end
+end
+
+function FALoot:parseWhisper(msg, author)
+	if not table_items[tellsInProgress] then
+		tellsInProgress = nil;
+		return;
+	end
+	local bid, spec;
+	if string.match(msg, "^%s*%d+%s*$") then
+		bid = string.match(msg, "^%s*(%d+)%s*$");
+	elseif string.match(msg, "^%s*%d+%s[MmOo][Ss]%s*$") then
+		bid, spec = string.match(msg, "^%s*(%d+)%s([MmOo][Ss])%s*$");
+	elseif string.match(msg, "^%s*"..HYPERLINK_PATTERN.."%s?%d+$") then
+		bid = string.match(msg, "^%s*"..HYPERLINK_PATTERN.."%s?(%d+)$");
+	elseif string.match(msg, "^%d+%s?"..HYPERLINK_PATTERN.."$") then
+		bid = string.match(msg, "^(%d+)%s?"..HYPERLINK_PATTERN.."$");
+	elseif string.lower(msg) == "pass" then
+		for i=1,#table_items[tellsInProgress]["tells"] do
+			if table_items[tellsInProgress]["tells"][i][1] == author then
+				table.remove(table_items[tellsInProgress]["tells"], i);
+				FALoot:tellsTableUpdate();
+				break;
+			end
+		end
+		return;
+	else
+		return;
+	end
+	bid = tonumber(bid);
+	
+	local groupType, inGroup;
+	if IsInRaid() then
+		groupType = "raid";
+	else
+		groupType = "party";
+	end
+	for i=1,GetNumGroupMembers() do
+		if UnitName(groupType..i) == author then
+			inGroup = true;
+			break;
+		end
+	end
+	if not inGroup then
+		return;
+	end
+	
+	local bidUpdated;
+	for i=1,#table_items[tellsInProgress]["tells"] do
+		if table_items[tellsInProgress]["tells"][i][1] == author then
+			table_items[tellsInProgress]["tells"][i][3] = bid;
+			SendChatMessage("<FA Loot> Updated your bid for "..table_items[tellsInProgress]["itemLink"]..".", "WHISPER", nil, author);
+			bidUpdated = true;
+			break;
+		end
+	end
+	if not bidUpdated then
+		table.insert(table_items[tellsInProgress]["tells"], {author, nil, bid});
+		SendChatMessage("<FA Loot> Bid for "..table_items[tellsInProgress]["itemLink"].." accepted.", "WHISPER", nil, author);
+	end
+	FALoot:tellsTableUpdate();
+end
+
+function FALoot:parseRoll(msg, author)
+	if table_items[tellsInProgress]["status"] ~= "Rolls" then
+		return;
+	end
+	local author, rollResult, rollMin, rollMax = string.match(msg, "(.+) rolls (%d+) %((%d+)-(%d+)%)");
+	
+	rollResult = tonumber(rollResult);
+	rollMin = tonumber(rollMin);
+	rollMax = tonumber(rollMax);
+	
+	for i=1,#table_items[tellsInProgress]["tells"] do
+		if table_items[tellsInProgress]["tells"][i][1] == author then
+			if table_items[tellsInProgress]["tells"][i][4] == "" and table_items[tellsInProgress]["tells"][i][3] >= table_items[tellsInProgress]["currentValue"] then
+				if (table_items[tellsInProgress]["tells"][i][3] == 30 and rollMin == 1 and rollMax == 30) or (rollMin + rollMax == table_items[tellsInProgress]["tells"][i][3] and rollMax - rollMin == 30) then
+					table_items[tellsInProgress]["tells"][i][4] = rollResult;
+					FALoot:tellsTableUpdate();
+				end
+			end
+			break;
 		end
 	end
 end
@@ -1338,6 +1812,8 @@ function events:ADDON_LOADED(name)
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
 		
+		table_itemHistory = FALoot_itemHistory or table_itemHistory;
+		
 		FALoot:RegisterComm(ADDON_MSG_PREFIX);
 	end
 end
@@ -1353,7 +1829,18 @@ function events:PLAYER_LOGIN()
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
 		itemAdd("96384:0")
-		FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+		FALoot:itemTakeTells("96740:0");
+		table_items[tellsInProgress]["tells"] = {
+			{"Dyrimar", nil, 30, ""},
+			{"Demonicblade", nil, 30, ""},
+			{"Pawkets", "Whelp", 118, ""},
+			{"Xaerlun", "Wyrm", 10, ""},
+			{"Unbrewable", nil, 100, ""},
+		}
+		tellsFrame:Show();
+		FALoot:tellsTableUpdate();
+		FALoot:itemTableUpdate();
 	else
 		frame:Hide();
 	end
@@ -1366,6 +1853,7 @@ function events:PLAYER_LOGOUT(...)
 		["autolootToggle"] = autolootToggle,
 		["autolootKey"]    = autolootKey,
 	};
+	FALoot_itemHistory = table_itemHistory;
 end
 function events:PLAYER_ENTERING_WORLD()
 	FALoot:setAutoLoot();
@@ -1417,7 +1905,7 @@ function events:LOOT_OPENED(...)
 		local sourceInfo = {GetLootSourceInfo(i)}
 		for j=1,#sourceInfo/2 do
 			local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
-			if mobID and not hasBeenLooted[mobID] then
+			if mobID and not hasBeenLooted[mobID] and not string.match(mobID, "0x4") then -- ignore items from sources that have already been looted or from item-based sources
 				if not loot[mobID] then
 					loot[mobID] = {};
 				end
@@ -1513,6 +2001,16 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 			end
 			FALoot:itemEnd(itemString);
 		end
+	end
+end
+function events:CHAT_MSG_WHISPER(msg, author)
+	if tellsInProgress then
+		FALoot:parseWhisper(msg, author);
+	end
+end
+function events:CHAT_MSG_SYSTEM(msg, author)
+	if tellsInProgress and string.match(msg, ".+ rolls %d+ %(%d+-%d+%)") then
+		FALoot:parseRoll(msg, author);
 	end
 end
 function events:GROUP_JOINED()
