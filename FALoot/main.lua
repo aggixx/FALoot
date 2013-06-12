@@ -1398,6 +1398,7 @@ function FALoot:tellsTableUpdate()
 		-- Set button text and script
 		if isCompetition and table_items[tellsInProgress]["tells"][1][3] >= t["currentValue"] then
 			if tellsFrameActionButton:GetButtonState() ~= "DISABLED" then
+				tellsFrameActionButton:Enable();
 				tellsFrameActionButton:SetText("Roll!");
 				tellsFrameActionButton:SetScript("OnClick", function(self)
 					SendChatMessage(table_items[tellsInProgress]["itemLink"].." roll", "RAID");
@@ -1405,33 +1406,33 @@ function FALoot:tellsTableUpdate()
 					self:Disable();
 				end)
 			end
+		elseif table_items[tellsInProgress]["currentValue"] > 10 then
+			tellsFrameActionButton:Enable();
+			tellsFrameActionButton:SetText("Lower to "..table_items[tellsInProgress]["currentValue"]-10);
+			tellsFrameActionButton:SetScript("OnClick", function()
+				SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["currentValue"]-10, "RAID");
+			end)
 		else
-			if table_items[tellsInProgress]["currentValue"] > 10 then
-				tellsFrameActionButton:SetText("Lower to "..table_items[tellsInProgress]["currentValue"]-10);
-				tellsFrameActionButton:SetScript("OnClick", function()
-					SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["currentValue"]-10, "RAID");
-				end)
-			else
-				tellsFrameActionButton:SetText("Disenchant");
-				tellsFrameActionButton:SetScript("OnClick", function()
-					local channels, channelNum = {GetChannelList()};
-					for i=1,#channels do
-						if string.lower(channels[i]) == "aspects" then
-							channelNum = channels[i-1];
-							break;
-						end
+			tellsFrameActionButton:Enable();
+			tellsFrameActionButton:SetText("Disenchant");
+			tellsFrameActionButton:SetScript("OnClick", function()
+				local channels, channelNum = {GetChannelList()};
+				for i=1,#channels do
+					if string.lower(channels[i]) == "aspects" then
+						channelNum = channels[i-1];
+						break;
 					end
-					if channelNum then
-						SendChatMessage(table_items[tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, channelNum);
-					end
-				end)
-			end
+				end
+				if channelNum then
+					SendChatMessage(table_items[tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, channelNum);
+				end
+			end)
 		end
 		
-		tellsFrame:Show()
+		tellsFrame:Show();
 	else
-		tellsInProgress = nil
-		tellsFrame:Hide()
+		tellsInProgress = nil;
+		tellsFrame:Hide();
 	end
 end
 
