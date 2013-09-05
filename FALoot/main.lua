@@ -1,10 +1,11 @@
 --[[
 	Announce winners to aspects chat when session ends
+	Confirm that the award item button actually does nothing when you have nobody selected
 -]]
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.2a";
+local ADDON_VERSION_FULL = "v4.2b";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -938,7 +939,7 @@ function FALoot:createGUI()
 end
 
 function FALoot:isThunderforged(iLevel)
-	return iLevel == 541 or iLevel == 528;
+	return iLevel == 572 or iLevel == 559 or iLevel == 541 or iLevel == 528;
 end
 
 function FALoot:generateIcons()
