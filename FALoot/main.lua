@@ -2072,9 +2072,49 @@ function events:GET_ITEM_INFO_RECEIVED()
 		FALoot:itemTableUpdate();
 	end
 end
+
+-- some stuff for Norushen
+function events:INSTANCE_ENCOUNTER_ENGAGE_UNIT()
+	if UnitName("boss1") == "Amalgam of Corruption" then
+		local frame = CreateFrame("frame")
+		local updateThrottle = 0;
+		eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+		SetMapToCurrentZone()
+		frame:SetScript("OnUpdate", function()
+			if GetTime() - updateThrottle >= 1 then
+				if not UnitExists("boss1") then
+					eventFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+					frame:SetScript("OnUpdate", nil)
+				end
+				
+				updateThrottle = GetTime()
+			end
+		end)
+	end
+end
+
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
 end)
 for k, v in pairs(events) do
 	eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
+end
+
+-- some stuff for Norushen
+function events:COMBAT_LOG_EVENT_UNFILTERED(timestamp, event, hideCaster, srcGUID, srcName, srcFlags, srcFlags2, dstGUID, dstName, dstFlags, dstFlags2, ...)
+	if cEvent == "SPELL_AURA_APPLIED" then
+		local spellName = select(2, ...)
+		if spellName == "Test of Confidence" or spellName == "Test of Serenity" or spellName == "Test of Reliance" then
+			for i=1,GetNumGroupMembers() do
+				if UnitName("raid"..i) == dstName then
+					posX, posY = GetPlayerMapPosition("raid"..i);
+					break
+				end
+			end
+			if not (posX and posY) then
+				return;
+			end
+			SendAddonMessage("FAS_Norushen", dstName.."|"..posX.."|"..posY, "RAID")
+		end
+	end
 end
