@@ -684,7 +684,6 @@ function FALoot:createGUI()
 
 	-- Create the "Close" button
 	closeButton = CreateFrame("Button", frame:GetName().."CloseButton", frame, "UIPanelButtonTemplate")
-	closeButton:SetTemplate("Default", true)
 	closeButton:SetPoint("BOTTOMRIGHT", -27, 17)
 	closeButton:SetHeight(20)
 	closeButton:SetWidth(80)
@@ -695,7 +694,6 @@ function FALoot:createGUI()
 	
 	-- Create the "Bid" button
 	bidButton = CreateFrame("Button", frame:GetName().."BidButton", frame, "UIPanelButtonTemplate")
-	bidButton:SetTemplate("Default", true)
 	bidButton:SetPoint("BOTTOMRIGHT", closeButton, "BOTTOMLEFT", -5, 0)
 	bidButton:SetHeight(20)
 	bidButton:SetWidth(80)
@@ -897,7 +895,6 @@ function FALoot:createGUI()
 	
 	-- Create the Tell Window Award button
 	tellsFrameAwardButton = CreateFrame("Button", tellsFrame:GetName().."AwardButton", tellsFrame, "UIPanelButtonTemplate")
-	tellsFrameAwardButton:SetTemplate("Default", true)
 	tellsFrameAwardButton:SetPoint("BOTTOMLEFT", 15, 15)
 	tellsFrameAwardButton:SetHeight(20)
 	tellsFrameAwardButton:SetWidth(154)
@@ -912,7 +909,6 @@ function FALoot:createGUI()
 	
 	-- Create the Tell Window Action button
 	tellsFrameActionButton = CreateFrame("Button", tellsFrame:GetName().."ActionButton", tellsFrame, "UIPanelButtonTemplate")
-	tellsFrameActionButton:SetTemplate("Default", true)
 	tellsFrameActionButton:SetPoint("BOTTOMRIGHT", -15, 15)
 	tellsFrameActionButton:SetHeight(20)
 	tellsFrameActionButton:SetWidth(154)
@@ -923,7 +919,6 @@ function FALoot:createGUI()
 
 	-- Create the "Take Tells" button
 	tellsButton = CreateFrame("Button", frame:GetName().."TellsButton", frame, "UIPanelButtonTemplate");
-	tellsButton:SetTemplate("Default", true)
 	tellsButton:SetScript("OnClick", function(self, event)
 		local id = scrollingTable:GetSelection()
 		local j, itemLink, itemString = 0;

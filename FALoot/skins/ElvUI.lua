@@ -10,7 +10,14 @@ frame:SetScript("OnUpdate", function()
 
 		AS:SkinFrame(FALootFrame)
 		AS:SkinFrame(FALootTellsFrame)
+		
 		FALootFrameStatusBar:SetTemplate("Default", true)
+		
+		FALootFrameCloseButton:SetTemplate("Default", true)
+		FALootFrameBidButton:SetTemplate("Default", true)
+		FALootFrameTellsButton:SetTemplate("Default", true)
+		FALootTellsFrameAwardButton:SetTemplate("Default", true)
+		FALootTellsFrameActionButton:SetTemplate("Default", true)
 		
 		frame:SetScript("OnUpdate", nil)
 	end
