@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.2d";
+local ADDON_VERSION_FULL = "v4.2e";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -623,7 +623,7 @@ end
 
 function FALoot:createGUI()
 	-- Create the main frame
-	frame = CreateFrame("frame", "FALoot", UIParent)
+	frame = CreateFrame("frame", "FALootFrame", UIParent)
 	frame:EnableMouse(true);
 	frame:SetMovable(true);
 	frame:SetFrameStrata("FULLSCREEN_DIALOG");
@@ -640,7 +640,7 @@ function FALoot:createGUI()
 	frame:SetPoint("CENTER");
 
 	-- Create the frame that holds the icons
-	iconFrame = CreateFrame("frame", "FALootIcons", frame);
+	iconFrame = CreateFrame("frame", frame:GetName().."IconFrame", frame);
 	iconFrame:SetHeight(40);
 	iconFrame:SetWidth(500);
 	iconFrame:SetPoint("TOP", frame, "TOP", 0, -30);
@@ -648,7 +648,7 @@ function FALoot:createGUI()
 	
 	-- Populate the iconFrame with icons
 	for i=1,maxIcons do
-		table_icons[i] = CreateFrame("frame", "FALootIcon"..tostring(i), iconFrame)
+		table_icons[i] = CreateFrame("frame", iconFrame:GetName().."Icon"..tostring(i), iconFrame)
 		table_icons[i]:SetWidth(40)
 		table_icons[i]:SetHeight(40)
 		table_icons[i]:Hide()
@@ -683,7 +683,8 @@ function FALoot:createGUI()
 	scrollingTable.frame:SetScale(1.1);
 
 	-- Create the "Close" button
-	closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	closeButton = CreateFrame("Button", frame:GetName().."CloseButton", frame, "UIPanelButtonTemplate")
+	closeButton:SetTemplate("Default", true)
 	closeButton:SetPoint("BOTTOMRIGHT", -27, 17)
 	closeButton:SetHeight(20)
 	closeButton:SetWidth(80)
@@ -693,7 +694,8 @@ function FALoot:createGUI()
 	end);
 	
 	-- Create the "Bid" button
-	bidButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	bidButton = CreateFrame("Button", frame:GetName().."BidButton", frame, "UIPanelButtonTemplate")
+	bidButton:SetTemplate("Default", true)
 	bidButton:SetPoint("BOTTOMRIGHT", closeButton, "BOTTOMLEFT", -5, 0)
 	bidButton:SetHeight(20)
 	bidButton:SetWidth(80)
@@ -729,9 +731,10 @@ function FALoot:createGUI()
 		StaticPopup_Show("FALOOT_BID");
 		debug("Querying for bid, coroutine paused.", 1);
 	end);
+	bidButton:Disable();
 
 	-- Create the background of the Status Bar
-	local statusbg = CreateFrame("Button", nil, frame)
+	local statusbg = CreateFrame("Button", frame:GetName().."StatusBar", frame)
 	statusbg:SetPoint("BOTTOMLEFT", 15, 15)
 	statusbg:SetPoint("BOTTOMRIGHT", -197, 15)
 	statusbg:SetHeight(24)
@@ -745,7 +748,7 @@ function FALoot:createGUI()
 	statusbg:SetBackdropBorderColor(0.4,0.4,0.4)
 
 	-- Create the text of the Status Bar
-	statusText = statusbg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	statusText = statusbg:CreateFontString(statusbg:GetName().."Text", "OVERLAY", "GameFontNormal")
 	statusText:SetPoint("TOPLEFT", 7, -2)
 	statusText:SetPoint("BOTTOMRIGHT", -7, 2)
 	statusText:SetHeight(20)
@@ -753,14 +756,14 @@ function FALoot:createGUI()
 	statusText:SetText("")
 
 	-- Create the background of the title
-	local titlebg = frame:CreateTexture(nil, "OVERLAY")
+	local titlebg = frame:CreateTexture(frame:GetName().."TitleBackground", "OVERLAY")
 	titlebg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
 	titlebg:SetTexCoord(0.31, 0.67, 0, 0.63)
 	titlebg:SetPoint("TOP", 0, 12)
 	titlebg:SetHeight(40)
 
 	-- Create the title frame
-	local title = CreateFrame("Frame", nil, frame)
+	local title = CreateFrame("Frame", frame:GetName().."TitleMover", frame)
 	title:EnableMouse(true)
 	title:SetScript("OnMouseDown", function(frame)
 		frame:GetParent():StartMoving()
@@ -771,14 +774,14 @@ function FALoot:createGUI()
 	title:SetAllPoints(titlebg)
 
 	-- Create the text of the title
-	local titletext = title:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	local titletext = title:CreateFontString(frame:GetName().."TitleText", "OVERLAY", "GameFontNormal")
 	titletext:SetPoint("TOP", titlebg, "TOP", 0, -14)
 	titletext:SetText("FA Loot");
 	
 	titlebg:SetWidth((titletext:GetWidth() or 0) + 10)
 
 	-- Create the title background left edge
-	local titlebg_l = frame:CreateTexture(nil, "OVERLAY")
+	local titlebg_l = frame:CreateTexture(frame:GetName().."TitleEdgeLeft", "OVERLAY")
 	titlebg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
 	titlebg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
 	titlebg_l:SetPoint("RIGHT", titlebg, "LEFT")
@@ -786,7 +789,7 @@ function FALoot:createGUI()
 	titlebg_l:SetHeight(40)
 
 	-- Create the title background right edge
-	local titlebg_r = frame:CreateTexture(nil, "OVERLAY")
+	local titlebg_r = frame:CreateTexture(frame:GetName().."TitleEdgeRight", "OVERLAY")
 	titlebg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
 	titlebg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
 	titlebg_r:SetPoint("LEFT", titlebg, "RIGHT")
@@ -798,7 +801,7 @@ function FALoot:createGUI()
 	-- //////////////////////
 	
 	-- Create the main tellsFrame
-	tellsFrame = CreateFrame("frame", "FALoot_Tells", UIParent)
+	tellsFrame = CreateFrame("frame", "FALootTellsFrame", UIParent)
 	tellsFrame:EnableMouse(true);
 	tellsFrame:SetMovable(true);
 	tellsFrame:SetFrameStrata("FULLSCREEN_DIALOG");
@@ -893,7 +896,8 @@ function FALoot:createGUI()
 	tellsTable.frame:SetScale(1.1);
 	
 	-- Create the Tell Window Award button
-	tellsFrameAwardButton = CreateFrame("Button", nil, tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameAwardButton = CreateFrame("Button", tellsFrame:GetName().."AwardButton", tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameAwardButton:SetTemplate("Default", true)
 	tellsFrameAwardButton:SetPoint("BOTTOMLEFT", 15, 15)
 	tellsFrameAwardButton:SetHeight(20)
 	tellsFrameAwardButton:SetWidth(154)
@@ -907,7 +911,8 @@ function FALoot:createGUI()
 	end);
 	
 	-- Create the Tell Window Action button
-	tellsFrameActionButton = CreateFrame("Button", nil, tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameActionButton = CreateFrame("Button", tellsFrame:GetName().."ActionButton", tellsFrame, "UIPanelButtonTemplate")
+	tellsFrameActionButton:SetTemplate("Default", true)
 	tellsFrameActionButton:SetPoint("BOTTOMRIGHT", -15, 15)
 	tellsFrameActionButton:SetHeight(20)
 	tellsFrameActionButton:SetWidth(154)
@@ -917,7 +922,8 @@ function FALoot:createGUI()
 	end);
 
 	-- Create the "Take Tells" button
-	tellsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate");
+	tellsButton = CreateFrame("Button", frame:GetName().."TellsButton", frame, "UIPanelButtonTemplate");
+	tellsButton:SetTemplate("Default", true)
 	tellsButton:SetScript("OnClick", function(self, event)
 		local id = scrollingTable:GetSelection()
 		local j, itemLink, itemString = 0;
@@ -1544,8 +1550,10 @@ function FALoot:onTableSelect(id)
 			if (not v["status"] or v["status"] == "") and not tellsInProgress then
 				--debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
 				tellsButton:Enable();
+				bidButton:Enable();
 			else
 				tellsButton:Disable();
+				bidButton:Disable();
 			end
 			break;
 		end
@@ -2073,48 +2081,9 @@ function events:GET_ITEM_INFO_RECEIVED()
 	end
 end
 
--- some stuff for Norushen
-function events:INSTANCE_ENCOUNTER_ENGAGE_UNIT()
-	if UnitName("boss1") == "Amalgam of Corruption" then
-		local frame = CreateFrame("frame")
-		local updateThrottle = 0;
-		eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-		SetMapToCurrentZone()
-		frame:SetScript("OnUpdate", function()
-			if GetTime() - updateThrottle >= 1 then
-				if not UnitExists("boss1") then
-					eventFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-					frame:SetScript("OnUpdate", nil)
-				end
-				
-				updateThrottle = GetTime()
-			end
-		end)
-	end
-end
-
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
 end)
 for k, v in pairs(events) do
 	eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
-end
-
--- some stuff for Norushen
-function events:COMBAT_LOG_EVENT_UNFILTERED(timestamp, event, hideCaster, srcGUID, srcName, srcFlags, srcFlags2, dstGUID, dstName, dstFlags, dstFlags2, ...)
-	if cEvent == "SPELL_AURA_APPLIED" then
-		local spellName = select(2, ...)
-		if spellName == "Test of Confidence" or spellName == "Test of Serenity" or spellName == "Test of Reliance" then
-			for i=1,GetNumGroupMembers() do
-				if UnitName("raid"..i) == dstName then
-					posX, posY = GetPlayerMapPosition("raid"..i);
-					break
-				end
-			end
-			if not (posX and posY) then
-				return;
-			end
-			SendAddonMessage("FAS_Norushen", dstName.."|"..posX.."|"..posY, "RAID")
-		end
-	end
 end

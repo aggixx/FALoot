@@ -4,6 +4,7 @@
 ## Version: v4.2
 ## Author: Pawkets
 ## SavedVariables: FALoot_options, FALoot_itemHistory
+## OptionalDeps: ElvUI, ElvUI_AddonSkins
 
 # Libraries
 embeds.xml
