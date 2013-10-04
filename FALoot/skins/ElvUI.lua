@@ -1,15 +1,19 @@
-if select(6, GetAddOnInfo("ElvUI")) or select(6, GetAddOnInfo("ElvUI_AddonSkins")) then
+if (select(6, GetAddOnInfo("ElvUI")) and select(6, GetAddOnInfo("TukUI"))) then
 	return
+end
+
+local function SkinFrame(frame, template, override, kill)
+	if not template then template = 'Transparent' end
+	if not override then frame:StripTextures(kill) end
+	frame:SetTemplate(template)
+	--AS:RegisterForPetBattleHide(frame)
 end
 
 local frame = CreateFrame("frame")
 frame:SetScript("OnUpdate", function()
 	if FALootFrame then
-		local E, L, V, P, G, _ = unpack(ElvUI)
-		local AS = ElvUI[1]:GetModule('AddOnSkins')
-
-		AS:SkinFrame(FALootFrame)
-		AS:SkinFrame(FALootTellsFrame)
+		SkinFrame(FALootFrame)
+		SkinFrame(FALootTellsFrame)
 		
 		FALootFrameStatusBar:SetTemplate("Default", true)
 		

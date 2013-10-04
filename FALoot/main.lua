@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.2e";
+local ADDON_VERSION_FULL = "v4.2f";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -1545,14 +1545,13 @@ function FALoot:onTableSelect(id)
 			if (not v["status"] or v["status"] == "") and not tellsInProgress then
 				--debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
 				tellsButton:Enable();
-				bidButton:Enable();
 			else
 				tellsButton:Disable();
-				bidButton:Disable();
 			end
 			break;
 		end
 	end
+	bidButton:Enable();
 end
 
 function FALoot:onTableDeselect()
@@ -1560,6 +1559,7 @@ function FALoot:onTableDeselect()
 	if not tellsInProgress then
 		tellsButton:Disable();
 	end
+	bidButton:Disable();
 end
 
 local function onUpdate(self,elapsed)
