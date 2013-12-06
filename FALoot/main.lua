@@ -625,12 +625,14 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		table.insert(table_items[t["itemString"]]["winners"][t["winAmount"]], sender);
 		FALoot:itemTableUpdate();
 	elseif t["foodTrackOn"] then
-		if foodCount then
-			FALoot:sendMessage(ADDON_MSG_PREFIX, {
-				["foodCount"] = foodCount,
-			}, "WHISPER", sender)
+		if not foodUpdateTo[sender] then
+			if foodCount then
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
+					["foodCount"] = foodCount,
+				}, "WHISPER", sender)
+			end
+			foodUpdateTo[sender] = true;
 		end
-		foodUpdateTo[sender] = true;
 	elseif t["foodTrackOff"] then
 		foodUpdateTo[sender] = nil;
 	elseif t["foodCount"] and type(t["foodCount"]) == "number" then
