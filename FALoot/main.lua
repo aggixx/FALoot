@@ -2101,7 +2101,7 @@ function events:GET_ITEM_INFO_RECEIVED()
 	end
 end
 function events:BAG_UPDATE_DELAYED()
-	local count = GetItemCount(itemId) or 0;
+	local count = GetItemCount(foodItemId) or 0;
 	if foodCount ~= count then
 		for i, v in pairs(foodUpdateTo) do
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
