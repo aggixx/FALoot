@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.2f";
+local ADDON_VERSION_FULL = "v4.2g";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -75,6 +75,12 @@ local tellsTable;
 local tellsFrameAwardButton;
 local tellsFrameActionButton;
 local tellsTitleBg;
+
+-- 300 food track
+local foodItemId = 101618;
+local foodCount = GetItemCount(itemId) or 0;
+local raidFoodCount = {};
+local foodUpdateTo = {};
 
 --helper functions
 
@@ -618,6 +624,17 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		end
 		table.insert(table_items[t["itemString"]]["winners"][t["winAmount"]], sender);
 		FALoot:itemTableUpdate();
+	elseif t["foodTrackOn"] then
+		if foodCount then
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["foodCount"] = foodCount,
+			}, "WHISPER", sender)
+		end
+		foodUpdateTo[sender] = true;
+	elseif t["foodTrackOff"] then
+		foodUpdateTo[sender] = nil;
+	elseif t["foodCount"] and type(t["foodCount"]) == "number" then
+		raidFoodCount[sender] = t["foodCount"];
 	end
 end
 
@@ -1055,6 +1072,12 @@ local function slashparse(msg, editbox)
 			debug(table_itemQuery);
 		elseif msg == "hasBeenLooted" then
 			debug(hasBeenLooted);
+		elseif msg == "food" then
+			local t = {};
+			for i, v in pairs(raidFoodCount) do
+				t[v] = (t[v] + 1) or 1;
+			end
+			debug(t);
 		end
 		return;
 	elseif string.match(msg, "^debug %d") then
@@ -2065,14 +2088,25 @@ function events:PLAYER_REGEN_ENABLED()
 end
 function events:GET_ITEM_INFO_RECEIVED()
 	local limit, itemAdded = #table_itemQuery;
-	for i=0,limit-1 do
-		local result = itemAdd(table_itemQuery[limit-i], true);
+	for i=limit,1,-1 do
+		local result = itemAdd(table_itemQuery[i], true);
 		if result and not itemAdded then
 			itemAdded = result;
 		end
 	end
 	if itemAdded then
 		FALoot:itemTableUpdate();
+	end
+end
+function events:BAG_UPDATE_DELAYED()
+	local count = GetItemCount(itemId) or 0;
+	if foodCount ~= count then
+		for i, v in pairs(foodUpdateTo) do
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["foodCount"] = foodCount,
+			}, "WHISPER", i)
+		end
+		foodCount = count;
 	end
 end
 
