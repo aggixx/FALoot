@@ -27,6 +27,7 @@ local ScrollingTable = LibStub("ScrollingTable");
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
 local libCompress = LibStub:GetLibrary("LibCompress");
 local libEncode = libCompress:GetAddonEncodeTable();
+local libGraph = LibStub("LibGraph-2.0");
 
 -- Declare local variables
 
@@ -75,6 +76,9 @@ local tellsTable;
 local tellsFrameAwardButton;
 local tellsFrameActionButton;
 local tellsTitleBg;
+
+local foodFrame;
+local foodFrameGraph;
 
 -- 300 food track
 local foodItemId = 101618;
@@ -212,7 +216,7 @@ local function isNameInGuild(name)
 	local _, onlineguildies = GetNumGuildMembers()
 	for j=1,onlineguildies do
 		local jname = GetGuildRosterInfo(j)
-		if jname == name then
+		if string.match(jname, name.."%-.+") then
 			return true
 		end
 	end
@@ -228,15 +232,13 @@ local function isGuildGroup(threshold)
 	end
 	local numguildies = 0
 	local numOffline = 0
-	for i=1,40 do
-		if UnitExists(groupType..i) then
-			local iname = GetRaidRosterInfo(i)
-			if isNameInGuild(iname) then
-				numguildies = numguildies + 1
-			end
-			if not UnitIsConnected(groupType..i) then
-				numOffline = numOffline + 1
-			end
+	for i=1,GetNumGroupMembers() do
+		local iname = GetRaidRosterInfo(i)
+		if isNameInGuild(iname) then
+			numguildies = numguildies + 1
+		end
+		if not UnitIsConnected(groupType..i) then
+			numOffline = numOffline + 1
 		end
 	end
 	if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
@@ -633,10 +635,26 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			end
 			foodUpdateTo[sender] = true;
 		end
+		debug("foodTrackOn recieved from "..sender, 1);
 	elseif t["foodTrackOff"] then
 		foodUpdateTo[sender] = nil;
+		debug("foodTrackOff recieved from "..sender, 1);
 	elseif t["foodCount"] and type(t["foodCount"]) == "number" then
 		raidFoodCount[sender] = t["foodCount"];
+		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
+		
+		local t = {};
+		for i, v in pairs(raidFoodCount) do
+			t[v] = t[v] + 1 or 1;
+		end
+		
+		local color = {0.5, 0.0, 0.0};
+		for i, v in pairs(t) do
+			foodFrameGraph:AddPie(v, color);
+			
+			color[1] = color[1] + 0.1;
+		end
+		foodFrameGraph:CompletePie({0.2,0.2,0.2})
 	end
 end
 
@@ -956,6 +974,31 @@ function FALoot:createGUI()
 	tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
 	tellsButton:Disable();
 	tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
+	
+	foodFrame = CreateFrame("Frame", FALootFoodFrame, UIParent);
+	foodFrame:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true, tileSize = 32, edgeSize = 32,
+		insets = { left = 8, right = 8, top = 8, bottom = 8 }
+	});
+	foodFrame:SetBackdropColor(0, 1, 0, 0.5);
+	foodFrame:SetScript("OnShow", function()
+		FALoot:sendMessage(ADDON_MSG_PREFIX, {
+			["foodTrackOn"] = true,
+		}, "RAID")
+		debug("Food tracking enabled.", 1);
+	end);
+	foodFrame:SetScript("OnHide", function()
+		FALoot:sendMessage(ADDON_MSG_PREFIX, {
+			["foodTrackOff"] = true,
+		}, "RAID")
+		debug("Food tracking disabled.", 1);
+	end);
+	foodFrameGraph = libGraph:CreateGraphPieChart("FoodChart", foodFrame, "CENTER", "CENTER");
+	
+	foodFrameGraph:Show();
+	foodFrame:Hide();
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -1097,12 +1140,18 @@ local function slashparse(msg, editbox)
 			["who"] = "query",
 		}, "GUILD");
 		return;
+	elseif msgLower == "food" then
+		if foodFrame:IsShown() then
+			return
+		end
+		foodFrame:Show();
 	else
 		debug("The following are valid slash commands:");
 		print("/fa debug <threshold> -- set debugging threshold");
 		print("/fa who -- see who is running the addon and what version");
 		print("/fa -- shows the loot window");
 		print("/faroll <value> -- does a FA roll for the designated DKP amount");
+		print("/fa food -- displays # of food remaining for each raid member via a pie chart");
 	end
 end
 SlashCmdList["RT"] = slashparse
