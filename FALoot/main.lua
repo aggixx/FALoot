@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.2g";
+local ADDON_VERSION_FULL = "v4.3a";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -79,6 +79,7 @@ local tellsTitleBg;
 
 local foodFrame;
 local foodFrameGraph;
+local foodColorKey = {};
 
 -- 300 food track
 local foodItemId = 101618;
@@ -537,7 +538,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
-	if sender == UnitName("player") and not t["who"] then
+	if sender == UnitName("player") and not (t["who"] or t["foodCount"]) then
 		return;
 	end
 	
@@ -643,18 +644,48 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		raidFoodCount[sender] = t["foodCount"];
 		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
 		
+		foodFrameGraph:ResetPie();
+		
 		local t = {};
 		for i, v in pairs(raidFoodCount) do
-			t[v] = t[v] + 1 or 1;
+			t[v] = (t[v] or 0) + 1;
 		end
 		
-		local color = {0.5, 0.0, 0.0};
+		local total = 0;
 		for i, v in pairs(t) do
-			foodFrameGraph:AddPie(v, color);
+			local color;
+			if i == 5 then
+				color = {0, 1, 0};
+			elseif i == 4 then
+				color = {1/2, 1, 0};
+			elseif i == 3 then
+				color = {1, 1, 0};
+			elseif i == 2 then
+				color = {1, 2/3, 0};
+			elseif i == 1 then
+				color = {1, 1/3, 0};
+			else
+				color = {1, 0, 0};
+			end
+			foodFrameGraph:AddPie(v/GetNumGroupMembers()*100, color);
 			
-			color[1] = color[1] + 0.1;
+			for j=1,#foodColorKey do
+				if foodColorKey[j][2]:GetText() == tostring(i) then
+					foodColorKey[j][3]:SetText(v);
+					break
+				end
+			end
+			
+			total = total + v;
 		end
-		foodFrameGraph:CompletePie({0.2,0.2,0.2})
+		
+		foodFrameGraph:CompletePie({1/5, 1/5, 1/5})
+		for j=1,#foodColorKey do
+			if foodColorKey[j][2]:GetText() == "?" then
+				foodColorKey[j][3]:SetText(GetNumGroupMembers()-total);
+				break
+			end
+		end
 	end
 end
 
@@ -975,7 +1006,7 @@ function FALoot:createGUI()
 	tellsButton:Disable();
 	tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
 	
-	foodFrame = CreateFrame("Frame", FALootFoodFrame, UIParent);
+	foodFrame = CreateFrame("Frame", "FALootFoodFrame", UIParent);
 	foodFrame:SetBackdrop({
 		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
 		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -983,6 +1014,7 @@ function FALoot:createGUI()
 		insets = { left = 8, right = 8, top = 8, bottom = 8 }
 	});
 	foodFrame:SetBackdropColor(0, 1, 0, 0.5);
+	foodFrame:Hide();
 	foodFrame:SetScript("OnShow", function()
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["foodTrackOn"] = true,
@@ -995,10 +1027,113 @@ function FALoot:createGUI()
 		}, "RAID")
 		debug("Food tracking disabled.", 1);
 	end);
-	foodFrameGraph = libGraph:CreateGraphPieChart("FoodChart", foodFrame, "CENTER", "CENTER");
+	foodFrame:SetWidth(280);
+	foodFrame:SetHeight(200);
+	foodFrame:SetPoint("CENTER");
+	foodFrameGraph = libGraph:CreateGraphPieChart("FALootFoodFrameChart", foodFrame, "LEFT", "LEFT", 15, 0, 170, 170);
 	
-	foodFrameGraph:Show();
-	foodFrame:Hide();
+	foodFrameGraph:AddPie(2/25*100, {0, 1, 0});
+	foodFrameGraph:AddPie(5/25*100, {1/2, 1, 0});
+	foodFrameGraph:AddPie(12/25*100, {1, 1, 0});
+	foodFrameGraph:AddPie(4/25*100, {1, 2/3, 0});
+	foodFrameGraph:CompletePie({1/5, 1/5, 1/5});
+	
+	for i=5,-1,-1 do
+		local key = CreateFrame("Frame", "FALootFoodFrameColor"..(-i+6), foodFrame);
+		key:SetWidth(19);
+		key:SetHeight(19);
+		if #foodColorKey > 0 then
+			key:SetPoint("TOP", foodColorKey[#foodColorKey][1], "BOTTOM", 0, -3);
+		else
+			key:SetPoint("CENTER", foodFrame, "TOPRIGHT", -60, -32);
+		end
+		key:SetBackdrop({
+			bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+			tile = true, tileSize = 32,
+			edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+			insets = { left = 1, right = 1, top = 1, bottom = 1 }, edgeSize = 1
+		});
+		if i == 5 then
+			key:SetBackdropColor(0, 1, 0, 1);
+		elseif i == 4 then
+			key:SetBackdropColor(1/2, 1, 0, 1);
+		elseif i == 3 then
+			key:SetBackdropColor(1, 1, 0, 1);
+		elseif i == 2 then
+			key:SetBackdropColor(1, 2/3, 0, 1);
+		elseif i == 1 then
+			key:SetBackdropColor(1, 1/3, 0, 1);
+		elseif i == 0 then
+			key:SetBackdropColor(1, 0, 0, 1);
+		elseif i == -1 then
+			key:SetBackdropColor(1/5, 1/5, 1/5, 1);
+		end
+		
+		-- Create left text
+		local leftText = key:CreateFontString(key:GetName().."LeftText", "OVERLAY", "GameFontNormal")
+		leftText:SetPoint("RIGHT", key, "LEFT", -4, 0)
+		if i >= 0 then
+			leftText:SetText(i);
+		else
+			leftText:SetText("?");
+		end
+		
+		-- Create right text
+		local rightText = key:CreateFontString(key:GetName().."RightText", "OVERLAY", "GameFontNormal")
+		rightText:SetPoint("LEFT", key, "RIGHT", 4, 0)
+		
+		table.insert(foodColorKey, {key, leftText, rightText});
+	end
+	
+	local foodFrameClose = CreateFrame("Button", foodFrame:GetName().."Button", foodFrame, "UIPanelButtonTemplate");
+	foodFrameClose:SetPoint("RIGHT", foodFrame, "BOTTOMRIGHT", -20, 2);
+	foodFrameClose:SetHeight(20);
+	foodFrameClose:SetWidth(80);
+	foodFrameClose:SetText("Close");
+	foodFrameClose:SetScript("OnClick", function(self)
+		self:GetParent():Hide();
+	end);
+	
+	-- make some fancy-ass title that takes way too much time to code
+	local foodTitleBg = foodFrame:CreateTexture(foodFrame:GetName().."TitleBackground", "OVERLAY")
+	foodTitleBg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	foodTitleBg:SetTexCoord(0.31, 0.67, 0, 0.63)
+	foodTitleBg:SetPoint("TOP", 0, 12)
+	foodTitleBg:SetHeight(40)
+
+	-- Create the title frame
+	local foodTitle = CreateFrame("Frame", foodFrame:GetName().."TitleMover", foodFrame)
+	foodTitle:EnableMouse(true)
+	foodTitle:SetScript("OnMouseDown", function(self)
+		self:GetParent():StartMoving()
+	end)
+	foodTitle:SetScript("OnMouseUp", function(self)
+		self:GetParent():StopMovingOrSizing()
+	end)
+	foodTitle:SetAllPoints(foodTitleBg)
+
+	-- Create the text of the title
+	local foodTitletext = foodTitle:CreateFontString(foodFrame:GetName().."TitleText", "OVERLAY", "GameFontNormal")
+	foodTitletext:SetPoint("TOP", foodTitleBg, "TOP", 0, -14)
+	foodTitletext:SetText("Food Count");
+	
+	foodTitleBg:SetWidth((foodTitletext:GetWidth() or 0) + 10)
+
+	-- Create the title background left edge
+	local foodTitleBg_l = frame:CreateTexture(foodFrame:GetName().."TitleEdgeLeft", "OVERLAY")
+	foodTitleBg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	foodTitleBg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
+	foodTitleBg_l:SetPoint("RIGHT", foodTitleBg, "LEFT")
+	foodTitleBg_l:SetWidth(30)
+	foodTitleBg_l:SetHeight(40)
+
+	-- Create the title background right edge
+	local foodTitleBg_r = frame:CreateTexture(foodFrame:GetName().."TitleEdgeRight", "OVERLAY")
+	foodTitleBg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	foodTitleBg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
+	foodTitleBg_r:SetPoint("LEFT", foodTitleBg, "RIGHT")
+	foodTitleBg_r:SetWidth(30)
+	foodTitleBg_r:SetHeight(40)
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -1117,12 +1252,6 @@ local function slashparse(msg, editbox)
 			debug(table_itemQuery);
 		elseif msg == "hasBeenLooted" then
 			debug(hasBeenLooted);
-		elseif msg == "food" then
-			local t = {};
-			for i, v in pairs(raidFoodCount) do
-				t[v] = (t[v] + 1) or 1;
-			end
-			debug(t);
 		end
 		return;
 	elseif string.match(msg, "^debug %d") then
@@ -1141,17 +1270,24 @@ local function slashparse(msg, editbox)
 		}, "GUILD");
 		return;
 	elseif msgLower == "food" then
-		if foodFrame:IsShown() then
-			return
+		if IsInRaid() or debugOn > 0 then
+			if foodFrame:IsShown() then
+				debug("Frame is already shown, doing nothing", 1);
+				foodFrame:Hide();
+			else
+				debug("Showing frame...", 1);
+				foodFrame:Show();
+			end
+		else
+			debug("You must be in a raid group to do that!");
 		end
-		foodFrame:Show();
 	else
 		debug("The following are valid slash commands:");
 		print("/fa debug <threshold> -- set debugging threshold");
 		print("/fa who -- see who is running the addon and what version");
 		print("/fa -- shows the loot window");
-		print("/faroll <value> -- does a FA roll for the designated DKP amount");
 		print("/fa food -- displays # of food remaining for each raid member via a pie chart");
+		print("/faroll <value> -- does a FA roll for the designated DKP amount");
 	end
 end
 SlashCmdList["RT"] = slashparse
@@ -1960,6 +2096,9 @@ function events:PLAYER_LOGOUT(...)
 end
 function events:PLAYER_ENTERING_WORLD()
 	FALoot:setAutoLoot();
+	
+	-- Register event for food tracking
+	eventFrame:RegisterEvent("BAG_UPDATE");
 end
 function events:VARIABLES_LOADED()
 	if autolootToggle and autolootKey then
@@ -2149,21 +2288,44 @@ function events:GET_ITEM_INFO_RECEIVED()
 		FALoot:itemTableUpdate();
 	end
 end
-function events:BAG_UPDATE_DELAYED()
-	local count = GetItemCount(foodItemId) or 0;
-	if foodCount ~= count then
-		for i, v in pairs(foodUpdateTo) do
-			FALoot:sendMessage(ADDON_MSG_PREFIX, {
-				["foodCount"] = foodCount,
-			}, "WHISPER", i)
-		end
-		foodCount = count;
-	end
-end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 	events[event](self, ...) -- call one of the functions above
 end)
 for k, v in pairs(events) do
 	eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
+end
+
+-- Events that will be manually registered at a later time.
+function events:BAG_UPDATE()
+	-- Registered on PLAYER_ENTERING WORLD to avoid
+	-- processing the event a zillion times when the UI loads.
+	debug("BAG_UPDATE triggered.", 2);
+	local count = GetItemCount(foodItemId) or 0;
+	if foodCount ~= count then
+		local groupType;
+		if IsInRaid() then
+			groupType = "raid";
+		else
+			groupType = "party";
+		end
+		for i, v in pairs(foodUpdateTo) do
+			local sent;
+			for i=1,GetNumGroupMembers() do
+				if UnitName(groupType..i) == i then
+					if UnitIsConnected(groupType..i) then
+						FALoot:sendMessage(ADDON_MSG_PREFIX, {
+							["foodCount"] = foodCount,
+						}, "WHISPER", i)
+						sent = true;
+					end
+					break
+				end
+			end
+			if not sent then
+				foodUpdateTo[i] = nil;
+			end
+		end
+		foodCount = count;
+	end
 end

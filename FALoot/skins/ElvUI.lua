@@ -14,6 +14,7 @@ frame:SetScript("OnUpdate", function()
 	if FALootFrame then
 		SkinFrame(FALootFrame)
 		SkinFrame(FALootTellsFrame)
+		SkinFrame(FALootFoodFrame)
 		
 		FALootFrameStatusBar:SetTemplate("Default", true)
 		
@@ -22,6 +23,7 @@ frame:SetScript("OnUpdate", function()
 		FALootFrameTellsButton:SetTemplate("Default", true)
 		FALootTellsFrameAwardButton:SetTemplate("Default", true)
 		FALootTellsFrameActionButton:SetTemplate("Default", true)
+		FALootFoodFrameButton:SetTemplate("Default", true)
 		
 		frame:SetScript("OnUpdate", nil)
 	end
