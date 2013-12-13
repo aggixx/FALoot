@@ -1120,7 +1120,7 @@ function FALoot:createGUI()
 	foodTitleBg:SetWidth((foodTitletext:GetWidth() or 0) + 10)
 
 	-- Create the title background left edge
-	local foodTitleBg_l = frame:CreateTexture(foodFrame:GetName().."TitleEdgeLeft", "OVERLAY")
+	local foodTitleBg_l = foodFrame:CreateTexture(foodFrame:GetName().."TitleEdgeLeft", "OVERLAY")
 	foodTitleBg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
 	foodTitleBg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
 	foodTitleBg_l:SetPoint("RIGHT", foodTitleBg, "LEFT")
@@ -1128,7 +1128,7 @@ function FALoot:createGUI()
 	foodTitleBg_l:SetHeight(40)
 
 	-- Create the title background right edge
-	local foodTitleBg_r = frame:CreateTexture(foodFrame:GetName().."TitleEdgeRight", "OVERLAY")
+	local foodTitleBg_r = foodFrame:CreateTexture(foodFrame:GetName().."TitleEdgeRight", "OVERLAY")
 	foodTitleBg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
 	foodTitleBg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
 	foodTitleBg_r:SetPoint("LEFT", foodTitleBg, "RIGHT")
