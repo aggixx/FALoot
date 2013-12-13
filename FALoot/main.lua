@@ -756,8 +756,8 @@ function FALoot:createGUI()
 	closeButton:SetHeight(20)
 	closeButton:SetWidth(80)
 	closeButton:SetText(CLOSE)
-	closeButton:SetScript("OnClick", function()
-		frame:Hide();
+	closeButton:SetScript("OnClick", function(self)
+		self:GetParent():Hide();
 	end);
 	
 	-- Create the "Bid" button
@@ -1030,6 +1030,7 @@ function FALoot:createGUI()
 	foodFrame:SetWidth(280);
 	foodFrame:SetHeight(200);
 	foodFrame:SetPoint("CENTER");
+	foodFrame:SetMovable(true);
 	foodFrameGraph = libGraph:CreateGraphPieChart("FALootFoodFrameChart", foodFrame, "LEFT", "LEFT", 15, 0, 170, 170);
 	
 	foodFrameGraph:AddPie(2/25*100, {0, 1, 0});
