@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.3a";
+local ADDON_VERSION_FULL = "v4.3b";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -235,11 +235,13 @@ local function isGuildGroup(threshold)
 	local numOffline = 0
 	for i=1,GetNumGroupMembers() do
 		local iname = GetRaidRosterInfo(i)
-		if isNameInGuild(iname) then
-			numguildies = numguildies + 1
-		end
-		if not UnitIsConnected(groupType..i) then
-			numOffline = numOffline + 1
+		if iname then
+			if isNameInGuild(iname) then
+				numguildies = numguildies + 1
+			end
+			if not UnitIsConnected(groupType..i) then
+				numOffline = numOffline + 1
+			end
 		end
 	end
 	if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
@@ -645,6 +647,9 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
 		
 		foodFrameGraph:ResetPie();
+		for i=1,#foodColorKey do
+			foodColorKey[i][3]:SetText("");
+		end
 		
 		local t = {};
 		for i, v in pairs(raidFoodCount) do
