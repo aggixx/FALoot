@@ -24,6 +24,7 @@ frame:SetScript("OnUpdate", function()
 		FALootTellsFrameAwardButton:SetTemplate("Default", true)
 		FALootTellsFrameActionButton:SetTemplate("Default", true)
 		FALootFoodFrameButton:SetTemplate("Default", true)
+		FALootFoodFrameButton2:SetTemplate("Default", true)
 		
 		frame:SetScript("OnUpdate", nil)
 	end
