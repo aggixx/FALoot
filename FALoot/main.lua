@@ -5,7 +5,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.3b";
+local ADDON_VERSION_FULL = "v4.3c";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -79,13 +79,15 @@ local tellsTitleBg;
 
 local foodFrame;
 local foodFrameGraph;
+local foodFrameMsg;
 local foodColorKey = {};
 
 -- 300 food track
 local foodItemId = 101618;
-local foodCount = GetItemCount(itemId) or 0;
+local foodCount = 0;
 local raidFoodCount = {};
 local foodUpdateTo = {};
+local lastCartSummon = -120;
 
 --helper functions
 
@@ -522,6 +524,72 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompr
 	FALoot:SendCommMessage(prefix, text, distribution, target, prio)
 end
 
+local function updatePieChart()
+	local groupType, members = "raid", GetNumGroupMembers();
+	if not IsInRaid() then
+		groupType = "party";
+		members = members - 1;
+	end
+	for i,v in pairs(raidFoodCount) do
+		local found;
+		for j=1,members do
+			if i == GetUnitName(groupType..j) then
+				found = true;
+				break;
+			end
+		end
+		if not found then
+			raidFoodCount[i] = nil;
+		end
+	end
+
+	foodFrameGraph:ResetPie();
+	for i=1,#foodColorKey do
+		foodColorKey[i][3]:SetText("");
+	end
+	
+	local t = {};
+	for i, v in pairs(raidFoodCount) do
+		t[v] = (t[v] or 0) + 1;
+	end
+	
+	local total = 0;
+	for i, v in pairs(t) do
+		local color;
+		if i >= 5 then
+			color = {0, 1, 0};
+		elseif i == 4 then
+			color = {1/2, 1, 0};
+		elseif i == 3 then
+			color = {1, 1, 0};
+		elseif i == 2 then
+			color = {1, 2/3, 0};
+		elseif i == 1 then
+			color = {1, 1/3, 0};
+		else
+			color = {1, 0, 0};
+		end
+		foodFrameGraph:AddPie(v/GetNumGroupMembers()*100, color);
+		
+		for j=1,#foodColorKey do
+			if foodColorKey[j][2]:GetText() == tostring(i) then
+				foodColorKey[j][3]:SetText(v);
+				break
+			end
+		end
+		
+		total = total + v;
+	end
+	
+	foodFrameGraph:CompletePie({1/5, 1/5, 1/5})
+	for j=1,#foodColorKey do
+		if foodColorKey[j][2]:GetText() == "?" then
+			foodColorKey[j][3]:SetText(GetNumGroupMembers()-total);
+			break
+		end
+	end
+end
+
 function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	if prefix ~= ADDON_MSG_PREFIX or not text then
 		return;
@@ -540,7 +608,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
-	if sender == UnitName("player") and not (t["who"] or t["foodCount"]) then
+	if sender == UnitName("player") and not t["who"] then
 		return;
 	end
 	
@@ -630,14 +698,12 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		table.insert(table_items[t["itemString"]]["winners"][t["winAmount"]], sender);
 		FALoot:itemTableUpdate();
 	elseif t["foodTrackOn"] then
-		if not foodUpdateTo[sender] then
-			if foodCount then
-				FALoot:sendMessage(ADDON_MSG_PREFIX, {
-					["foodCount"] = foodCount,
-				}, "WHISPER", sender)
-			end
-			foodUpdateTo[sender] = true;
+		if foodCount then
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["foodCount"] = foodCount,
+			}, "WHISPER", sender)
 		end
+		foodUpdateTo[sender] = true;
 		debug("foodTrackOn recieved from "..sender, 1);
 	elseif t["foodTrackOff"] then
 		foodUpdateTo[sender] = nil;
@@ -646,51 +712,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		raidFoodCount[sender] = t["foodCount"];
 		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
 		
-		foodFrameGraph:ResetPie();
-		for i=1,#foodColorKey do
-			foodColorKey[i][3]:SetText("");
-		end
-		
-		local t = {};
-		for i, v in pairs(raidFoodCount) do
-			t[v] = (t[v] or 0) + 1;
-		end
-		
-		local total = 0;
-		for i, v in pairs(t) do
-			local color;
-			if i == 5 then
-				color = {0, 1, 0};
-			elseif i == 4 then
-				color = {1/2, 1, 0};
-			elseif i == 3 then
-				color = {1, 1, 0};
-			elseif i == 2 then
-				color = {1, 2/3, 0};
-			elseif i == 1 then
-				color = {1, 1/3, 0};
-			else
-				color = {1, 0, 0};
-			end
-			foodFrameGraph:AddPie(v/GetNumGroupMembers()*100, color);
-			
-			for j=1,#foodColorKey do
-				if foodColorKey[j][2]:GetText() == tostring(i) then
-					foodColorKey[j][3]:SetText(v);
-					break
-				end
-			end
-			
-			total = total + v;
-		end
-		
-		foodFrameGraph:CompletePie({1/5, 1/5, 1/5})
-		for j=1,#foodColorKey do
-			if foodColorKey[j][2]:GetText() == "?" then
-				foodColorKey[j][3]:SetText(GetNumGroupMembers()-total);
-				break
-			end
-		end
+		updatePieChart();
 	end
 end
 
@@ -1021,15 +1043,19 @@ function FALoot:createGUI()
 	foodFrame:SetBackdropColor(0, 1, 0, 0.5);
 	foodFrame:Hide();
 	foodFrame:SetScript("OnShow", function()
-		FALoot:sendMessage(ADDON_MSG_PREFIX, {
-			["foodTrackOn"] = true,
-		}, "RAID")
-		debug("Food tracking enabled.", 1);
+		if IsInRaid() then
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["foodTrackOn"] = true,
+			}, "RAID");
+			debug("Food tracking enabled.", 1);
+		end
 	end);
 	foodFrame:SetScript("OnHide", function()
-		FALoot:sendMessage(ADDON_MSG_PREFIX, {
-			["foodTrackOff"] = true,
-		}, "RAID")
+		if IsInRaid() then
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["foodTrackOff"] = true,
+			}, "RAID");
+		end
 		debug("Food tracking disabled.", 1);
 	end);
 	foodFrame:SetWidth(280);
@@ -1099,6 +1125,24 @@ function FALoot:createGUI()
 	foodFrameClose:SetScript("OnClick", function(self)
 		self:GetParent():Hide();
 	end);
+	
+	foodFrameMsg = CreateFrame("Button", foodFrame:GetName().."Button2", foodFrame, "UIPanelButtonTemplate");
+	foodFrameMsg:SetPoint("LEFT", foodFrame, "BOTTOMLEFT", 20, 2);
+	foodFrameMsg:SetHeight(20);
+	foodFrameMsg:SetWidth(80);
+	foodFrameMsg:SetText("Reminder");
+	foodFrameMsg:SetScript("OnClick", function(self)
+		if UnitIsRaidOfficer("player") or UnitIsGroupLeader("player") then
+			for i,v in pairs(raidFoodCount) do
+				if v < 5 then
+					SendChatMessage("Get your damn food!", "WHISPER", nil, i);
+				end
+			end
+		else
+			debug("You must have raid assist to do that!");
+		end
+	end);
+	foodFrameMsg:Hide();
 	
 	-- make some fancy-ass title that takes way too much time to code
 	local foodTitleBg = foodFrame:CreateTexture(foodFrame:GetName().."TitleBackground", "OVERLAY")
@@ -1748,8 +1792,10 @@ function FALoot:setLeaderUIVisibility()
 	-- enable/disable UI elements
 	if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") or debugOn > 0 then
 		tellsButton:Show();
+		foodFrameMsg:Show();
 	else
 		tellsButton:Hide();
+		foodFrameMsg:Hide();
 	end
 end
 
@@ -2105,6 +2151,9 @@ function events:PLAYER_ENTERING_WORLD()
 	
 	-- Register event for food tracking
 	eventFrame:RegisterEvent("BAG_UPDATE");
+	
+	-- Force a food count get
+	events:BAG_UPDATE();
 end
 function events:VARIABLES_LOADED()
 	if autolootToggle and autolootKey then
@@ -2271,10 +2320,18 @@ end
 function events:GROUP_ROSTER_UPDATE()
 	FALoot:setAutoLoot();
 	FALoot:setLeaderUIVisibility();
+	
+	if not IsInRaid() then
+		foodFrame:Hide();
+	end
 end
 function events:RAID_ROSTER_UPDATE()
 	FALoot:setAutoLoot();
 	FALoot:setLeaderUIVisibility();
+	
+	if not IsInRaid() then
+		foodFrame:Hide();
+	end
 end
 function events:PLAYER_REGEN_ENABLED()
 	if showAfterCombat then
@@ -2309,29 +2366,30 @@ function events:BAG_UPDATE()
 	debug("BAG_UPDATE triggered.", 2);
 	local count = GetItemCount(foodItemId) or 0;
 	if foodCount ~= count then
-		local groupType;
-		if IsInRaid() then
-			groupType = "raid";
-		else
+		local groupType, members = "raid", GetNumGroupMembers();
+		if not IsInRaid() then
 			groupType = "party";
+			members = members - 1;
 		end
-		for i, v in pairs(foodUpdateTo) do
+		for name,v in pairs(foodUpdateTo) do
 			local sent;
-			for i=1,GetNumGroupMembers() do
-				if UnitName(groupType..i) == i then
+			for i=1,members do
+				if UnitName(groupType..i) == name then
 					if UnitIsConnected(groupType..i) then
 						FALoot:sendMessage(ADDON_MSG_PREFIX, {
-							["foodCount"] = foodCount,
-						}, "WHISPER", i)
+							["foodCount"] = count,
+						}, "WHISPER", name)
 						sent = true;
 					end
 					break
 				end
 			end
 			if not sent then
-				foodUpdateTo[i] = nil;
+				foodUpdateTo[name] = nil;
 			end
 		end
 		foodCount = count;
+		raidFoodCount[UnitName("player")] = foodCount;
+		updatePieChart();
 	end
 end
