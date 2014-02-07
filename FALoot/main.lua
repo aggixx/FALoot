@@ -2,9 +2,8 @@
 	== Bugs to fix ==
 	Prevent "Take tells" collision by asking permission from the raid leader (y/n/noresponse method)
 	Fix communication of final sale price for items
-	Fix GetGuildRosterInfo API change collateral damage
 	
-	== Features to implement ==
+	== Features to implement / finish implementing ==
 	Announce winners to aspects chat when session ends
 	Add a persistent debug log to assist troubleshooting
 	More robust/expandable item tracking
@@ -190,6 +189,14 @@ local function deepcopy(orig)
         copy = orig
     end
     return copy
+end
+
+-- hook GetGuildRosterInfo to not include realm suffixes (hacky but fuck it this is way easier)
+local GetGuildRosterInfo_orig = GetGuildRosterInfo;
+local function GetGuildRosterInfo(index)
+	local fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation = GetGuildRosterInfo_orig(index);
+	fullName = string.match(fullName, "^[^-]+");
+	return fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation;
 end
 
 local function ItemLinkStrip(itemLink)
