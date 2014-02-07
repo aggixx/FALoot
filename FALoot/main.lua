@@ -1,7 +1,18 @@
 --[[
+	== Bugs to fix ==
+	Prevent "Take tells" collision by asking permission from the raid leader (y/n/noresponse method)
+	Fix communication of final sale price for items
+	Fix GetGuildRosterInfo API change collateral damage
+	
+	== Features to implement ==
 	Announce winners to aspects chat when session ends
+	Add a persistent debug log to assist troubleshooting
+	More robust/expandable item tracking
+	
+	== Must construct additional DATAZ ==
+	Rare inconsistency with autoloot disable
 	Confirm that the award item button actually does nothing when you have nobody selected
--]]
+--]]
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
@@ -215,14 +226,16 @@ local function ItemLinkAssemble(itemString)
 end
 
 local function isNameInGuild(name)
-	SetGuildRosterShowOffline(false)
-	local _, onlineguildies = GetNumGuildMembers()
+	local showOffline = GetGuildRosterShowOffline();
+	SetGuildRosterShowOffline(false);
+	local _, onlineguildies = GetNumGuildMembers();
 	for j=1,onlineguildies do
-		local jname = GetGuildRosterInfo(j)
+		local jname = GetGuildRosterInfo(j);
 		if string.match(jname, name.."%-.+") then
-			return true
+			return true;
 		end
 	end
+	SetGuildRosterShowOffline(showOffline);
 end
 
 local function isGuildGroup(threshold)
@@ -372,10 +385,12 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	end
 	
 	-- check if the item level of the item is high enough
-	local playerTotal = GetAverageItemLevel()
-	if checkItemLevel and playerTotal - ilevel > 20 then -- if the item is more than 20 levels below the player
-		debug("Item Level of "..itemLink.." is too low.", 1);
-		return false
+	if checkItemLevel then
+		local playerTotal = GetAverageItemLevel()
+		if playerTotal - ilevel > 60 then -- if the item is more than 60 levels below the player
+			debug("Item Level of "..itemLink.." is too low.", 1);
+			return false
+		end
 	end
 	
 	return true
@@ -417,7 +432,7 @@ local function itemAdd(itemString, checkCache)
 	end
 	
 	-- check if item passes the filter
-	if not FALoot:checkFilters(itemString) then
+	if not FALoot:checkFilters(itemString, true) then
 		debug(itemString.." did not pass the item filter.", 2);
 		return;
 	end
