@@ -2,7 +2,6 @@
 	== Bugs to fix ==
 	Fix communication of final sale price for items
 	Fix strata on item tracker and debug window buttons
-	Bids that don't go through (user error?)
 	
 	== Features to implement / finish implementing ==
 	Announce winners to aspects chat when session ends
@@ -14,6 +13,7 @@
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
+	Bids that don't go through (user error?)
 --]]
 
 -- Declare strings
