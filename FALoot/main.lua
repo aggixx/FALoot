@@ -128,7 +128,11 @@ local function debug(msg, verbosity)
 	elseif type(msg) == "boolean" then
 		output = msg;
 	elseif type(msg) == "table" then
-		--DevTools_Dump(msg);
+		if DevTools_Dump then
+			DevTools_Dump(msg);
+		else
+			output = "DevTools not found.";
+		end
 		return;
 	else
 		return;
