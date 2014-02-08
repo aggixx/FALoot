@@ -1,8 +1,8 @@
 --[[
 	== Bugs to fix ==
-	Prevent "Take tells" collision by asking permission from the raid leader (y/n/noresponse method)
 	Fix communication of final sale price for items
 	Fix strata on item tracker and debug window buttons
+	Bids that don't go through (user error?)
 	
 	== Features to implement / finish implementing ==
 	Announce winners to aspects chat when session ends
@@ -14,7 +14,6 @@
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
-	Confirm that the award item button actually does nothing when you have nobody selected
 --]]
 
 -- Declare strings
@@ -54,6 +53,7 @@ local autolootKey;
 
 -- Hard-coded options
 local maxIcons = 11;
+local postRequestMaxWait = 3; -- Amount of time to wait for a response from the raid leader before posting a request anyway, in seconds.
 
 -- Session Variables
 local _;
@@ -75,6 +75,7 @@ local tellsGreenThreshold;
 local tellsYellowThreshold;
 local tellsRankThreshold;
 local debugData = {};
+local postRequestTimer;
 
 -- GUI elements
 local frame;
@@ -544,6 +545,48 @@ function FALoot:itemTakeTells(itemString)
 	end
 end
 
+function FALoot:itemRequestTakeTells(itemString)
+	-- Acquire name of raid leader
+	local raidLeader, raidLeaderUnitID;
+	if IsInRaid() then
+		for i=1,GetNumGroupMembers() do
+			if UnitIsGroupLeader("raid"..i) and UnitIsConnected("raid"..i) then
+				raidLeader = UnitName("raid"..i);
+				raidLeaderUnitID = "raid"..i;
+				break;
+			end
+		end
+	elseif debugOn > 0 then
+		-- For testing purposes, let's let the player act as the raid leader.
+		raidLeader = UnitName("player");
+	else
+		return;
+	end
+	if raidLeader and raidLeader == "Unknown" then
+		debug("Raid leader was found, but returned name Unknown. Aborting.", 1);
+		return;
+	elseif raidLeader then
+		-- Set itemString to become the active tells item
+		tellsInProgress = itemString;
+		if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and debugOn > 0) then
+			-- Ask raid leader for permission to start item
+			debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["postRequest"] = itemString,
+			}, "WHISPER", raidLeader);
+			-- Set request timer
+			postRequestTimer = GetTime();
+		else
+			-- Leader is offline, so let's just go ahead post the item.
+			debug('Raid leader "' .. raidLeader .. '" is offline, skipping redundancy check.', 1);
+			FALoot:itemTakeTells(itemString);
+		end
+	else
+		debug("Raid leader not found. Aborting.", 1);
+		return;
+	end
+end
+
 function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompress)
 	--serialize
 	local serialized, msg = libSerialize:Serialize(text)
@@ -659,8 +702,27 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
-	if sender == UnitName("player") and not t["who"] then
-		return;
+	-- List of whitelisted message types
+	-- Add an entry here to allow the player to recieve messages from themself of that type.
+	local whitelisted = {
+		"who",
+		"postRequest",
+		"postReply",
+	};
+	
+	-- Block all messages from self that are not of a type included in the whitelist
+	if sender == UnitName("player") then
+		local allow = false;
+		for i=1,#whitelisted do
+			if t[whitelisted[i]] ~= nil then
+				allow = true;
+				break;
+			end
+		end
+		if not allow then
+			debug("Message from self and not of a whitelisted type, discarding.", 1);
+			return;
+		end
 	end
 	
 	debug(t, 2);
@@ -764,6 +826,49 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
 		
 		updatePieChart();
+	elseif t["postRequest"] then
+		local requestedItem = t["postRequest"];
+		-- validate input
+		if requestedItem then
+			debug('Received postRequest from "' .. sender .. '" on item "' .. requestedItem .. '".', 1);
+		else
+			debug("Received postRequest with no itemString, aborting.", 1);
+			return;
+		end
+		
+		if not table_items[requestedItem] then
+			debug("Item does not exist, denying request.", 1);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["postReply"] = false,
+			}, "WHISPER", sender);
+		elseif table_items[requestedItem]["status"] then
+			debug("Item is already in progress, denying request.", 1);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["postReply"] = false,
+			}, "WHISPER", sender);
+		elseif table_items[requestedItem]["host"] then
+			debug('Item has already been claimed for posting by "' .. table_items[requestedItem]["host"] .. '", denying request.', 1);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["postReply"] = false,
+			}, "WHISPER", sender);
+		else
+			debug('Request granted.', 1);
+			table_items[requestedItem]["host"] = sender;
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["postReply"] = true,
+			}, "WHISPER", sender);
+		end
+	elseif t["postReply"] ~= nil and tellsInProgress and postRequestTimer then
+		if t["postReply"] == true then
+			debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);
+			FALoot:itemTakeTells(tellsInProgress);
+		elseif t["postReply"] == false then
+			debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
+			tellsInProgress = nil;
+			FALoot:onTableSelect(scrollingTable:GetSelection());
+		end
+		
+		postRequestTimer = nil;
 	end
 end
 
@@ -1067,11 +1172,14 @@ function FALoot:createGUI()
 	tellsButton = CreateFrame("Button", frame:GetName().."TellsButton", frame, "UIPanelButtonTemplate");
 	tellsButton:SetScript("OnClick", function(self, event)
 		local id = scrollingTable:GetSelection()
-		local j, itemLink, itemString = 0;
+		local j = 0;
 		for i, v in pairs(table_items) do
 			j = j + 1;
 			if j == id then
-				FALoot:itemTakeTells(i);
+				-- We've figured out the item string of the corresponding item (i), so now let's ask for permission to post it.
+				FALoot:itemRequestTakeTells(i);
+				-- While we're waiting for a request to our response, let's make sure the user can't take tells on any more items.
+				FALoot:onTableSelect(scrollingTable:GetSelection());
 				break;
 			end
 		end
@@ -2032,6 +2140,14 @@ local function onUpdate(self,elapsed)
 		end
 		table_who = {}
 	end
+	
+	-- Post request timer
+	-- If we've been waiting more than postRequestMaxWait seconds for a response from the raid leader, then go ahead and post the item anyway.
+	if postRequestTimer and currentTime - postRequestTimer >= postRequestMaxWait then
+		debug(postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. tellsInProgress .. ") anyway.", 1);
+		FALoot:itemTakeTells(tellsInProgress);
+		postRequestTimer = nil;
+	end
 end
 
 local ouframe = CreateFrame("frame")
@@ -2282,7 +2398,8 @@ function events:PLAYER_LOGIN()
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
 		itemAdd("96384:0")
 		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
-		FALoot:itemTakeTells("96740:0");
+		--FALoot:itemRequestTakeTells("96740:0");
+		--[[
 		table_items[tellsInProgress]["tells"] = {
 			{"Dyrimar", nil, 30, ""},
 			{"Demonicblade", nil, 30, ""},
@@ -2290,6 +2407,7 @@ function events:PLAYER_LOGIN()
 			{"Xaerlun", "Wyrm", 10, ""},
 			{"Unbrewable", nil, 10, ""},
 		}
+		--]]
 		tellsFrame:Show();
 		FALoot:tellsTableUpdate();
 		FALoot:itemTableUpdate();
