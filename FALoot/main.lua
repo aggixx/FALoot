@@ -128,7 +128,7 @@ local function debug(msg, verbosity)
 	elseif type(msg) == "boolean" then
 		output = msg;
 	elseif type(msg) == "table" then
-		DevTools_Dump(msg);
+		--DevTools_Dump(msg);
 		return;
 	else
 		return;
@@ -546,6 +546,13 @@ function FALoot:itemTakeTells(itemString)
 end
 
 function FALoot:itemRequestTakeTells(itemString)
+	debug("itemRequestTakeTells("..itemString..")", 1);
+
+	-- Make sure that this is an item we can actually take tells on before trying to submit a request
+	if not table_items[itemString] or table_items[itemString]["status"] or table_items[itemString]["host"] then
+		debug("Invalid itemString, aborting.", 1);
+		return;
+	end
 	-- Acquire name of raid leader
 	local raidLeader, raidLeaderUnitID;
 	if IsInRaid() then
