@@ -15,6 +15,7 @@ frame:SetScript("OnUpdate", function()
 		SkinFrame(FALootFrame)
 		SkinFrame(FALootTellsFrame)
 		SkinFrame(FALootFoodFrame)
+		SkinFrame(FALootDebugFrame)
 		
 		FALootFrameStatusBar:SetTemplate("Default", true)
 		
@@ -25,6 +26,8 @@ frame:SetScript("OnUpdate", function()
 		FALootTellsFrameActionButton:SetTemplate("Default", true)
 		FALootFoodFrameButton:SetTemplate("Default", true)
 		FALootFoodFrameButton2:SetTemplate("Default", true)
+		FALootDebugFrameButton:SetTemplate("Default", true)
+		FALootDebugFrameEditBox:SetTemplate("Default", true)
 		
 		frame:SetScript("OnUpdate", nil)
 	end

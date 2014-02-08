@@ -2,11 +2,15 @@
 	== Bugs to fix ==
 	Prevent "Take tells" collision by asking permission from the raid leader (y/n/noresponse method)
 	Fix communication of final sale price for items
+	Fix strata on item tracker and debug window buttons
 	
 	== Features to implement / finish implementing ==
 	Announce winners to aspects chat when session ends
-	Add a persistent debug log to assist troubleshooting
 	More robust/expandable item tracking
+	Flag counter
+	Ability to toggle skinning
+	Make reminders exclusive to the person in the cart (and automated?)
+	Add table dumps to debug log
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
@@ -70,6 +74,7 @@ local tellsInProgress;
 local tellsGreenThreshold;
 local tellsYellowThreshold;
 local tellsRankThreshold;
+local debugData = {};
 
 -- GUI elements
 local frame;
@@ -92,6 +97,9 @@ local foodFrameGraph;
 local foodFrameMsg;
 local foodColorKey = {};
 
+local debugFrame;
+local debugFrameEditbox;
+
 -- 300 food track
 local foodItemId = 101618;
 local foodCount = 0;
@@ -101,18 +109,39 @@ local lastCartSummon = -120;
 
 --helper functions
 
-local function debug(msg, verbosity)
-	if (not verbosity or debugOn >= verbosity) then
-		if type(msg) == "string" or type(msg) == "number" or type(msg) == nil then
-			print(ADDON_CHAT_HEADER..(msg or "nil"));
-		elseif type(msg) == "boolean" then
-			print(ADDON_CHAT_HEADER..msg);
-		elseif type(msg) == "table" then
-			if not DevTools_Dump then
-				LoadAddOn("Blizzard UI Debug Tools");
-			end
-			DevTools_Dump(msg);
+local function formatDebugData()
+	local s = ""
+	for i=1,#debugData do
+		if i > 1 then
+			s = s .. "\n";
 		end
+		s = s .. "[" .. date("%c", debugData[i].time) .. "]<" .. debugData[i].threshold .. "> " .. debugData[i].msg;
+	end
+	return s;
+end;
+
+local function debug(msg, verbosity)
+	local output;
+	if type(msg) == "string" or type(msg) == "number" or type(msg) == nil then
+		output = msg or "nil";
+	elseif type(msg) == "boolean" then
+		output = msg;
+	elseif type(msg) == "table" then
+		DevTools_Dump(msg);
+		return;
+	else
+		return;
+	end
+	table.insert(debugData, {
+		["msg"] = output,
+		["time"] = time(),
+		["threshold"] = verbosity or 0,
+	});
+	if debugFrame and debugFrame:IsShown() then
+		debugEditBox:SetText(formatDebugData());
+	end
+	if not verbosity or debugOn >= verbosity then
+		print(ADDON_CHAT_HEADER..output);
 	end
 end
 
@@ -1206,6 +1235,113 @@ function FALoot:createGUI()
 	foodTitleBg_r:SetPoint("LEFT", foodTitleBg, "RIGHT")
 	foodTitleBg_r:SetWidth(30)
 	foodTitleBg_r:SetHeight(40)
+	
+	debugFrame = CreateFrame("Frame", "FALootDebugFrame", UIParent);
+	debugFrame:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true, tileSize = 32, edgeSize = 32,
+		insets = { left = 8, right = 8, top = 8, bottom = 8 }
+	});
+	debugFrame:SetBackdropColor(0, 1, 0, 0.5);
+	debugFrame:SetScript("OnShow", nil);
+	debugFrame:SetScript("OnHide", nil);
+	debugFrame:SetWidth(400);
+	debugFrame:SetHeight(250);
+	debugFrame:SetPoint("CENTER");
+	debugFrame:SetMovable(true);
+	debugFrame:Hide();
+	
+	local debugFrameClose = CreateFrame("Button", debugFrame:GetName().."Button", debugFrame, "UIPanelButtonTemplate");
+	debugFrameClose:SetPoint("CENTER", debugFrame, "BOTTOM", -20, 2);
+	debugFrameClose:SetHeight(20);
+	debugFrameClose:SetWidth(100);
+	debugFrameClose:SetText("Close");
+	debugFrameClose:SetScript("OnClick", function(self)
+		self:GetParent():Hide();
+	end);
+	
+	-- make some fancy-ass title that takes way too much time to code
+	local debugTitleBg = debugFrame:CreateTexture(debugFrame:GetName().."TitleBackground", "OVERLAY")
+	debugTitleBg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	debugTitleBg:SetTexCoord(0.31, 0.67, 0, 0.63)
+	debugTitleBg:SetPoint("TOP", 0, 12)
+	debugTitleBg:SetHeight(40)
+
+	-- Create the title frame
+	local debugTitle = CreateFrame("Frame", debugFrame:GetName().."TitleMover", debugFrame)
+	debugTitle:EnableMouse(true)
+	debugTitle:SetScript("OnMouseDown", function(self)
+		self:GetParent():StartMoving()
+	end)
+	debugTitle:SetScript("OnMouseUp", function(self)
+		self:GetParent():StopMovingOrSizing()
+	end)
+	debugTitle:SetAllPoints(debugTitleBg)
+
+	-- Create the text of the title
+	local debugTitletext = debugTitle:CreateFontString(debugFrame:GetName().."TitleText", "OVERLAY", "GameFontNormal")
+	debugTitletext:SetPoint("TOP", debugTitleBg, "TOP", 0, -14)
+	debugTitletext:SetText("Debug Info");
+	
+	debugTitleBg:SetWidth((debugTitletext:GetWidth() or 0) + 10)
+
+	-- Create the title background left edge
+	local debugTitleBg_l = debugFrame:CreateTexture(debugFrame:GetName().."TitleEdgeLeft", "OVERLAY")
+	debugTitleBg_l:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	debugTitleBg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
+	debugTitleBg_l:SetPoint("RIGHT", debugTitleBg, "LEFT")
+	debugTitleBg_l:SetWidth(30)
+	debugTitleBg_l:SetHeight(40)
+
+	-- Create the title background right edge
+	local debugTitleBg_r = debugFrame:CreateTexture(debugFrame:GetName().."TitleEdgeRight", "OVERLAY")
+	debugTitleBg_r:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+	debugTitleBg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
+	debugTitleBg_r:SetPoint("LEFT", debugTitleBg, "RIGHT")
+	debugTitleBg_r:SetWidth(30)
+	debugTitleBg_r:SetHeight(40)
+	
+	debugTitleBg:SetWidth((debugTitletext:GetWidth() or 0) + 10)
+	
+	-- Create description text
+	local debugDescText = debugFrame:CreateFontString(debugFrame:GetName().."DescText", "OVERLAY", "GameFontNormal")
+	debugDescText:SetPoint("TOPLEFT", debugFrame, "TOPLEFT", 15, -20)
+	debugDescText:SetText("Please copy and paste the text below to pastebin.com and provide the resulting link to Pawkets.");
+	debugDescText:SetWidth(debugFrame:GetWidth()-30);
+	debugDescText:SetJustifyH("LEFT");
+	
+	-- Create scroll frame for editbox
+	local debugScroll = CreateFrame("ScrollFrame", debugFrame:GetName().."Scroll", debugFrame, "UIPanelScrollFrameTemplate");
+	debugScroll:SetPoint("LEFT", debugFrame, "LEFT", 16, 0);
+	debugScroll:SetPoint("RIGHT", debugFrame, "RIGHT", -16-25, 0);
+	debugScroll:SetPoint("TOP", debugDescText, "BOTTOM", 0, -6);
+	debugScroll:SetPoint("BOTTOM", debugFrameClose, "TOP", 0, 6);
+	debugScroll:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true, tileSize = 32, edgeSize = 8,
+		insets = { left = 0, right = 0, top = 0, bottom = 0 }
+	});
+	
+	-- Create editbox
+	debugEditBox = CreateFrame("EditBox", debugFrame:GetName().."EditBox");
+	debugEditBox:SetWidth(debugScroll:GetWidth());
+	debugEditBox:SetHeight(debugScroll:GetHeight());
+	debugEditBox:SetTextInsets(4, 4, 4, 4);
+	debugEditBox:SetScript("OnTextChanged", function(self)
+		self:SetText(formatDebugData());
+	end);
+	debugEditBox:SetScript("OnEscapePressed", function(self)
+		debugFrame:Hide();
+	end);
+	debugEditBox:SetFontObject("GameFontNormal");
+	debugEditBox:SetAutoFocus(false);
+	debugEditBox:SetMultiLine(true);
+	debugEditBox:Enable();
+	
+	debugScroll:SetScrollChild(debugEditBox);
+	
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -1336,6 +1472,9 @@ local function slashparse(msg, editbox)
 		
 		FALoot:setLeaderUIVisibility();
 		return;
+	elseif msgLower == "debuginfo" then
+		debugFrame:Show();
+		debugEditBox:SetText(formatDebugData());
 	elseif msgLower == "who" or msgLower == "vc" or msgLower == "versioncheck" then
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["who"] = "query",
