@@ -1,7 +1,6 @@
 --[[
 	== Bugs to fix ==
 	Fix communication of final sale price for items
-	Fix strata on item tracker and debug window buttons
 	
 	== Features to implement / finish implementing ==
 	Announce winners to aspects chat when session ends
@@ -1295,6 +1294,8 @@ function FALoot:createGUI()
 	foodFrameClose:SetScript("OnClick", function(self)
 		self:GetParent():Hide();
 	end);
+	-- Fix edges of parent clipping over button
+	foodFrameClose:SetFrameLevel(foodFrameClose:GetFrameLevel()+1);
 	
 	foodFrameMsg = CreateFrame("Button", foodFrame:GetName().."Button2", foodFrame, "UIPanelButtonTemplate");
 	foodFrameMsg:SetPoint("LEFT", foodFrame, "BOTTOMLEFT", 20, 2);
@@ -1312,6 +1313,8 @@ function FALoot:createGUI()
 			debug("You must have raid assist to do that!");
 		end
 	end);
+	-- Fix edges of parent clipping over button
+	foodFrameMsg:SetFrameLevel(foodFrameMsg:GetFrameLevel()+1);
 	foodFrameMsg:Hide();
 	
 	-- make some fancy-ass title that takes way too much time to code
@@ -1602,10 +1605,10 @@ local function slashparse(msg, editbox)
 	elseif msgLower == "food" then
 		if IsInRaid() or debugOn > 0 then
 			if foodFrame:IsShown() then
-				debug("Frame is already shown, doing nothing", 1);
+				debug("Food frame is already shown, doing nothing", 1);
 				foodFrame:Hide();
 			else
-				debug("Showing frame...", 1);
+				debug("Showing food frame...", 1);
 				foodFrame:Show();
 			end
 		else
