@@ -2311,8 +2311,8 @@ local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
 function FALoot:parseChat(msg, author)
-	debug("Parsing a chat message.", 1);
-	debug("Msg: "..msg, 2);
+	debug("Parsing a chat message.", 2);
+	debug("Msg: "..msg, 3);
 	local rank;
 	if debugOn == 0 then
 		for i=1,40 do
@@ -2416,12 +2416,12 @@ function FALoot:parseChat(msg, author)
 					FALoot:tellsTableUpdate();
 				end
 			else
-				debug("Hyperlink is not in item table.", 1);
+				debug("Hyperlink is not in item table.", 2);
 			end
 		else
-			debug("Message does not have exactly 1 hyperlink.", 1);
-			debug("linkless = "..linkless, 2);
-			debug("replaces = "..replaces, 2);
+			debug("Message does not have exactly 1 hyperlink.", 2);
+			debug("linkless = "..linkless, 3);
+			debug("replaces = "..replaces, 3);
 		end
 	else
 		debug("Author is not of sufficient rank.", 1);
