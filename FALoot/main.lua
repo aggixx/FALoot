@@ -13,6 +13,9 @@
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
 	Bids that don't go through (user error?)
+	
+	== Verify working ==
+	Loot won alert frame
 --]]
 
 -- Declare strings
@@ -27,8 +30,9 @@ local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
 local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r";
 -- |c COLOR    |H linkType : itemId : enchantId : gemId1 : gemId2 : gemId3 : gemId4 : suffixId : uniqueId  : linkLevel : reforgeId :      :      :      :      :      |h itemName            |h|r
--- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    :? %d*      :? %d*      :? %d* :? %d* :? %d* :? %d* :? %d* |h .-                  |h|r"
+-- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    : ?%d*      : ?%d*      : ?%d* : ?%d* : ?%d* : ?%d* : ?%d* |h .-                  |h|r"
 -- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
+-- |c ffa335ee |H item     : 96740  : 0         : 0      : 0      : 0      : 0      : 0        : 0         : 90        : 0         : 0                                |h[ Sign of the Bloodied God] |h|r 30
 local THUNDERFORGED_COLOR = "FFFF8000";
 
 -- Load the libraries
@@ -46,13 +50,14 @@ local libGraph = LibStub("LibGraph-2.0");
 -- SavedVariables options
 local debugOn = 0;		-- Debug threshold
 local expTime = 15;		-- Amount of time before an ended item is removed from the window, in seconds.
-local cacheInterval = 200;	-- Amount of time between attempts to check for item data, in milliseconds.
 local autolootToggle;
 local autolootKey;
 
 -- Hard-coded options
 local maxIcons = 11;
 local postRequestMaxWait = 3; -- Amount of time to wait for a response from the raid leader before posting a request anyway, in seconds.
+local itemHistorySyncMinInterval = 60 * 5; -- Minimum amount of time between item history sync attempts, in seconds.
+local cacheInterval = 200;	-- Amount of time between attempts to check for item data, in milliseconds.
 
 -- Session Variables
 local _;
@@ -75,6 +80,8 @@ local tellsYellowThreshold;
 local tellsRankThreshold;
 local debugData = {};
 local postRequestTimer;
+local lastItemHistorySync = time();
+local itemHistorySync = {};
 
 -- GUI elements
 local frame;
@@ -168,47 +175,6 @@ local function str_split(delimiter, text)
 	return list
 end
 
-function string.levenshtein(str1, str2)
-	local len1 = string.len(str1)
-	local len2 = string.len(str2)
-	local matrix = {}
-	local cost = 0
-	
-        -- quick cut-offs to save time
-	if (len1 == 0) then
-		return len2
-	elseif (len2 == 0) then
-		return len1
-	elseif (str1 == str2) then
-		return 0
-	end
-	
-        -- initialise the base matrix values
-	for i = 0, len1, 1 do
-		matrix[i] = {}
-		matrix[i][0] = i
-	end
-	for j = 0, len2, 1 do
-		matrix[0][j] = j
-	end
-	
-        -- actual Levenshtein algorithm
-	for i = 1, len1, 1 do
-		for j = 1, len2, 1 do
-			if (str1:byte(i) == str2:byte(j)) then
-				cost = 0
-			else
-				cost = 1
-			end
-			
-			matrix[i][j] = math.min(matrix[i-1][j] + 1, matrix[i][j-1] + 1, matrix[i-1][j-1] + cost)
-		end
-	end
-	
-        -- return the last value - this is the Levenshtein distance
-	return matrix[len1][len2]
-end
-
 local function deepcopy(orig)
     local orig_type = type(orig)
     local copy
@@ -230,6 +196,21 @@ local function GetGuildRosterInfo(index)
 	local fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation = GetGuildRosterInfo_orig(index);
 	fullName = string.match(fullName, "^[^-]+");
 	return fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation;
+end
+
+-- Get current server timestamp
+local function GetCurrentServerTime()
+	local _, hours, minutes = GameTime_GetGameTime(true);
+	local _, month, day, year = CalendarGetDate();
+	local currentServerTime = time({
+		["hour"] = hours,
+		["min"] = minutes,
+		["month"] = month,
+		["day"] = day,
+		["year"] = year,
+	});
+	debug("GetCurrentServerTime() = "..currentServerTime, 2);
+	return currentServerTime;
 end
 
 local function ItemLinkStrip(itemLink)
@@ -337,35 +318,6 @@ local function isMainRaid()
 	else
 		return false
 	end
-end
-
-function FALoot:findClosestGroupMember(name)
-	local closestMatch, closestMatchName, groupType, numGroupMembers = math.huge;
-	if IsInRaid() then
-		groupType = "raid";
-		numGroupMembers = GetNumGroupMembers();
-	elseif GetNumGroupMembers() > 0 then
-		groupType = "party";
-		numGroupMembers = GetNumGroupMembers() + 1;
-	else
-		groupType = "player"
-		numGroupMembers = GetNumGroupMembers() + 1;
-	end
-	for i=1,numGroupMembers do
-		local unitId;
-		if UnitExists(groupType..i) then
-			unitId = groupType..i;
-		else
-			unitId = "player"
-		end
-		local name2 = UnitName(unitId)
-		local distance = string.levenshtein(name, name2:lower())
-		if distance and distance < closestMatch then
-			closestMatch = distance;
-			closestMatchName = name2;
-		end
-	end
-	return closestMatchName or name;
 end
 
 function FALoot:addonEnabled(overrideDebug)
@@ -807,19 +759,13 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				updateMsg = true
 			end
 		end
-	elseif t["winAmount"] and t["itemString"] then
-		if table_items[t["itemString"]] then
-			for i, v in pairs(table_items[t["itemString"]]["winners"]) do
-				for j=1,#v do
-					if v[j] == sender then
-						table.remove(table_items[t["itemString"]]["winners"][i], j);
-						break
-					end
-				end
-			end
-		end
-		table.insert(table_items[t["itemString"]]["winners"][t["winAmount"]], sender);
-		FALoot:itemTableUpdate();
+	elseif t["itemWinner"] then
+		FALoot:itemAddWinner(
+			t["itemWinner"]["itemString"],
+			t["itemWinner"]["winner"],
+			t["itemWinner"]["bid"],
+			t["itemWinner"]["time"]
+		);
 	elseif t["foodTrackOn"] then
 		if foodCount then
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
@@ -879,6 +825,115 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		end
 		
 		postRequestTimer = nil;
+	elseif t["historySyncRequest"] or t["historySyncRequestFull"] then
+		local mType;
+		if t["historySyncRequest"] then
+			mType = "historySyncRequest";
+		else
+			mType = "historySyncRequestFull";
+		end
+		
+		-- Count our current number of applicable entries
+		local count = 0;
+		if mType == "historySyncRequestFull" then
+			count = #table_itemHistory;
+		else
+			for i=#table_itemHistory,1,-1 do
+				if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+					count = count + 1;
+				else
+					break;
+				end
+			end
+		end
+		
+		if count > t[mType] then
+			debug("Recieved "..mType..", replying with count "..count..".", 1);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["historySyncCount"] = count,
+			}, "WHISPER", sender);
+		else
+			debug("Recieved "..mType.." but count is equal or lower.", 2);
+		end
+	elseif t["historySyncCount"] and itemHistorySync.p1 and not itemHistorySync.p2 then
+		debug("Recieved historySyncCount of "..t["historySyncCount"].." from "..sender..".", 2);
+		table.insert(itemHistorySync.p1, {sender, t["historySyncCount"]});
+	elseif t["historySyncStart"] ~= nil then
+		debug("Recieved historySyncStart from "..sender..", commencing info dump!", 1);
+		local items = {};
+		if t["historySyncStart"] then
+			items = deepcopy(table_itemHistory);
+		else
+			for i=#table_itemHistory,1,-1 do
+				if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+					table.insert(items, 1, table_itemHistory[i]);
+				else
+					break;
+				end
+			end
+		end
+		FALoot:sendMessage(ADDON_MSG_PREFIX, {
+			["historySyncData"] = items,
+		}, "WHISPER", sender, "BULK");
+	elseif t["historySyncData"] and itemHistorySync.p2 then
+		debug("Recieved historySyncData from "..sender..", parsing...", 1);
+		
+		-- Shorten things up a tad
+		local t = t["historySyncData"];
+		
+		for i=1,#t do
+			local foundMatch = false;
+			for j=#table_itemHistory,1,-1 do
+				if t[i] == table_itemHistory[j] then
+					foundMatch = true;
+					break;
+				end
+			end
+			if not foundMatch then
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
+					["historySyncVerifyRequest"] = t[i],
+				}, "RAID", nil, "BULK");
+				t[i].varifies = 0;
+				table.insert(itemHistorySync.p2, t[i]);
+			end
+		end
+		
+		itemHistorySync.p2.time = GetTime();
+	elseif t["historySyncVerifyRequest"] then
+		debug("Recieved historySyncVerifyRequest from "..sender..".", 1);
+
+		for i=#table_itemHistory,1,-1 do
+			if t["historySyncVerifyRequest"] == table_itemHistory[i] then
+				FALoot:sendMessage(ADDON_MSG_PREFIX, {
+					["historySyncVerify"] = t["historySyncVerifyRequest"],
+				}, "WHISPER", sender);
+				debug("Varified request.", 1);
+				break;
+			end
+		end
+	elseif t["historySyncVerify"] and itemHistorySync.p2 then
+		debug("Recieved historySyncVerify from "..sender..".", 1);
+		for i=1,#itemHistorySync.p2 do
+			local compare = itemHistorySync.p2[i];
+			compare.varifies = nil;
+		
+			if t["historySyncVerify"] == compare then
+				itemHistorySync.p2[i].varifies = itemHistorySync.p2[i].varifies + 1;
+				
+				-- if we have enough verifies, let's go ahead and insert it now
+				if itemHistorySync.p2[i].varifies >= 5 or (debugOn > 0 and itemHistorySync.p2[i].varifies >= 1) then
+					debug("Entry has recieved enough varifies, adding to itemHistory.", 1);
+					for j=#table_itemHistory,1,-1 do
+						if table_itemHistory[j].time < compare.time then
+							table.insert(table_itemHistory, j+1, compare);
+							table.remove(itemHistorySync.p2, i);
+							break
+						end
+					end
+				end
+				break;
+			end
+		end
 	end
 end
 
@@ -1163,7 +1218,21 @@ function FALoot:createGUI()
 	tellsFrameAwardButton:SetScript("OnClick", function(frame)
 		local selection = tellsTable:GetSelection();
 		if selection then
+			-- Send a chat message with the winner for those that don't have the addon
 			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["tells"][selection][1], "RAID");
+			
+			-- Send an addon message for those with the addon
+			local cST = GetCurrentServerTime();
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["itemWinner"] = {
+					["itemString"] = tellsInProgress,
+					["winner"] = table_items[tellsInProgress]["tells"][selection][1],
+					["bid"] = table_items[tellsInProgress]["tells"][selection][3],
+					["time"] = cST,
+				},
+			}, "RAID");
+			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
+			
 			table.remove(table_items[tellsInProgress]["tells"], selection);
 		end
 	end);
@@ -1580,6 +1649,8 @@ local function slashparse(msg, editbox)
 			debug(table_items);
 		elseif msg == "table_itemQuery" then
 			debug(table_itemQuery);
+		elseif msg == "table_itemHistory" then
+			debug(table_itemHistory);
 		elseif msg == "hasBeenLooted" then
 			debug(hasBeenLooted);
 		end
@@ -1611,6 +1682,12 @@ local function slashparse(msg, editbox)
 				debug("Showing food frame...", 1);
 				foodFrame:Show();
 			end
+		else
+			debug("You must be in a raid group to do that!");
+		end
+	elseif msgLower == "fullsync" then
+		if IsInRaid() then
+			FALoot:itemHistorySync(true);
 		else
 			debug("You must be in a raid group to do that!");
 		end
@@ -1814,6 +1891,22 @@ function FALoot:tellsTableUpdate()
 			end
 		end--]]
 		
+		-- Count flags
+		local currentServerTime = GetCurrentServerTime();
+		for i=1,#t["tells"] do
+			local flags = 0;
+			for j=#table_itemHistory,1,-1 do
+				if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
+					if table_itemHistory[j].winner == t.tells[i][1] then
+						flags = flags + 1;
+					end
+				else
+					break;
+				end
+			end
+			table.insert(t.tells[i], flags);
+		end
+		
 		-- Set name color
 		for i=1,#t["tells"] do
 			if not string.match(t["tells"][i][1], "|c%x+.|r") then
@@ -1831,20 +1924,6 @@ function FALoot:tellsTableUpdate()
 					end
 				end
 			end
-		end
-		
-		-- Count flags
-		local currentTime = time();
-		for i=1,#t["tells"] do
-			local flags = 0;
-			if table_itemHistory[t["tells"][i][1]] then
-				for j=1,#table_itemHistory[t["tells"][i][1]] do
-					if currentTime-table_itemHistory[t["tells"][i][1]][j][2] <= 60*60*12 then
-						flags = flags + 1;
-					end
-				end
-			end
-			table.insert(t["tells"][i], flags);
 		end
 		
 		local isCompetition;
@@ -1994,6 +2073,50 @@ function FALoot:itemBid(itemString, bid)
 	debug("FALoot:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
 	
 	FALoot:checkBids();
+end
+
+function FALoot:itemAddWinner(itemString, winner, bid, time)
+	debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
+	if not itemString or not winner or not bid or not time then
+		debug("Input not valid, aborting.", 1);
+		return;
+	end
+	if not table_items[itemString] then
+		debug(itemString.." is not a valid active item!", 1);
+		return;
+	end
+		
+	-- check if the player was the winner of the item
+	if winner == UnitName("player") then
+		debug("The player won an item!", 1);
+		LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
+	end
+	
+	-- create a table entry for that pricepoint
+	if not table_items[itemString]["winners"][bid] then
+		table_items[itemString]["winners"][bid] = {};
+	end
+	
+	-- insert this event into the winners table
+	table.insert(table_items[itemString]["winners"][bid], winner);
+	
+	-- insert into item history
+	table.insert(table_itemHistory, {
+		["itemString"] = itemString,
+		["winner"] = winner,
+		["bid"] = bid,
+		["time"] = time,
+	});
+	
+	-- if # of winners >= item quantity then auto end the item
+	local numWinners = 0;
+	for j, v in pairs(table_items[itemString]["winners"]) do
+		numWinners = numWinners + #v;
+	end
+	debug("numWinners = "..numWinners, 3);
+	if numWinners >= table_items[itemString]["quantity"] then
+		FALoot:itemEnd(itemString);
+	end
 end
 
 function FALoot:itemEnd(itemString) -- itemLink or ID
@@ -2162,12 +2285,34 @@ local function onUpdate(self,elapsed)
 		FALoot:itemTakeTells(tellsInProgress);
 		postRequestTimer = nil;
 	end
+	
+	-- Item history sync
+	if itemHistorySync.p1 and not itemHistorySync.p2 and currentTime-itemHistorySync.p1.time >= 3 then
+		if itemHistorySync.p1[1] then
+			table.sort(itemHistorySync.p1, function(a,b) return a[2]>b[2] end);
+			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				["historySyncStart"] = itemHistorySync.full,
+			}, "WHISPER", itemHistorySync.p1[1][1]);
+			itemHistorySync.p2 = {};
+		else
+			debug("Synchronization failed, no responses.", 1);
+			itemHistorySync = {};
+		end
+	elseif itemHistorySync.p2 and itemHistorySync.p2.time and currentTime-itemHistorySync.p2.time >= 5 then
+		debug("Sync varifies have been open for 5 seconds, ending synchronization.", 1);
+		if #itemHistorySync.p2 > 0 then
+			debug("Deleted "..#itemHistorySync.p2.." unverified sync entries.", 1);
+		end
+		itemHistorySync = {};
+	end
 end
 
 local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
 function FALoot:parseChat(msg, author)
+	debug("Parsing a chat message.", 1);
+	debug("Msg: "..msg, 2);
 	local rank;
 	if debugOn == 0 then
 		for i=1,40 do
@@ -2209,6 +2354,7 @@ function FALoot:parseChat(msg, author)
 				elseif string.match(value, "[321]0") then
 					table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
 					table_items[itemString]["status"] = "Tells";
+				--[[
 				else
 					-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
 					value = string.gsub(value, "%sand%s", ", ")
@@ -2227,12 +2373,7 @@ function FALoot:parseChat(msg, author)
 						if winners[i] == UnitName("player"):lower() then
 							debug("The player won an item!", 1)
 							if table_items[itemString]["bid"] then
-								cost = table_items[itemString]["bid"];
-								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, cost.." DKP");
-								FALoot:sendMessage(ADDON_MSG_PREFIX, {
-									["winAmount"] = cost,
-									["itemString"] = itemString,
-								}, "RAID")
+								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, table_items[itemString]["bid"].." DKP");
 							else
 								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1);
 							end
@@ -2266,6 +2407,7 @@ function FALoot:parseChat(msg, author)
 							break;
 						end
 					end
+				--]]
 				end
 				
 				FALoot:itemTableUpdate();
@@ -2273,8 +2415,16 @@ function FALoot:parseChat(msg, author)
 				if tellsInProgress and tellsInProgress == itemString then
 					FALoot:tellsTableUpdate();
 				end
+			else
+				debug("Hyperlink is not in item table.", 1);
 			end
+		else
+			debug("Message does not have exactly 1 hyperlink.", 1);
+			debug("linkless = "..linkless, 2);
+			debug("replaces = "..replaces, 2);
 		end
+	else
+		debug("Author is not of sufficient rank.", 1);
 	end
 end
 
@@ -2383,6 +2533,52 @@ function FALoot:setAutoLoot()
 		end
 	end
 end
+
+function FALoot:itemHistorySync(full)
+	if not full then
+		full = false;
+	end
+	
+	-- Detemine type of syncronization (Full or 12hr)
+	local syncType = "historySyncRequest";
+	if full then
+		syncType = "historySyncRequestFull";
+		debug("Initiating FULL item history sync...", 1);
+	else
+		debug("Initiating item history sync...", 1);
+	end
+	
+	-- Count our current number of applicable entries
+	local count = 0;
+	if full then
+		count = #table_itemHistory;
+	else
+		for i=#table_itemHistory,1,-1 do
+			if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+				count = count + 1;
+			else
+				break;
+			end
+		end
+	end
+	debug("Self count is "..count..".", 1);
+	
+	-- Send a sync request with our count
+	-- We'll recieve replies back from people who have more entries than us.
+	FALoot:sendMessage(ADDON_MSG_PREFIX, {
+		[syncType] = count;
+	}, "RAID");
+	
+	-- Prepare our table to get ready for replies
+	itemHistorySync = {
+		["full"] = full,
+		["p1"] = {
+			["time"] = GetTime(),
+		},
+	};
+	
+	lastItemHistorySync = time();
+end
 	
 local eventFrame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
@@ -2393,6 +2589,7 @@ function events:ADDON_LOADED(name)
 		cacheInterval = FALoot_options["cacheInterval"] or cacheInterval;
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
+		lastItemHistorySync = FALoot_options["lastItemHistorySync"] or lastItemHistorySync;
 		
 		table_itemHistory = FALoot_itemHistory or table_itemHistory;
 		
@@ -2436,6 +2633,7 @@ function events:PLAYER_LOGOUT(...)
 		["cacheInterval"]  = cacheInterval,
 		["autolootToggle"] = autolootToggle,
 		["autolootKey"]    = autolootKey,
+		["lastItemHistorySync"] = lastItemHistorySync,
 	};
 	FALoot_itemHistory = table_itemHistory;
 end
@@ -2617,6 +2815,9 @@ function events:GROUP_ROSTER_UPDATE()
 	if not IsInRaid() then
 		foodFrame:Hide();
 	end
+	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and (time()-lastItemHistorySync >= itemHistorySyncMinInterval) then
+		FALoot:itemHistorySync();
+	end
 end
 function events:RAID_ROSTER_UPDATE()
 	FALoot:setAutoLoot();
@@ -2624,6 +2825,9 @@ function events:RAID_ROSTER_UPDATE()
 	
 	if not IsInRaid() then
 		foodFrame:Hide();
+	end
+	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and (time()-lastItemHistorySync >= itemHistorySyncMinInterval) then
+		FALoot:itemHistorySync();
 	end
 end
 function events:PLAYER_REGEN_ENABLED()
