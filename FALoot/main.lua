@@ -9,6 +9,7 @@
 	Ability to toggle skinning
 	Make reminders exclusive to the person in the cart (and automated?)
 	Add table dumps to debug log
+	Write some comm stuff so I can look at people's debug logs at will
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
@@ -188,6 +189,26 @@ local function deepcopy(orig)
         copy = orig
     end
     return copy
+end
+
+function deepCompare(t1, t2, ignore_mt)
+	local ty1 = type(t1)
+	local ty2 = type(t2)
+	if ty1 ~= ty2 then return false end
+	-- non-table types can be directly compared
+	if ty1 ~= 'table' and ty2 ~= 'table' then return t1 == t2 end
+	-- as well as tables which have the metamethod __eq
+	local mt = getmetatable(t1)
+	if not ignore_mt and mt and mt.__eq then return t1 == t2 end
+	for k1,v1 in pairs(t1) do
+		local v2 = t2[k1]
+		if v2 == nil or not deepCompare(v1,v2) then return false end
+	end
+	for k2,v2 in pairs(t2) do
+		local v1 = t1[k2]
+		if v1 == nil or not deepCompare(v1,v2) then return false end
+	end
+	return true
 end
 
 -- hook GetGuildRosterInfo to not include realm suffixes (hacky but fuck it this is way easier)
@@ -890,10 +911,11 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				end
 			end
 			if not foundMatch then
+				debug('Sending historySyncVerifyRequest for item "'..t[i].itemString..'".', 2);
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerifyRequest"] = t[i],
 				}, "RAID", nil, "BULK");
-				t[i].varifies = 0;
+				t[i].verifies = 0;
 				table.insert(itemHistorySync.p2, t[i]);
 			end
 		end
@@ -901,28 +923,33 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		itemHistorySync.p2.time = GetTime();
 	elseif t["historySyncVerifyRequest"] then
 		debug("Recieved historySyncVerifyRequest from "..sender..".", 1);
+		debug(t["historySyncVerifyRequest"], 3);
+		debug("---", 3);
 
 		for i=#table_itemHistory,1,-1 do
-			if t["historySyncVerifyRequest"] == table_itemHistory[i] then
+			if deepCompare(t["historySyncVerifyRequest"], table_itemHistory[i]) then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerify"] = t["historySyncVerifyRequest"],
 				}, "WHISPER", sender);
-				debug("Varified request.", 1);
+				debug("Verified request.", 1);
 				break;
+			else
+				debug("The following entry did not match:", 3);
+				debug(table_itemHistory[i], 3);
 			end
 		end
 	elseif t["historySyncVerify"] and itemHistorySync.p2 then
 		debug("Recieved historySyncVerify from "..sender..".", 1);
 		for i=1,#itemHistorySync.p2 do
 			local compare = itemHistorySync.p2[i];
-			compare.varifies = nil;
+			compare.verifies = nil;
 		
-			if t["historySyncVerify"] == compare then
-				itemHistorySync.p2[i].varifies = itemHistorySync.p2[i].varifies + 1;
+			if deepCompare(t["historySyncVerify"], compare) then
+				itemHistorySync.p2[i].verifies = itemHistorySync.p2[i].verifies + 1;
 				
 				-- if we have enough verifies, let's go ahead and insert it now
-				if itemHistorySync.p2[i].varifies >= 5 or (debugOn > 0 and itemHistorySync.p2[i].varifies >= 1) then
-					debug("Entry has recieved enough varifies, adding to itemHistory.", 1);
+				if itemHistorySync.p2[i].verifies >= 5 or (debugOn > 0 and itemHistorySync.p2[i].verifies >= 1) then
+					debug("Entry has recieved enough verifies, adding to itemHistory.", 1);
 					for j=#table_itemHistory,1,-1 do
 						if table_itemHistory[j].time < compare.time then
 							table.insert(table_itemHistory, j+1, compare);
@@ -1232,6 +1259,22 @@ function FALoot:createGUI()
 				},
 			}, "RAID");
 			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
+			
+			--[[
+			-- Announce winner and bid amount to aspects chat
+			local channels, channelNum = {GetChannelList()};
+			for i=1,#channels do
+				if string.lower(channels[i]) == "aspects" then
+					channelNum = channels[i-1];
+					break;
+				end
+			end
+			if channelNum then
+				SendChatMessage(table_items[tellsInProgress]["itemLink"].." "
+				..table_items[tellsInProgress]["tells"][selection][1].." "
+				..table_items[tellsInProgress]["tells"][selection][3], "CHANNEL", nil, channelNum);
+			end
+			--]]
 			
 			table.remove(table_items[tellsInProgress]["tells"], selection);
 		end
@@ -1685,12 +1728,15 @@ local function slashparse(msg, editbox)
 		else
 			debug("You must be in a raid group to do that!");
 		end
-	elseif msgLower == "fullsync" then
+	elseif msgLower == "history sync" or msgLower == "history synchronize" then
 		if IsInRaid() then
 			FALoot:itemHistorySync(true);
 		else
 			debug("You must be in a raid group to do that!");
 		end
+	elseif msgLower == "history clear" then
+		table_itemHistory = {};
+		debug("Your item history has been cleared.");
 	else
 		debug("The following are valid slash commands:");
 		print("/fa debug <threshold> -- set debugging threshold");
@@ -2290,6 +2336,7 @@ local function onUpdate(self,elapsed)
 	if itemHistorySync.p1 and not itemHistorySync.p2 and currentTime-itemHistorySync.p1.time >= 3 then
 		if itemHistorySync.p1[1] then
 			table.sort(itemHistorySync.p1, function(a,b) return a[2]>b[2] end);
+			debug("Sending historySyncStart command to "..itemHistorySync.p1[1][1]..".", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["historySyncStart"] = itemHistorySync.full,
 			}, "WHISPER", itemHistorySync.p1[1][1]);
@@ -2299,7 +2346,7 @@ local function onUpdate(self,elapsed)
 			itemHistorySync = {};
 		end
 	elseif itemHistorySync.p2 and itemHistorySync.p2.time and currentTime-itemHistorySync.p2.time >= 5 then
-		debug("Sync varifies have been open for 5 seconds, ending synchronization.", 1);
+		debug("Sync verifies have been open for 5 seconds, ending synchronization.", 1);
 		if #itemHistorySync.p2 > 0 then
 			debug("Deleted "..#itemHistorySync.p2.." unverified sync entries.", 1);
 		end
