@@ -1,15 +1,12 @@
 --[[
 	== Bugs to fix ==
-	Fix communication of final sale price for items
 	
 	== Features to implement / finish implementing ==
-	Announce winners to aspects chat when session ends
 	More robust/expandable item tracking
 	Flag counter
 	Ability to toggle skinning
 	Make reminders exclusive to the person in the cart (and automated?)
 	Add table dumps to debug log
-	Write some comm stuff so I can look at people's debug logs at will
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
@@ -17,6 +14,7 @@
 	
 	== Verify working ==
 	Loot won alert frame
+	Communication of final sale price for items
 --]]
 
 -- Declare strings
@@ -1260,7 +1258,6 @@ function FALoot:createGUI()
 			}, "RAID");
 			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
 			
-			--[[
 			-- Announce winner and bid amount to aspects chat
 			local channels, channelNum = {GetChannelList()};
 			for i=1,#channels do
@@ -1270,11 +1267,12 @@ function FALoot:createGUI()
 				end
 			end
 			if channelNum then
-				SendChatMessage(table_items[tellsInProgress]["itemLink"].." "
-				..table_items[tellsInProgress]["tells"][selection][1].." "
-				..table_items[tellsInProgress]["tells"][selection][3], "CHANNEL", nil, channelNum);
+				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
+				local link = table_items[tellsInProgress]["itemLink"];
+				local winner = table_items[tellsInProgress]["tells"][selection][1];
+				local bid = table_items[tellsInProgress]["tells"][selection][3];
+				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
-			--]]
 			
 			table.remove(table_items[tellsInProgress]["tells"], selection);
 		end
@@ -2342,7 +2340,7 @@ local function onUpdate(self,elapsed)
 			}, "WHISPER", itemHistorySync.p1[1][1]);
 			itemHistorySync.p2 = {};
 		else
-			debug("Synchronization failed, no responses.", 1);
+			debug("Synchronization complete: no more complete data is available.", 1);
 			itemHistorySync = {};
 		end
 	elseif itemHistorySync.p2 and itemHistorySync.p2.time and currentTime-itemHistorySync.p2.time >= 5 then
