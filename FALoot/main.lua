@@ -915,9 +915,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerifyRequest"] = t[i],
 				}, "RAID", nil, "BULK");
-				local tableToInsert = deepcopy(t[i]);
-				tableToInsert["verifies"] = 0;
-				table.insert(itemHistorySync.p2, tableToInsert);
+				t[i].verifies = 0;
+				table.insert(itemHistorySync.p2, t[i]);
 			end
 		end
 		
@@ -942,7 +941,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	elseif t["historySyncVerify"] and itemHistorySync.p2 then
 		debug("Recieved historySyncVerify from "..sender..".", 1);
 		for i=1,#itemHistorySync.p2 do
-			local compare = itemHistorySync.p2[i];
+			local compare = deepcopy(itemHistorySync.p2[i]);
 			compare.verifies = nil;
 		
 			if deepCompare(t["historySyncVerify"], compare) then
