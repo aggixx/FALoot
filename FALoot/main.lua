@@ -915,8 +915,9 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerifyRequest"] = t[i],
 				}, "RAID", nil, "BULK");
-				t[i].verifies = 0;
-				table.insert(itemHistorySync.p2, t[i]);
+				local tableToInsert = deepcopy(t[i]);
+				tableToInsert["verifies"] = 0;
+				table.insert(itemHistorySync.p2, tableToInsert);
 			end
 		end
 		
