@@ -1,10 +1,12 @@
 --[[
 	== Bugs to fix ==
-	addonEnabled debug print when debug is off
+	Spam/lockups caused by 1 end of a sync disconnecting mid process
 	
 	== Features to implement / finish implementing ==
+	More exact flag counter (MS items)
+	Better auto sync code (once/session)
+	
 	More robust/expandable item tracking
-	Flag counter
 	Ability to toggle skinning
 	Make reminders exclusive to the person in the cart (and automated?)
 	Add table dumps to debug log
@@ -2587,9 +2589,9 @@ function FALoot:itemHistorySync(full)
 	local syncType = "historySyncRequest";
 	if full then
 		syncType = "historySyncRequestFull";
-		debug("Initiating FULL item history sync...", 1);
+		debug("Initiating FULL item history sync...");
 	else
-		debug("Initiating item history sync...", 1);
+		debug("Initiating item history sync...");
 	end
 	
 	-- Count our current number of applicable entries
