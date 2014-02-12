@@ -1,23 +1,23 @@
 --[[
 	== Bugs to fix ==
-	Spam/lockups caused by 1 end of a sync disconnecting mid process
 	
 	== Features to implement / finish implementing ==
 	More exact flag counter (MS items)
-	Better auto sync code (once/session)
 	
 	More robust/expandable item tracking
 	Ability to toggle skinning
 	Make reminders exclusive to the person in the cart (and automated?)
 	Add table dumps to debug log
+	Rework addon message code to be register/unregister based to better support modularization
 	
 	== Must construct additional DATAZ ==
 	Rare inconsistency with autoloot disable
 	Bids that don't go through (user error?)
 	
-	== Verify working ==
+	== Verify fixed/working ==
 	Loot won alert frame
 	Communication of final sale price for items
+	Troubles with sync code (DCs and lavish use causing throttling)
 --]]
 
 -- Declare strings
@@ -82,7 +82,7 @@ local tellsYellowThreshold;
 local tellsRankThreshold;
 local debugData = {};
 local postRequestTimer;
-local lastItemHistorySync = time();
+local hasItemHistorySynced = false;
 local itemHistorySync = {};
 
 -- GUI elements
@@ -573,32 +573,53 @@ function FALoot:itemRequestTakeTells(itemString)
 	end
 end
 
-function FALoot:sendMessage(prefix, text, distribution, target, prio, needsCompress)
+function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTarget)
 	--serialize
 	local serialized, msg = libSerialize:Serialize(text)
 	if serialized then
 		text = serialized
 	else
 		debug("Serialization of data failed!");
-		return
+		return false, "serialization of data failed";
 	end
+	
+	--[[
 	--compress
-	if needsCompress and false then -- disabled
-		local compressed, msg = libCompress:CompressHuffman(text)
-		if compressed then
-			text = compressed
-		else
-			debug("Compression of data failed!");
-			return
-		end
+	local compressed, msg = libCompress:CompressHuffman(text)
+	if compressed then
+		text = compressed
+	else
+		debug("Compression of data failed!");
+		return false, "compression of data failed";
 	end
+	--]]
+	
 	--encode
 	local encoded, msg = libEncode:Encode(text)
 	if encoded then
 		text = encoded
 	else
 		debug("Encoding of data failed!");
-		return
+		return false, "encoding of data failed";
+	end
+	
+	-- make sure target is valid
+	if validateTarget and string.lower(distribution) == "WHISPER" then
+		local groupType = ("raid" and IsInRaid()) or "party";
+		for i=1,GetNumGroupMembers() do
+			if UnitName(groupType..i) == target then
+				if not UnitIsConnected(groupType..i) then
+					local mType;
+					for i,v in pairs(text) do
+						mType = i;
+						break;
+					end
+					debug("The target of message type "..(mType or "unknown")..' "'..target..'" is offline.', 2);
+					return false, "target of message is offline";
+				end
+				break;
+			end
+		end
 	end
 	
 	FALoot:SendCommMessage(prefix, text, distribution, target, prio)
@@ -777,7 +798,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			if version < ADDON_VERSION_FULL then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["update"] = true,
-				}, "WHISPER", sender)
+				}, "WHISPER", sender, nil, distribution == "RAID");
 			elseif not updateMsg and ADDON_VERSION_FULL < version then
 				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
@@ -794,7 +815,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		if foodCount then
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["foodCount"] = foodCount,
-			}, "WHISPER", sender)
+			}, "WHISPER", sender, nil, true)
 		end
 		foodUpdateTo[sender] = true;
 		debug("foodTrackOn recieved from "..sender, 1);
@@ -820,23 +841,23 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			debug("Item does not exist, denying request.", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
-			}, "WHISPER", sender);
+			}, "WHISPER", sender, nil, true);
 		elseif table_items[requestedItem]["status"] then
 			debug("Item is already in progress, denying request.", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
-			}, "WHISPER", sender);
+			}, "WHISPER", sender, nil, true);
 		elseif table_items[requestedItem]["host"] then
 			debug('Item has already been claimed for posting by "' .. table_items[requestedItem]["host"] .. '", denying request.', 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
-			}, "WHISPER", sender);
+			}, "WHISPER", sender, nil, true);
 		else
 			debug('Request granted.', 1);
 			table_items[requestedItem]["host"] = sender;
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = true,
-			}, "WHISPER", sender);
+			}, "WHISPER", sender, nil, true);
 		end
 	elseif t["postReply"] ~= nil and tellsInProgress and postRequestTimer then
 		if t["postReply"] == true then
@@ -844,7 +865,9 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			FALoot:itemTakeTells(tellsInProgress);
 		elseif t["postReply"] == false then
 			debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
+			-- cancel the item in progress
 			tellsInProgress = nil;
+			-- force a button state update
 			FALoot:onTableSelect(scrollingTable:GetSelection());
 		end
 		
@@ -875,7 +898,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			debug("Recieved "..mType..", replying with count "..count..".", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["historySyncCount"] = count,
-			}, "WHISPER", sender);
+			}, "WHISPER", sender, nil, true);
 		else
 			debug("Recieved "..mType.." but count is equal or lower.", 2);
 		end
@@ -898,9 +921,9 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		end
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["historySyncData"] = items,
-		}, "WHISPER", sender, "BULK");
+		}, "WHISPER", sender, "BULK", true);
 	elseif t["historySyncData"] and itemHistorySync.p2 then
-		debug("Recieved historySyncData from "..sender..", parsing...", 1);
+		debug("Received historySyncData from "..sender..", parsing...", 1);
 		
 		-- Shorten things up a tad
 		local t = t["historySyncData"];
@@ -930,15 +953,19 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 
 		for i=#table_itemHistory,1,-1 do
 			if deepCompare(t["historySyncVerifyRequest"], table_itemHistory[i]) then
-				FALoot:sendMessage(ADDON_MSG_PREFIX, {
+				local success, reason = FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerify"] = t["historySyncVerifyRequest"],
-				}, "WHISPER", sender);
-				debug("Verified request.", 1);
+				}, "WHISPER", sender, nil, true);
+				if success then
+					debug("Verified request.", 1);
+				else
+					debug("Attempted to verify request, but "..reason..".", 1);
+				end
 				break;
 			end
 		end
 	elseif t["historySyncVerify"] and itemHistorySync.p2 then
-		debug("Recieved historySyncVerify from "..sender..".", 1);
+		debug("Received historySyncVerify from "..sender..".", 1);
 		for i=1,#itemHistorySync.p2 do
 			local compare = deepcopy(itemHistorySync.p2[i]);
 			compare.verifies = nil;
@@ -948,7 +975,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				
 				-- if we have enough verifies, let's go ahead and insert it now
 				if itemHistorySync.p2[i].verifies >= 5 or (debugOn > 0 and itemHistorySync.p2[i].verifies >= 1) then
-					debug("Entry has recieved enough verifies, adding to itemHistory.", 1);
+					debug("Entry has received enough verifies, adding to itemHistory.", 1);
 					for j=#table_itemHistory,1,-1 do
 						if table_itemHistory[j].time < compare.time then
 							table.insert(table_itemHistory, j+1, compare);
@@ -967,6 +994,7 @@ function FALoot:createGUI()
 	-- Create the main frame
 	frame = CreateFrame("frame", "FALootFrame", UIParent)
 	frame:EnableMouse(true);
+	frame:SetMovable(true);
 	frame:SetMovable(true);
 	frame:SetFrameStrata("FULLSCREEN_DIALOG");
 	frame:SetBackdrop({
@@ -2336,10 +2364,15 @@ local function onUpdate(self,elapsed)
 		if itemHistorySync.p1[1] then
 			table.sort(itemHistorySync.p1, function(a,b) return a[2]>b[2] end);
 			debug("Sending historySyncStart command to "..itemHistorySync.p1[1][1]..".", 1);
-			FALoot:sendMessage(ADDON_MSG_PREFIX, {
+			local success, reason = FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["historySyncStart"] = itemHistorySync.full,
-			}, "WHISPER", itemHistorySync.p1[1][1]);
-			itemHistorySync.p2 = {};
+			}, "WHISPER", itemHistorySync.p1[1][1], nil, true);
+			if success then
+				itemHistorySync.p2 = {};
+			else
+				debug("Attempted to send historySyncStart, but "..reason.."! Aborting synchronization.", 1);
+				itemHistorySync = {};
+			end
 		else
 			debug("Synchronization complete: no more complete data is available.", 1);
 			itemHistorySync = {};
@@ -2623,7 +2656,7 @@ function FALoot:itemHistorySync(full)
 		},
 	};
 	
-	lastItemHistorySync = time();
+	hasItemHistorySynced = true;
 end
 	
 local eventFrame, events = CreateFrame("Frame"), {}
@@ -2635,7 +2668,6 @@ function events:ADDON_LOADED(name)
 		cacheInterval = FALoot_options["cacheInterval"] or cacheInterval;
 		autolootToggle = FALoot_options["autolootToggle"];
 		autolootKey = FALoot_options["autolootKey"];
-		lastItemHistorySync = FALoot_options["lastItemHistorySync"] or lastItemHistorySync;
 		
 		table_itemHistory = FALoot_itemHistory or table_itemHistory;
 		
@@ -2679,7 +2711,6 @@ function events:PLAYER_LOGOUT(...)
 		["cacheInterval"]  = cacheInterval,
 		["autolootToggle"] = autolootToggle,
 		["autolootKey"]    = autolootKey,
-		["lastItemHistorySync"] = lastItemHistorySync,
 	};
 	FALoot_itemHistory = table_itemHistory;
 end
@@ -2861,8 +2892,10 @@ function events:GROUP_ROSTER_UPDATE()
 	if not IsInRaid() then
 		foodFrame:Hide();
 	end
-	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and (time()-lastItemHistorySync >= itemHistorySyncMinInterval) then
+	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
 		FALoot:itemHistorySync();
+	elseif GetNumGroupMembers() == 0 then
+		hasItemHistorySynced = false;
 	end
 end
 function events:RAID_ROSTER_UPDATE()
@@ -2872,8 +2905,10 @@ function events:RAID_ROSTER_UPDATE()
 	if not IsInRaid() then
 		foodFrame:Hide();
 	end
-	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and (time()-lastItemHistorySync >= itemHistorySyncMinInterval) then
+	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
 		FALoot:itemHistorySync();
+	elseif GetNumGroupMembers() == 0 then
+		hasItemHistorySynced = false;
 	end
 end
 function events:PLAYER_REGEN_ENABLED()
