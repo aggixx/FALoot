@@ -923,7 +923,6 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	elseif t["historySyncVerifyRequest"] then
 		debug("Recieved historySyncVerifyRequest from "..sender..".", 1);
 		debug(t["historySyncVerifyRequest"], 3);
-		debug("---", 3);
 
 		for i=#table_itemHistory,1,-1 do
 			if deepCompare(t["historySyncVerifyRequest"], table_itemHistory[i]) then
@@ -932,9 +931,6 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				}, "WHISPER", sender);
 				debug("Verified request.", 1);
 				break;
-			else
-				debug("The following entry did not match:", 3);
-				debug(table_itemHistory[i], 3);
 			end
 		end
 	elseif t["historySyncVerify"] and itemHistorySync.p2 then
