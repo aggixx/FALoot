@@ -1,5 +1,6 @@
 --[[
 	== Bugs to fix ==
+	addonEnabled debug print when debug is off
 	
 	== Features to implement / finish implementing ==
 	More robust/expandable item tracking
