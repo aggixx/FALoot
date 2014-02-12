@@ -19,7 +19,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.3d";
+local ADDON_VERSION_FULL = "v4.3e";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -1941,7 +1941,7 @@ function FALoot:tellsTableUpdate()
 			local flags = 0;
 			for j=#table_itemHistory,1,-1 do
 				if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
-					if table_itemHistory[j].winner == t.tells[i][1] then
+					if table_itemHistory[j].winner == t.tells[i][1] and table_itemHistory[j].bid ~= 20 then
 						flags = flags + 1;
 					end
 				else
