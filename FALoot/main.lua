@@ -274,7 +274,7 @@ local function isNameInGuild(name)
 	local _, onlineguildies = GetNumGuildMembers();
 	for j=1,onlineguildies do
 		local jname = GetGuildRosterInfo(j);
-		if string.match(jname, name.."%-.+") then
+		if jname == name then
 			return true;
 		end
 	end
@@ -672,7 +672,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	if prefix ~= ADDON_MSG_PREFIX or not text then
 		return;
 	end
-	debug("Recieved addon message.", 1);
+	debug("Recieved addon message from "..(sender or "Unknown")..".", 1);
 	
 	-- Decode the data
 	local t = libEncode:Decode(text)
