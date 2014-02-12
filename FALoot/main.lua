@@ -135,7 +135,9 @@ local function debug(msg, verbosity)
 		output = msg;
 	elseif type(msg) == "table" then
 		if DevTools_Dump then
-			DevTools_Dump(msg);
+			if not verbosity or debugOn >= verbosity then
+				DevTools_Dump(msg);
+			end
 			return;
 		else
 			output = "DevTools not found.";
