@@ -3,6 +3,7 @@
 	
 	== Features to implement / finish implementing ==
 	More exact flag counter (MS items)
+	Item history in tooltips
 	
 	More robust/expandable item tracking
 	Ability to toggle skinning
@@ -15,8 +16,6 @@
 	Bids that don't go through (user error?)
 	
 	== Verify fixed/working ==
-	Loot won alert frame
-	Communication of final sale price for items
 	Troubles with sync code (DCs and lavish use causing throttling)
 --]]
 
@@ -623,6 +622,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	end
 	
 	FALoot:SendCommMessage(prefix, text, distribution, target, prio)
+	return true;
 end
 
 local function updatePieChart()
@@ -1262,6 +1262,53 @@ function FALoot:createGUI()
 	tellsTable:EnableSelection(true);
 	tellsTable.frame:SetPoint("TOP", tellsTitleBg, "BOTTOM", 0, -10);
 	tellsTable.frame:SetScale(1.1);
+	
+	-- Create the flag count mouseover frames
+	local flagMouseovers = {};
+	for i=1,6 do
+		flagMouseovers[i] = CreateFrame("frame", tellsFrame:GetName().."STFlagOverlay"..tostring(i), tellsTable.frame)
+		flagMouseovers[i]:SetWidth(66 )
+		flagMouseovers[i]:SetHeight(14.5)
+		if i == 1 then
+			flagMouseovers[i]:SetPoint("TOPRIGHT", tellsTable.frame, "TOPRIGHT", -3, -5);
+		else
+			flagMouseovers[i]:SetPoint("TOP", flagMouseovers[i-1], "BOTTOM", 0, -1);
+		end
+		
+		flagMouseovers[i]:SetScript("OnEnter", function(self)
+			local num = tonumber(string.match(self:GetName(), "%d$"));
+			if tellsInProgress and table_items[tellsInProgress]["tells"][num] and
+			table_items[tellsInProgress]["tells"][num][4] and tonumber(table_items[tellsInProgress]["tells"][num][4]) and tonumber(table_items[tellsInProgress]["tells"][num][4]) > 0 then
+				GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
+				local player = table_items[tellsInProgress]["tells"][num][1];
+				local currentServerTime = GetCurrentServerTime();
+				
+				for j=#table_itemHistory,1,-1 do
+					if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
+						if table_itemHistory[j].winner == player and table_itemHistory[j].bid ~= 20 then
+							debug("Created tooltip entry for "..table_itemHistory[j].itemString..".", 1);
+							GameTooltip:AddDoubleLine(ItemLinkAssemble(table_itemHistory[j].itemString), table_itemHistory[j].bid);
+						else
+							debug("Entry is not from the appropriate player.", 1);
+						end
+					else
+						break;
+					end
+				end
+				
+				GameTooltip:Show();
+			end
+		end);
+		flagMouseovers[i]:SetScript("OnLeave", function()
+			GameTooltip:Hide();
+		end);
+		
+		flagMouseovers[i]:SetBackdrop({
+			bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+			tile = true, tileSize = 32,
+		});
+		flagMouseovers[i]:SetBackdropColor(1-math.random()^1.2, 1-math.random()^1.2, 1-math.random()^1.2, 0.75);
+	end
 	
 	-- Create the Tell Window Award button
 	tellsFrameAwardButton = CreateFrame("Button", tellsFrame:GetName().."AwardButton", tellsFrame, "UIPanelButtonTemplate")
