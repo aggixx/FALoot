@@ -705,7 +705,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	if success then
 		t = deserialized
 	else
-		debug("Deserialization of data failed: "..t);
+		debug("Deserialization of data failed.");
 		return
 	end
 	
