@@ -21,7 +21,7 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.3e";
+local ADDON_VERSION_FULL = "v4.3f";
 local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
 
 local ADDON_COLOR = "FFF9CC30";
@@ -213,12 +213,31 @@ function deepCompare(t1, t2, ignore_mt)
 	return true
 end
 
+--[[
 -- hook GetGuildRosterInfo to not include realm suffixes (hacky but fuck it this is way easier)
 local GetGuildRosterInfo_orig = GetGuildRosterInfo;
 local function GetGuildRosterInfo(index)
 	local fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation = GetGuildRosterInfo_orig(index);
 	fullName = string.match(fullName, "^[^-]+");
 	return fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation;
+end
+--]]
+
+-- hook GetUnitName
+local UnitName_orig = UnitName;
+local function UnitName(unit, showServer)
+	local name = UnitName_orig(unit, showServer);
+	if showServer and not string.match(name, "-") then
+		name = name .. "-" .. GetRealmName();
+	end
+	return name;
+end
+
+-- hook GetRaidRosterInfo
+local GetRaidRosterInfo_orig = GetRaidRosterInfo;
+local function GetRaidRosterInfo(index)
+	local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo_orig(index);
+	return (UnitName("raid"..index, true) or name), rank, subgroup, level, class, fileName, zone, online, isDead, role, isML;
 end
 
 -- Get current server timestamp
@@ -536,14 +555,14 @@ function FALoot:itemRequestTakeTells(itemString)
 	if IsInRaid() then
 		for i=1,GetNumGroupMembers() do
 			if UnitIsGroupLeader("raid"..i) and UnitIsConnected("raid"..i) then
-				raidLeader = UnitName("raid"..i);
+				raidLeader = UnitName("raid"..i, true);
 				raidLeaderUnitID = "raid"..i;
 				break;
 			end
 		end
 	elseif debugOn > 0 then
 		-- For testing purposes, let's let the player act as the raid leader.
-		raidLeader = UnitName("player");
+		raidLeader = UnitName("player", true);
 	else
 		return;
 	end
@@ -606,7 +625,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	if validateTarget and string.lower(distribution) == "WHISPER" then
 		local groupType = ("raid" and IsInRaid()) or "party";
 		for i=1,GetNumGroupMembers() do
-			if UnitName(groupType..i) == target then
+			if UnitName(groupType..i, true) == target then
 				if not UnitIsConnected(groupType..i) then
 					local mType;
 					for i,v in pairs(text) do
@@ -634,7 +653,7 @@ local function updatePieChart()
 	for i,v in pairs(raidFoodCount) do
 		local found;
 		for j=1,members do
-			if i == GetUnitName(groupType..j) then
+			if i == GetUnitName(groupType..j, true) then
 				found = true;
 				break;
 			end
@@ -718,7 +737,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	};
 	
 	-- Block all messages from self that are not of a type included in the whitelist
-	if sender == UnitName("player") then
+	if sender == UnitName("player", true) then
 		local allow = false;
 		for i=1,#whitelisted do
 			if t[whitelisted[i]] ~= nil then
@@ -2037,7 +2056,7 @@ function FALoot:tellsTableUpdate()
 					groupType = "party";
 				end
 				for j=1,GetNumGroupMembers() do
-					if t["tells"][i][1] == UnitName(groupType..j) then
+					if t["tells"][i][1] == UnitName(groupType..j, true) then
 						local _, class = UnitClass(groupType..j);
 						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. t["tells"][i][1] .. "|r";
 						break;
@@ -2207,7 +2226,7 @@ function FALoot:itemAddWinner(itemString, winner, bid, time)
 	end
 		
 	-- check if the player was the winner of the item
-	if winner == UnitName("player") then
+	if winner == UnitName("player", true) then
 		debug("The player won an item!", 1);
 		LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
@@ -2496,7 +2515,7 @@ function FALoot:parseChat(msg, author)
 						-- check if the player was the winner of the item
 						-- and if they are retrieve the amount of DKP they spent on it
 						local cost;
-						if winners[i] == UnitName("player"):lower() then
+						if winners[i] == UnitName("player", true):lower() then
 							debug("The player won an item!", 1)
 							if table_items[itemString]["bid"] then
 								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, table_items[itemString]["bid"].." DKP");
@@ -2589,7 +2608,7 @@ function FALoot:parseWhisper(msg, author)
 		groupType = "party";
 	end
 	for i=1,GetNumGroupMembers() do
-		if UnitName(groupType..i) == author then
+		if UnitName(groupType..i, true) == author then
 			inGroup = true;
 			break;
 		end
@@ -2733,7 +2752,7 @@ function events:PLAYER_LOGIN()
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
 		itemAdd("96384:0")
-		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER"))
+		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER", true))
 		--FALoot:itemRequestTakeTells("96740:0");
 		--[[
 		table_items[tellsInProgress]["tells"] = {
@@ -2999,7 +3018,7 @@ function events:BAG_UPDATE()
 		for name,v in pairs(foodUpdateTo) do
 			local sent;
 			for i=1,members do
-				if UnitName(groupType..i) == name then
+				if UnitName(groupType..i, true) == name then
 					if UnitIsConnected(groupType..i) then
 						FALoot:sendMessage(ADDON_MSG_PREFIX, {
 							["foodCount"] = count,
@@ -3014,7 +3033,7 @@ function events:BAG_UPDATE()
 			end
 		end
 		foodCount = count;
-		raidFoodCount[UnitName("player")] = foodCount;
+		raidFoodCount[UnitName("player", true)] = foodCount;
 		updatePieChart();
 	end
 end
