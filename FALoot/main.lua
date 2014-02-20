@@ -1,5 +1,6 @@
 --[[
 	== Bugs to fix ==
+	Roll detection
 	
 	== Features to implement / finish implementing ==
 	More exact flag counter (MS items)
@@ -21,8 +22,33 @@
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
-local ADDON_VERSION_FULL = "v4.3f";
-local ADDON_VERSION = string.gsub(ADDON_VERSION_FULL, "[^%d]", "");
+
+--[[
+	Versioning
+	vMAJOR.MINOR.BUILD-rREV
+	ex: v5.0.1-r1
+	
+	Addons only communicate with users of the same minor version for purposes of data communications.
+	Users are reminded to update their addon when a newer build is available.
+	Revision number is specifically for diagnosing issues (knowing the exact code the user is running).
+--]]
+local ADDON_VERSION_MAJOR = 5;
+local ADDON_VERSION_MINOR = 0;
+local ADDON_VERSION_BUILD = 1;
+local ADDON_VERSION_REVISION = 1;
+local function GetAddonVersion(verbosity)
+	local v = "v" .. ADDON_VERSION_MAJOR;
+	if verbosity > 1 then
+		v = v .. "." .. ADDON_VERSION_MINOR;
+	end
+	if verbosity > 2 then
+		v = v .. "." .. ADDON_VERSION_BUILD;
+	end
+	if verbosity > 3 then
+		v = v .. "-r" .. ADDON_VERSION_REVISION;
+	end
+	return v;
+end
 
 local ADDON_COLOR = "FFF9CC30";
 local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
@@ -227,7 +253,7 @@ end
 local UnitName_orig = UnitName;
 local function UnitName(unit, showServer)
 	local name = UnitName_orig(unit, showServer);
-	if showServer and not string.match(name, "-") then
+	if showServer and name and not string.match(name, "-") then
 		name = name .. "-" .. GetRealmName();
 	end
 	return name;
@@ -753,7 +779,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	
 	debug(t, 2);
 	
-	if t["ADDON_VERSION"] and t["ADDON_VERSION"] ~= ADDON_VERSION then
+	if t["ADDON_VERSION"] and t["ADDON_VERSION"] ~= GetAddonVersion(2) then
 		return;
 	end
 	
@@ -803,7 +829,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
-				["who"] = ADDON_VERSION_FULL,
+				["who"] = GetAddonVersion(4),
 			}, "WHISPER", sender)
 		end
 	elseif t["update"] then
@@ -814,11 +840,11 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
 			local version = t["update"]
-			if version < ADDON_VERSION_FULL then
+			if version < GetAddonVersion(3) then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["update"] = true,
 				}, "WHISPER", sender, nil, distribution == "RAID");
-			elseif not updateMsg and ADDON_VERSION_FULL < version then
+			elseif not updateMsg and GetAddonVersion(3) < version then
 				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
@@ -1746,7 +1772,7 @@ function FALoot:generateIcons()
 							debug("Ending item "..v["itemLink"]..".", 1);
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FALoot:sendMessage(ADDON_MSG_PREFIX, {
-									["ADDON_VERSION"] = ADDON_VERSION, 
+									["ADDON_VERSION"] = GetAddonVersion(2), 
 									["end"] = i,
 								}, "RAID")
 							end
@@ -2887,7 +2913,7 @@ function events:LOOT_OPENED(...)
 	
 	-- send addon message to tell others to add this to their window
 	FALoot:sendMessage(ADDON_MSG_PREFIX, {
-		["ADDON_VERSION"] = ADDON_VERSION,
+		["ADDON_VERSION"] = GetAddonVersion(2),
 		["loot"] = loot,
 	}, "RAID", nil, "BULK");
 	
@@ -2926,7 +2952,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
-					["ADDON_VERSION"] = ADDON_VERSION,
+					["ADDON_VERSION"] = GetAddonVersion(2),
 					["end"] = itemString,
 				}, "RAID")
 			end
@@ -2947,7 +2973,7 @@ end
 function events:GROUP_JOINED()
 	if IsInRaid() then
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
-			["update"] = ADDON_VERSION_FULL,
+			["update"] = GetAddonVersion(3),
 		}, "RAID", nil, "BULK")
 	end
 end
