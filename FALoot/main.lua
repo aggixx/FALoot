@@ -1,54 +1,54 @@
---[[
+--[[ =======================================================
+	Bugs // To-do
+     -------------------------------------------------------
 	== Bugs to fix ==
-	Roll detection
-	
+	Button responsiveness
+	Items posted to aspects
+
 	== Features to implement / finish implementing ==
 	More exact flag counter (MS items)
 	Item history in tooltips
-	
+
 	More robust/expandable item tracking
 	Ability to toggle skinning
 	Make reminders exclusive to the person in the cart (and automated?)
 	Add table dumps to debug log
 	Rework addon message code to be register/unregister based to better support modularization
-	
+
 	== Must construct additional DATAZ ==
-	Rare inconsistency with autoloot disable
+	Inconsistency with autoloot disable: must check addonEnabled on PLAYER_ENTERING_WORLD in a raid group with debug off
 	Bids that don't go through (user error?)
-	
+
 	== Verify fixed/working ==
-	Troubles with sync code (DCs and lavish use causing throttling)
---]]
+	Loot history tracking & sync
+     ======================================================= --]]
 
 -- Declare strings
 local ADDON_NAME = "FALoot";
 
---[[
+--[[ =======================================================
 	Versioning
-	vMAJOR.MINOR.BUILD-rREV
-	ex: v5.0.1-r1
-	
-	Addons only communicate with users of the same minor version for purposes of data communications.
-	Users are reminded to update their addon when a newer build is available.
-	Revision number is specifically for diagnosing issues (knowing the exact code the user is running).
---]]
-local ADDON_VERSION_MAJOR = 5;
-local ADDON_VERSION_MINOR = 0;
-local ADDON_VERSION_BUILD = 1;
-local ADDON_VERSION_REVISION = 1;
-local function GetAddonVersion(verbosity)
-	local v = "v" .. ADDON_VERSION_MAJOR;
-	if verbosity > 1 then
-		v = v .. "." .. ADDON_VERSION_MINOR;
-	end
-	if verbosity > 2 then
-		v = v .. "." .. ADDON_VERSION_BUILD;
-	end
-	if verbosity > 3 then
-		v = v .. "-r" .. ADDON_VERSION_REVISION;
-	end
-	return v;
-end
+     ======================================================= --]]
+
+local ADDON_MVERSION = 6; -- Addons only communicate with users of the same major version.
+local ADDON_REVISION = 1; -- Specific code revision for identification purposes.
+
+--[[ =======================================================
+	Libraries
+     ======================================================= --]]
+     
+FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME);
+LibStub("AceComm-3.0"):Embed(FALoot);
+
+local ScrollingTable = LibStub("ScrollingTable");
+local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
+local libCompress = LibStub:GetLibrary("LibCompress");
+local libEncode = libCompress:GetAddonEncodeTable();
+local libGraph = LibStub("LibGraph-2.0");
+
+--[[ =======================================================
+	Local Constants
+     ======================================================= --]]
 
 local ADDON_COLOR = "FFF9CC30";
 local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
@@ -61,20 +61,14 @@ local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%
 -- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
 -- |c ffa335ee |H item     : 96740  : 0         : 0      : 0      : 0      : 0      : 0        : 0         : 90        : 0         : 0                                |h[ Sign of the Bloodied God] |h|r 30
 local THUNDERFORGED_COLOR = "FFFF8000";
+local PLAYER_REALM = GetRealmName();
+local PLAYER_NAME = UnitName("player") .. "-" .. PLAYER_REALM;
 
--- Load the libraries
-FALoot = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME);
-LibStub("AceComm-3.0"):Embed(FALoot);
+--[[ =======================================================
+	Option Variables
+     ======================================================= --]]
 
-local ScrollingTable = LibStub("ScrollingTable");
-local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
-local libCompress = LibStub:GetLibrary("LibCompress");
-local libEncode = libCompress:GetAddonEncodeTable();
-local libGraph = LibStub("LibGraph-2.0");
-
--- Declare local variables
-
--- SavedVariables options
+-- Saved Variables
 local debugOn = 0;		-- Debug threshold
 local expTime = 15;		-- Amount of time before an ended item is removed from the window, in seconds.
 local autolootToggle;
@@ -85,6 +79,7 @@ local maxIcons = 11;
 local postRequestMaxWait = 3; -- Amount of time to wait for a response from the raid leader before posting a request anyway, in seconds.
 local itemHistorySyncMinInterval = 60 * 5; -- Minimum amount of time between item history sync attempts, in seconds.
 local cacheInterval = 200;	-- Amount of time between attempts to check for item data, in milliseconds.
+local foodItemId = 101618;
 
 -- Session Variables
 local _;
@@ -109,8 +104,15 @@ local debugData = {};
 local postRequestTimer;
 local hasItemHistorySynced = false;
 local itemHistorySync = {};
+local foodCount = 0;
+local raidFoodCount = {};
+local foodUpdateTo = {};
+local lastCartSummon = -120;
 
--- GUI elements
+--[[ =======================================================
+	GUI Elements
+     ======================================================= --]]
+
 local frame;
 local iconFrame;
 local scrollingTable;
@@ -134,14 +136,9 @@ local foodColorKey = {};
 local debugFrame;
 local debugFrameEditbox;
 
--- 300 food track
-local foodItemId = 101618;
-local foodCount = 0;
-local raidFoodCount = {};
-local foodUpdateTo = {};
-local lastCartSummon = -120;
-
---helper functions
+--[[ =======================================================
+	Helper Functions
+     ======================================================= --]]
 
 local function formatDebugData()
 	local s = ""
@@ -177,9 +174,6 @@ local function debug(msg, verbosity)
 		["time"] = time(),
 		["threshold"] = verbosity or 0,
 	});
-	if debugFrame and debugFrame:IsShown() then
-		debugEditBox:SetText(formatDebugData());
-	end
 	if not verbosity or debugOn >= verbosity then
 		print(ADDON_CHAT_HEADER..output);
 	end
@@ -239,22 +233,12 @@ function deepCompare(t1, t2, ignore_mt)
 	return true
 end
 
---[[
--- hook GetGuildRosterInfo to not include realm suffixes (hacky but fuck it this is way easier)
-local GetGuildRosterInfo_orig = GetGuildRosterInfo;
-local function GetGuildRosterInfo(index)
-	local fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation = GetGuildRosterInfo_orig(index);
-	fullName = string.match(fullName, "^[^-]+");
-	return fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation;
-end
---]]
-
 -- hook GetUnitName
 local UnitName_orig = UnitName;
 local function UnitName(unit, showServer)
 	local name = UnitName_orig(unit, showServer);
 	if showServer and name and not string.match(name, "-") then
-		name = name .. "-" .. GetRealmName();
+		name = name .. "-" .. PLAYER_REALM;
 	end
 	return name;
 end
@@ -277,7 +261,6 @@ local function GetCurrentServerTime()
 		["day"] = day,
 		["year"] = year,
 	});
-	debug("GetCurrentServerTime() = "..currentServerTime, 2);
 	return currentServerTime;
 end
 
@@ -460,7 +443,9 @@ local function StaticDataSave(data)
 	promptBidValue = data
 end
 
--- Main Code
+--[[ =======================================================
+	Main Functions
+     ======================================================= --]]
 
 local function itemAdd(itemString, checkCache)
 	debug("itemAdd(), itemString = "..itemString, 1);
@@ -588,7 +573,7 @@ function FALoot:itemRequestTakeTells(itemString)
 		end
 	elseif debugOn > 0 then
 		-- For testing purposes, let's let the player act as the raid leader.
-		raidLeader = UnitName("player", true);
+		raidLeader = PLAYER_NAME;
 	else
 		return;
 	end
@@ -754,6 +739,11 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		return
 	end
 	
+	-- Constrain sender to Name-Realm format
+	if not string.match(sender, "-") then
+		sender = sender.."-"..PLAYER_REALM;
+	end
+	
 	-- List of whitelisted message types
 	-- Add an entry here to allow the player to recieve messages from themself of that type.
 	local whitelisted = {
@@ -763,7 +753,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	};
 	
 	-- Block all messages from self that are not of a type included in the whitelist
-	if sender == UnitName("player", true) then
+	if sender == PLAYER_NAME then
 		local allow = false;
 		for i=1,#whitelisted do
 			if t[whitelisted[i]] ~= nil then
@@ -779,7 +769,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	
 	debug(t, 2);
 	
-	if t["ADDON_VERSION"] and t["ADDON_VERSION"] ~= GetAddonVersion(2) then
+	-- If the message is version-specific and from a different version then block it.
+	if t["reqVersion"] and t["reqVersion"] ~= ADDON_MVERSION then
 		return;
 	end
 	
@@ -815,21 +806,21 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		FALoot:itemEnd(t["end"])
 	elseif t["who"] then
 		if distribution == "WHISPER" then
-			local version = t["who"]
+			local senderRev = t["who"]
 			
 			table_who = table_who or {}
-			if version then
+			if senderRev then
 				debug("Who response recieved from "..sender..".", 1);
-				if not table_who[version] then
-					table_who[version] = {}
-					table.insert(table_who, version)
+				if not table_who[senderRev] then
+					table_who[senderRev] = {}
+					table.insert(table_who, senderRev)
 				end
-				table.insert(table_who[version], sender)
+				table.insert(table_who[senderRev], sender)
 			end
 			table_who["time"] = GetTime()
 		elseif distribution == "GUILD" then
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
-				["who"] = GetAddonVersion(4),
+				["who"] = "r"..ADDON_REVISION,
 			}, "WHISPER", sender)
 		end
 	elseif t["update"] then
@@ -839,12 +830,12 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
-			local version = t["update"]
-			if version < GetAddonVersion(3) then
+			local senderRev = t["update"]
+			if senderRev < ADDON_REVISION then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["update"] = true,
 				}, "WHISPER", sender, nil, distribution == "RAID");
-			elseif not updateMsg and GetAddonVersion(3) < version then
+			elseif not updateMsg and ADDON_REVISION < senderRev then
 				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
@@ -1312,8 +1303,9 @@ function FALoot:createGUI()
 	local flagMouseovers = {};
 	for i=1,6 do
 		flagMouseovers[i] = CreateFrame("frame", tellsFrame:GetName().."STFlagOverlay"..tostring(i), tellsTable.frame)
-		flagMouseovers[i]:SetWidth(66 )
+		flagMouseovers[i]:SetWidth(66)
 		flagMouseovers[i]:SetHeight(14.5)
+		flagMouseovers[i]:SetFrameLevel(flagMouseovers[i]:GetFrameLevel() + 1);
 		if i == 1 then
 			flagMouseovers[i]:SetPoint("TOPRIGHT", tellsTable.frame, "TOPRIGHT", -3, -5);
 		else
@@ -1322,17 +1314,29 @@ function FALoot:createGUI()
 		
 		flagMouseovers[i]:SetScript("OnEnter", function(self)
 			local num = tonumber(string.match(self:GetName(), "%d$"));
-			if tellsInProgress and table_items[tellsInProgress]["tells"][num] and
-			table_items[tellsInProgress]["tells"][num][4] and tonumber(table_items[tellsInProgress]["tells"][num][4]) and tonumber(table_items[tellsInProgress]["tells"][num][4]) > 0 then
+			if tellsInProgress and table_items[tellsInProgress].tells[num] and (table_items[tellsInProgress].tells[num][5] or 0) > 0 then
 				GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
 				local player = table_items[tellsInProgress]["tells"][num][1];
 				local currentServerTime = GetCurrentServerTime();
 				
+				GameTooltip:AddLine("Possible MS items won this raid: \n");
+				
 				for j=#table_itemHistory,1,-1 do
 					if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
 						if table_itemHistory[j].winner == player and table_itemHistory[j].bid ~= 20 then
-							debug("Created tooltip entry for "..table_itemHistory[j].itemString..".", 1);
-							GameTooltip:AddDoubleLine(ItemLinkAssemble(table_itemHistory[j].itemString), table_itemHistory[j].bid);
+							-- Calculate and format time elapsed
+							local eSecs = currentServerTime-table_itemHistory[j].time;
+							local eMins = math.ceil(eSecs/60);
+							local eHrs  = math.floor(eMins/60);
+							eMins       = eMins - 60*eHrs;
+							local eStr = eMins.."m ago";
+							if eHrs > 0 then
+								eStr = eHrs .. "h" .. eStr;
+							end
+							eStr = "~" .. eStr;
+							
+							GameTooltip:AddDoubleLine(ItemLinkAssemble(table_itemHistory[j].itemString), eStr);
+							GameTooltip:AddLine("  - Cost: " .. table_itemHistory[j].bid .. " DKP");
 						else
 							debug("Entry is not from the appropriate player.", 1);
 						end
@@ -1352,7 +1356,7 @@ function FALoot:createGUI()
 			bgFile = "Interface/Tooltips/UI-Tooltip-Background",
 			tile = true, tileSize = 32,
 		});
-		flagMouseovers[i]:SetBackdropColor(1-math.random()^1.2, 1-math.random()^1.2, 1-math.random()^1.2, 0.75);
+		flagMouseovers[i]:SetBackdropColor(1, 1, 1, 0);
 	end
 	
 	-- Create the Tell Window Award button
@@ -1365,7 +1369,8 @@ function FALoot:createGUI()
 		local selection = tellsTable:GetSelection();
 		if selection then
 			-- Send a chat message with the winner for those that don't have the addon
-			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..table_items[tellsInProgress]["tells"][selection][1], "RAID");
+			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
 			
 			-- Send an addon message for those with the addon
 			local cST = GetCurrentServerTime();
@@ -1390,7 +1395,7 @@ function FALoot:createGUI()
 			if channelNum then
 				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
 				local link = table_items[tellsInProgress]["itemLink"];
-				local winner = table_items[tellsInProgress]["tells"][selection][1];
+				local winner = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
 				local bid = table_items[tellsInProgress]["tells"][selection][3];
 				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
@@ -1605,8 +1610,14 @@ function FALoot:createGUI()
 	debugFrame:SetMovable(true);
 	debugFrame:Hide();
 	
-	local debugFrameClose = CreateFrame("Button", debugFrame:GetName().."Button", debugFrame, "UIPanelButtonTemplate");
-	debugFrameClose:SetPoint("CENTER", debugFrame, "BOTTOM", -20, 2);
+	local debugFrameRefresh = CreateFrame("Button", debugFrame:GetName().."RefreshButton", debugFrame, "UIPanelButtonTemplate");
+	debugFrameRefresh:SetPoint("CENTER", debugFrame, "BOTTOM", -55, 2);
+	debugFrameRefresh:SetHeight(20);
+	debugFrameRefresh:SetWidth(100);
+	debugFrameRefresh:SetText("Refresh");
+	
+	local debugFrameClose = CreateFrame("Button", debugFrame:GetName().."CloseButton", debugFrame, "UIPanelButtonTemplate");
+	debugFrameClose:SetPoint("CENTER", debugFrame, "BOTTOM", 55, 2);
 	debugFrameClose:SetHeight(20);
 	debugFrameClose:SetWidth(100);
 	debugFrameClose:SetText("Close");
@@ -1695,6 +1706,13 @@ function FALoot:createGUI()
 	
 	debugScroll:SetScrollChild(debugEditBox);
 	
+	debugFrameRefresh:SetScript("OnClick", function(self)
+		debugEditBox:SetText(formatDebugData());
+	end);
+	
+	debugFrame:SetScript("OnShow", function()
+		debugEditBox:SetText(formatDebugData());
+	end);
 end
 
 function FALoot:isThunderforged(iLevel)
@@ -1772,7 +1790,7 @@ function FALoot:generateIcons()
 							debug("Ending item "..v["itemLink"]..".", 1);
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FALoot:sendMessage(ADDON_MSG_PREFIX, {
-									["ADDON_VERSION"] = GetAddonVersion(2), 
+									["reqVersion"] = ADDON_MVERSION, 
 									["end"] = i,
 								}, "RAID")
 							end
@@ -1796,6 +1814,10 @@ function FALoot:generateIcons()
 	end
 	table_icons[1]:SetPoint("LEFT", iconFrame, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
 end
+
+--[[ =======================================================
+	Slash Commands
+     ======================================================= --]]
 	
 SLASH_RT1 = "/rt";
 SLASH_FALOOT1 = "/faloot";
@@ -1815,6 +1837,8 @@ local function slashparse(msg, editbox)
 			debug(table_itemHistory);
 		elseif msg == "hasBeenLooted" then
 			debug(hasBeenLooted);
+		elseif msg == "tellsTable" and tellsInProgress then
+			debug(table_items[tellsInProgress].tells);
 		end
 		return;
 	elseif string.match(msg, "^debug %d") then
@@ -1889,6 +1913,10 @@ local function FARoll(value)
 end
 SlashCmdList["FAROLL"] = FARoll
 
+--[[ =======================================================
+	Static Popup Dialogs
+     ======================================================= --]]
+
 StaticPopupDialogs["FALOOT_BID"] = {
 	text = "How much would you like to bid?",
 	button1 = "Bid",
@@ -1927,6 +1955,10 @@ StaticPopupDialogs["FALOOT_END"] = {
 	enterClicksFirstButton = 1,
 	preferredIndex = STATICPOPUPS_NUMDIALOGS,
 }
+
+--[[ =======================================================
+	Main Functions
+     ======================================================= --]]
 
 function FALoot:itemTableUpdate()
 	local t = {};
@@ -2024,6 +2056,22 @@ function FALoot:tellsTableUpdate()
 		
 		SetGuildRosterShowOffline(showOffline);
 		
+		-- Count flags
+		local currentServerTime = GetCurrentServerTime();
+		for i=1,#table_items[tellsInProgress].tells do
+			local flags = 0;
+			for j=#table_itemHistory,1,-1 do
+				if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
+					if table_itemHistory[j].winner == table_items[tellsInProgress].tells[i][1] and table_itemHistory[j].bid ~= 20 then
+						flags = flags + 1;
+					end
+				else
+					break;
+				end
+			end
+			table_items[tellsInProgress].tells[i][5] = flags;
+		end
+		
 		-- Sort table
 		table.sort(table_items[tellsInProgress]["tells"], function(a, b)
 			if a[2] ~= b[2] then
@@ -2056,22 +2104,6 @@ function FALoot:tellsTableUpdate()
 			end
 		end--]]
 		
-		-- Count flags
-		local currentServerTime = GetCurrentServerTime();
-		for i=1,#t["tells"] do
-			local flags = 0;
-			for j=#table_itemHistory,1,-1 do
-				if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
-					if table_itemHistory[j].winner == t.tells[i][1] and table_itemHistory[j].bid ~= 20 then
-						flags = flags + 1;
-					end
-				else
-					break;
-				end
-			end
-			table.insert(t.tells[i], flags);
-		end
-		
 		-- Set name color
 		for i=1,#t["tells"] do
 			if not string.match(t["tells"][i][1], "|c%x+.|r") then
@@ -2084,7 +2116,7 @@ function FALoot:tellsTableUpdate()
 				for j=1,GetNumGroupMembers() do
 					if t["tells"][i][1] == UnitName(groupType..j, true) then
 						local _, class = UnitClass(groupType..j);
-						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. t["tells"][i][1] .. "|r";
+						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. UnitName(groupType..j, false) .. "|r";
 						break;
 					end
 				end
@@ -2252,7 +2284,7 @@ function FALoot:itemAddWinner(itemString, winner, bid, time)
 	end
 		
 	-- check if the player was the winner of the item
-	if winner == UnitName("player", true) then
+	if winner == PLAYER_NAME then
 		debug("The player won an item!", 1);
 		LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
@@ -2403,6 +2435,7 @@ local function onUpdate(self,elapsed)
 		if v["expirationTime"] and v["expirationTime"] + expTime <= currentTime then
 			debug(v["itemLink"].." has expired, removing.", 1);
 			FALoot:itemRemove(i);
+			oldSelectStatus = nil; -- clear stored select status to force button state refresh
 		end
 	end
 	
@@ -2426,6 +2459,15 @@ local function onUpdate(self,elapsed)
 			FALoot:onTableDeselect();
 		end
 		oldSelectStatus = selectStatus;
+	end
+	
+	-- FIXME: not terribly efficient, but this isnt going to be running in combat so fuck it.
+	if tellsInProgress and tellsTable then
+		if not tellsTable:GetSelection() and tellsFrameAwardButton:GetText() == "Award Item" then
+			tellsFrameAwardButton:Disable();
+		else
+			tellsFrameAwardButton:Enable();
+		end
 	end
 	
 	-- who stuff
@@ -2516,8 +2558,6 @@ function FALoot:parseChat(msg, author)
 			if table_items[itemString] then
 				if not table_items[itemString]["host"] then
 					table_items[itemString]["host"] = author;
-				elseif tellsInProgress and tellsInProgress == itemString and table_items[itemString]["host"] ~= author then
-					tellsInProgress = nil;
 				end
 				
 				if string.match(value, "roll") then
@@ -2525,60 +2565,6 @@ function FALoot:parseChat(msg, author)
 				elseif string.match(value, "[321]0") then
 					table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
 					table_items[itemString]["status"] = "Tells";
-				--[[
-				else
-					-- do some stuff to replace a bunch of ways that people could potentially list multiple winners with commas
-					value = string.gsub(value, "%sand%s", ", ")
-					value = string.gsub(value, "%s?&%s?", ", ")
-					value = string.gsub(value, "%s?/%s?", ", ")
-					value = string.gsub(value, "%s?\+%s?", ", ")
-					
-					local winners = str_split(", ", value);
-					debug(winners, 1);
-					for i=1, #winners do
-						winners[i] = FALoot:findClosestGroupMember(winners[i]);
-						
-						-- check if the player was the winner of the item
-						-- and if they are retrieve the amount of DKP they spent on it
-						local cost;
-						if winners[i] == UnitName("player", true):lower() then
-							debug("The player won an item!", 1)
-							if table_items[itemString]["bid"] then
-								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, table_items[itemString]["bid"].." DKP");
-							else
-								LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1);
-							end
-						end
-						
-						-- if the player didn't win or if we don't know what they bid then create a placeholder value
-						if not cost then
-							if table_items[itemString]["currentValue"] == 30 then
-								cost = table_items[itemString]["bid"] or "30+";
-							else
-								cost = tostring(table_items[itemString]["currentValue"]);
-							end
-						end
-						
-						-- create a table entry for that pricepoint
-						if not table_items[itemString]["winners"][cost] then
-							table_items[itemString]["winners"][cost] = {};
-						end
-						
-						-- insert this event into the winners table
-						table.insert(table_items[itemString]["winners"][cost], winners[i]);
-						
-						-- if # of winners >= item quantity then auto end the item
-						local numWinners = 0;
-						for j, v in pairs(table_items[itemString]["winners"]) do
-							numWinners = numWinners + #v;
-						end
-						debug("numWinners = "..numWinners, 3);
-						if numWinners >= table_items[itemString]["quantity"] then
-							FALoot:itemEnd(itemString);
-							break;
-						end
-					end
-				--]]
 				end
 				
 				FALoot:itemTableUpdate();
@@ -2600,7 +2586,9 @@ function FALoot:parseChat(msg, author)
 end
 
 function FALoot:parseWhisper(msg, author)
+	debug("Parsing a whisper.", 2);
 	if not table_items[tellsInProgress] then
+		debug("Item in progress does not exist.", 1);
 		tellsInProgress = nil;
 		return;
 	end
@@ -2665,6 +2653,12 @@ function FALoot:parseRoll(msg, author)
 	end
 	local author, rollResult, rollMin, rollMax = string.match(msg, "(.+) rolls (%d+) %((%d+)-(%d+)%)");
 	
+	-- Constrain name to Player-Realm format
+	if not string.match(author, "-") then
+		author = author .. "-" .. PLAYER_REALM;
+	end
+	
+	-- Convert roll values to integers
 	rollResult = tonumber(rollResult);
 	rollMin = tonumber(rollMin);
 	rollMax = tonumber(rollMax);
@@ -2750,6 +2744,10 @@ function FALoot:itemHistorySync(full)
 	
 	hasItemHistorySynced = true;
 end
+
+--[[ =======================================================
+	Event Triggers
+     ======================================================= --]]
 	
 local eventFrame, events = CreateFrame("Frame"), {}
 function events:ADDON_LOADED(name)
@@ -2778,7 +2776,7 @@ function events:PLAYER_LOGIN()
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
 		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
 		itemAdd("96384:0")
-		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", UnitName("PLAYER", true))
+		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", PLAYER_NAME)
 		--FALoot:itemRequestTakeTells("96740:0");
 		--[[
 		table_items[tellsInProgress]["tells"] = {
@@ -2913,7 +2911,7 @@ function events:LOOT_OPENED(...)
 	
 	-- send addon message to tell others to add this to their window
 	FALoot:sendMessage(ADDON_MSG_PREFIX, {
-		["ADDON_VERSION"] = GetAddonVersion(2),
+		["reqVersion"] = ADDON_MVERSION,
 		["loot"] = loot,
 	}, "RAID", nil, "BULK");
 	
@@ -2952,7 +2950,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
 			if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
-					["ADDON_VERSION"] = GetAddonVersion(2),
+					["reqVersion"] = ADDON_MVERSION,
 					["end"] = itemString,
 				}, "RAID")
 			end
@@ -2973,7 +2971,7 @@ end
 function events:GROUP_JOINED()
 	if IsInRaid() then
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
-			["update"] = GetAddonVersion(3),
+			["update"] = ADDON_REVISION,
 		}, "RAID", nil, "BULK")
 	end
 end
@@ -3030,6 +3028,7 @@ for k, v in pairs(events) do
 end
 
 -- Events that will be manually registered at a later time.
+
 function events:BAG_UPDATE()
 	-- Registered on PLAYER_ENTERING WORLD to avoid
 	-- processing the event a zillion times when the UI loads.
@@ -3059,7 +3058,7 @@ function events:BAG_UPDATE()
 			end
 		end
 		foodCount = count;
-		raidFoodCount[UnitName("player", true)] = foodCount;
+		raidFoodCount[PLAYER_NAME] = foodCount;
 		updatePieChart();
 	end
 end
