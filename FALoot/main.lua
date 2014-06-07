@@ -31,7 +31,7 @@ local ADDON_NAME = "FALoot";
      ======================================================= --]]
 
 local ADDON_MVERSION = 6; -- Addons only communicate with users of the same major version.
-local ADDON_REVISION = 1; -- Specific code revision for identification purposes.
+local ADDON_REVISION = 2; -- Specific code revision for identification purposes.
 
 --[[ =======================================================
 	Libraries
@@ -752,6 +752,11 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		"postReply",
 	};
 	
+	-- Block messages from very old versions
+	if t["ADDON_VERSION"] then
+		return;
+	end
+	
 	-- Block all messages from self that are not of a type included in the whitelist
 	if sender == PLAYER_NAME then
 		local allow = false;
@@ -810,6 +815,8 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			
 			table_who = table_who or {}
 			if senderRev then
+				-- Remove realm suffix
+				sender = string.match(sender, "^(.-)%-.+");
 				debug("Who response recieved from "..sender..".", 1);
 				if not table_who[senderRev] then
 					table_who[senderRev] = {}
