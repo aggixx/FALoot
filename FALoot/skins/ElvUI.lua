@@ -13,16 +13,16 @@ local frame = CreateFrame("frame")
 frame:SetScript("OnUpdate", function()
 	if FALootFrame then
 	  local UI = FALoot.UI;
-		SkinFrame(UI.itemFrame)
+		SkinFrame(UI.itemWindow.frame)
 		--SkinFrame(FALootTellsFrame)
 		--SkinFrame(FALootFoodFrame)
 		--SkinFrame(FALootDebugFrame)
 		
 		--FALootFrameStatusBar:SetTemplate("Default", true)
 		
-		UI.itemClose:SetTemplate("Default", true)
-		UI.itemBid:SetTemplate("Default", true)
-		UI.itemTells:SetTemplate("Default", true)
+		UI.itemWindow.closeButton:SetTemplate("Default", true)
+		UI.itemWindow.bidButton:SetTemplate("Default", true)
+		UI.itemWindow.tellsButton:SetTemplate("Default", true)
 		--FALootTellsFrameAwardButton:SetTemplate("Default", true)
 		--FALootTellsFrameActionButton:SetTemplate("Default", true)
 		--FALootFoodFrameButton:SetTemplate("Default", true)

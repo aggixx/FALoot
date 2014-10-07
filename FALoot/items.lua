@@ -23,6 +23,8 @@ F.items = {};
      ======================================================= --]]
          
 do
+  UI.itemWindow = {};
+
   -- Create the main frame
   local frame = CreateFrame("frame", "FALootFrame", UIParent)
   frame:EnableMouse(true);
@@ -41,7 +43,7 @@ do
   frame:SetHeight(270);
   frame:SetPoint("CENTER");
   
-  UI.itemFrame = frame;
+  UI.itemWindow.frame = frame;
 
   -- Create the frame that holds the icons
   local iconFrame = CreateFrame("frame", frame:GetName().."IconFrame", frame);
@@ -50,7 +52,7 @@ do
   iconFrame:SetPoint("TOP", frame, "TOP", 0, -30);
   iconFrame:Show();
   
-  UI.iconFrame = iconFrame;
+  UI.itemWindow.iconFrame = iconFrame;
   
   -- Populate the iconFrame with icons
   for i=1,PD.maxIcons do
@@ -88,7 +90,7 @@ do
   scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20);
   scrollingTable.frame:SetScale(1.1);
   
-  UI.itemST = scrollingTable;
+  UI.itemWindow.scrollingTable = scrollingTable;
 
   -- Create the "Close" button
   local closeButton = CreateFrame("Button", frame:GetName().."CloseButton", frame, "UIPanelButtonTemplate")
@@ -100,7 +102,7 @@ do
     self:GetParent():Hide();
   end);
   
-  UI.itemClose = closeButton;
+  UI.itemWindow.closeButton = closeButton;
   
   -- Create the "Bid" button
   local bidButton = CreateFrame("Button", frame:GetName().."BidButton", frame, "UIPanelButtonTemplate")
@@ -141,7 +143,7 @@ do
   end);
   bidButton:Disable();
   
-  UI.itemBid = bidButton;
+  UI.itemWindow.bidButton = bidButton;
   
   -- Create the "Take Tells" button
   local tellsButton = CreateFrame("Button", frame:GetName().."TellsButton", frame, "UIPanelButtonTemplate");
@@ -167,7 +169,7 @@ do
   tellsButton:Disable();
   tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
   
-  UI.itemTells = tellsButton;
+  UI.itemWindow.tellsButton = tellsButton;
 
   -- Create the background of the Status Bar
   local statusbg = CreateFrame("Button", frame:GetName().."StatusBar", frame)
@@ -263,15 +265,15 @@ local function generateIcons()
         })
         SD.table_icons[k]:SetScript("OnEnter", function(self, button) -- set code that triggers on mouse enter
           -- store what row was selected so we can restore it later
-          iconSelect = scrollingTable:GetSelection() or 0;
+          iconSelect = UI.itemWindow.scrollingTable:GetSelection() or 0;
           
           -- retrieve the row id that corresponds to the icon we're mousedover
           local row = 0;
-          for l, w in pairs(table_items) do
+          for l, w in pairs(SD.table_items) do
             row = row + 1;
             if i == l then
               -- select the row that correlates to the icon
-              scrollingTable:SetSelection(row);
+              UI.itemWindow.scrollingTable:SetSelection(row);
               break;
             end
           end
@@ -283,7 +285,7 @@ local function generateIcons()
         end)
         SD.table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
           -- restore the row that was selected before we mousedover this icon
-          UI.itemST:SetSelection(iconSelect);
+          UI.itemWindow.scrollingTable:SetSelection(iconSelect);
           iconSelect = nil;
           
           GameTooltip:Hide()
@@ -334,8 +336,10 @@ local function generateIcons()
       end
     end
   end
-  SD.table_icons[1]:SetPoint("LEFT", UI.iconFrame, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
+  SD.table_icons[1]:SetPoint("LEFT", UI.itemWindow.iconFrame, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
 end
+
+F.generateIcons = generateIcons;
 
 --[[ =======================================================
      Item Functions
@@ -411,7 +415,7 @@ F.items.add = function(itemString, checkCache)
     }
   end
   
-  if not UI.itemFrame:IsShown() then
+  if not UI.itemWindow.frame:IsShown() then
     if UnitAffectingCombat("PLAYER") then
       showAfterCombat = true
       U.debug(itemLink.." was found but the player is in combat.");
@@ -563,15 +567,15 @@ E.Register("ITEM_UPDATE", function()
     })
   end
 
-  UI.itemST:SetData(t, false)
+  UI.itemWindow.scrollingTable:SetData(t, false)
   generateIcons()
   
   if #t >= 8 then
-    UI.itemTells:ClearAllPoints();
-    UI.itemTells:SetPoint("TOP", UI.itemBid, "BOTTOM");
+    UI.itemWindow.tellsButton:ClearAllPoints();
+    UI.itemWindow.tellsButton:SetPoint("TOP", UI.itemBid, "BOTTOM");
   else
-    UI.itemTells:ClearAllPoints();
-    UI.itemTells:SetPoint("BOTTOM", UI.itemBid, "TOP");
+    UI.itemWindow.tellsButton:ClearAllPoints();
+    UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemBid, "TOP");
   end
 end)
 
