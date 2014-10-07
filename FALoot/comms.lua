@@ -3,6 +3,7 @@ local F = A.functions;
 
 -- Load libraries
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
+local libCompress = LibStub:GetLibrary("LibCompress");
 local libEncode = libCompress:GetAddonEncodeTable();
 
 local bulkMessages = {};

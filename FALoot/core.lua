@@ -20,7 +20,7 @@ E.Register = function(event, func)
   if type(event) ~= "string" then
     error("events.Register passed a non-string value for event");
     return;
-  else if type(func) ~= "function" then
+  elseif type(func) ~= "function" then
     error("events.Register passed a non-function value for func");
     return;
   end
@@ -52,7 +52,7 @@ M.Register = function(event, func)
   if type(event) ~= "string" then
     error("messages.Register passed a non-string value for event");
     return;
-  else if type(func) ~= "function" then
+  elseif type(func) ~= "function" then
     error("messages.Register passed a non-function value for func");
     return;
   end

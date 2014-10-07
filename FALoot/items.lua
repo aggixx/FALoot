@@ -451,7 +451,7 @@ end
 
 --   === itemRequestTakeTells() ===============================================
 
-F.item.requestTakeTells = function(itemString)
+F.items.requestTakeTells = function(itemString)
   U.debug("itemRequestTakeTells("..itemString..")", 1);
 
   -- Make sure that this is an item we can actually take tells on before trying to submit a request
