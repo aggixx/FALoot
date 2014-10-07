@@ -16,13 +16,7 @@ SD.table_itemQuery = {};
 SD.table_items = {};
 SD.table_icons = {};
 
---[[ =======================================================
-     Helper Functions
-     ======================================================= --]]
-     
-local function isThunderforged(iLevel)
-  return iLevel == 572 or iLevel == 559 or iLevel == 541 or iLevel == 528;
-end
+F.items = {};
 
 --[[ =======================================================
      GUI Creation
@@ -239,7 +233,15 @@ do
   titlebg_r:SetHeight(40)
 end
 
-F.generateIcons = function()
+--[[ =======================================================
+     Helper Functions
+     ======================================================= --]]
+     
+local function isThunderforged(iLevel)
+  return iLevel == 572 or iLevel == 559 or iLevel == 541 or iLevel == 528;
+end
+
+local function generateIcons()
   local lasticon = nil -- reference value for anchoring to the most recently constructed icon
   local firsticon = nil -- reference value for anchoring the first constructed icon
   local k = 0 -- this variable contains the number of the icon we're currently constructing, necessary because we need to be able to create multiple icons per entry in the table
@@ -341,7 +343,7 @@ end
 
 --   === itemAdd() ============================================================
      
-F.itemAdd = function(itemString, checkCache)
+F.items.add = function(itemString, checkCache)
   U.debug("itemAdd(), itemString = "..itemString, 1);
   -- itemString must be a string!
   if type(itemString) ~= "string" then
@@ -426,7 +428,7 @@ end
 
 --   === itemTakeTells() ======================================================
 
-F.itemTakeTells = function(itemString)
+F.items.takeTells = function(itemString)
   U.debug("itemTakeTells(), itemString = "..itemString, 1);
   -- itemString must be a string!
   if type(itemString) ~= "string" then
@@ -449,7 +451,7 @@ end
 
 --   === itemRequestTakeTells() ===============================================
 
-F.itemRequestTakeTells = function(itemString)
+F.item.requestTakeTells = function(itemString)
   U.debug("itemRequestTakeTells("..itemString..")", 1);
 
   -- Make sure that this is an item we can actually take tells on before trying to submit a request
@@ -562,7 +564,7 @@ E.Register("ITEM_UPDATE", function()
   end
 
   UI.itemST:SetData(t, false)
-  F.generateIcons()
+  generateIcons()
   
   if #t >= 8 then
     UI.itemTells:ClearAllPoints();
