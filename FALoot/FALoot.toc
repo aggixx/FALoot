@@ -1,5 +1,5 @@
 ## Interface: 50400
-## Title: FA Loot Alpha
+## Title: FA Loot
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
 ## Version: v7.1
 ## Author: Pawkets
@@ -14,3 +14,4 @@ util.lua
 constants.lua
 options.lua
 items.lua
+comms.lua
