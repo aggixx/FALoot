@@ -91,9 +91,9 @@ local F = A.functions;
 
 A.UI = {};
 
---[[ =======================================================
+--[[ ==========================================================================
      Addon Definition & Properties
-     ======================================================= --]]
+     ========================================================================== --]]
  
 A.NAME = "FALoot";
 A.MVERSION = 7; -- Addons only communicate with users of the same major version.
@@ -106,8 +106,6 @@ A.COLOR = "FFF9CC30";
 A.CHAT_HEADER  = "|c" .. A.COLOR .. "FA Loot:|r ";
 A.MSG_PREFIX = "FALoot";
 A.DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
-
-
 
 
 

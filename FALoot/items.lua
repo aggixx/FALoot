@@ -22,11 +22,11 @@ F.items = {};
 -- Init some item window variables
 local itemWindowSelection = nil;
 
---[[ =======================================================
+--[[ ==========================================================================
      GUI Creation
-     ======================================================= --]]
+     ========================================================================== --]]
          
-do
+local function createGUI()
   UI.itemWindow = {};
 
   -- Create the main frame
@@ -276,9 +276,9 @@ do
   titlebg_r:SetHeight(40)
 end
 
---[[ =======================================================
+--[[ ==========================================================================
      Helper Functions
-     ======================================================= --]]
+     ========================================================================== --]]
      
 local function isThunderforged(iLevel)
   return iLevel == 572 or iLevel == 559 or iLevel == 541 or iLevel == 528;
@@ -396,9 +396,9 @@ local function generateIcons()
   SD.table_icons[1]:SetPoint("LEFT", UI.itemWindow.iconFrame, "LEFT", (501-(k*(40+1)))/2, 0)
 end
 
---[[ =======================================================
+--[[ ==========================================================================
      Item Functions
-     ======================================================= --]]
+     ========================================================================== --]]
 
 --   === itemAdd() ============================================================
      
@@ -651,9 +651,30 @@ E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   end
 end)
 
+-- === Item Cache manager =====================================================
 
+local eventFrame, events = CreateFrame("Frame"), {}
 
+function events:GET_ITEM_INFO_RECEIVED()
+  local limit, itemAdded = #SD.table_itemQuery;
+  for i=limit,1,-1 do
+    local result = F.items.add(SD.table_itemQuery[i], true);
+    if result and not itemAdded then
+      itemAdded = result;
+    end
+  end
+end
 
+function events:PLAYER_LOGIN()
+  createGUI();
+end
+
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+  events[event](self, ...) -- call one of the functions above
+end)
+for k, v in pairs(events) do
+  eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
+end
 
 
 
