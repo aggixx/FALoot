@@ -1937,8 +1937,8 @@ StaticPopupDialogs["FALOOT_BID"] = {
 	OnShow = function(self)
 		self.editBox:SetText("")
 		self.editBox:SetScript("OnEnterPressed", function(self)
-			StaticDataSave(self:GetText())
-			coroutine.resume(bidPrompt)
+			StaticDataSave(self:GetText());
+			coroutine.resume(bidPrompt);
 			StaticPopup_Hide("FALOOT_BID");
 		end);
 		self.editBox:SetScript("OnEscapePressed", function(self)

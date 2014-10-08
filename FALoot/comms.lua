@@ -161,12 +161,12 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
     if not msg then
       return;
     end
-    local itemLink = string.match(msg, HYPERLINK_PATTERN);
+    local itemLink = string.match(msg, SD.HYPERLINK_PATTERN);
     if not itemLink then
       return;
     end
     local itemString = U.ItemLinkStrip(itemLink);
-    local msg = string.match(msg, HYPERLINK_PATTERN.."(.+)"); -- now remove the link
+    local msg = string.match(msg, SD.HYPERLINK_PATTERN.."(.+)"); -- now remove the link
     if not msg or msg == "" then
       return;
     end

@@ -21,6 +21,7 @@ F.items = {};
 
 -- Init some item window variables
 local itemWindowSelection = nil;
+local bidAmount = nil;
 
 --[[ ==========================================================================
      GUI Creation
@@ -154,7 +155,7 @@ local function createGUI()
   bidButton:SetScript("OnClick", function(self, event)
     local id = scrollingTable:GetSelection()
     local j, itemLink, itemString = 0;
-    for i, v in pairs(table_items) do
+    for i, v in pairs(SD.table_items) do
       j = j + 1;
       if j == id then
         itemLink, itemString = v["itemLink"], i;
@@ -397,6 +398,49 @@ local function generateIcons()
 end
 
 --[[ ==========================================================================
+  Static Popup Dialogs
+     ========================================================================== --]]
+
+StaticPopupDialogs["FALOOT_BID"] = {
+  text = "How much would you like to bid?",
+  button1 = "Bid",
+  button2 = CANCEL,
+  timeout = 0,
+  whileDead = true,
+  OnAccept = function(self)
+    bidAmount = tonumber(self.editBox:GetText());
+    coroutine.resume(bidPrompt);
+  end,
+  OnShow = function(self)
+    self.editBox:SetText("");
+    self.editBox:SetScript("OnEnterPressed", function(self)
+      bidAmount = tonumber(self:GetText());
+      coroutine.resume(bidPrompt);
+      StaticPopup_Hide("FALOOT_BID");
+    end);
+    self.editBox:SetScript("OnEscapePressed", function(self)
+      StaticPopup_Hide("FALOOT_BID");
+    end);
+  end,
+  hasEditBox = true,
+  preferredIndex = STATICPOPUPS_NUMDIALOGS,
+}
+
+StaticPopupDialogs["FALOOT_END"] = {
+  text = "Are you sure you want to manually end this item for all players in the raid?",
+  button1 = YES,
+  button2 = CANCEL,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+  OnAccept = function()
+    coroutine.resume(endPrompt)
+  end,
+  enterClicksFirstButton = 1,
+  preferredIndex = STATICPOPUPS_NUMDIALOGS,
+}
+
+--[[ ==========================================================================
      Item Functions
      ========================================================================== --]]
 
@@ -530,7 +574,7 @@ F.items.requestTakeTells = function(itemString)
     end
   elseif debugOn > 0 then
     -- For testing purposes, let's let the player act as the raid leader.
-    raidLeader = PLAYER_NAME;
+    raidLeader = SD.PLAYER_NAME;
   else
     return;
   end
@@ -620,8 +664,8 @@ E.Register("ITEM_UPDATE", function()
     })
   end
 
-  UI.itemWindow.scrollingTable:SetData(t, false)
-  generateIcons()
+  UI.itemWindow.scrollingTable:SetData(t, false);
+  generateIcons();
   
   if #t >= 8 then
     UI.itemWindow.tellsButton:ClearAllPoints();
