@@ -164,7 +164,7 @@ local function createGUI()
     end
     bidPrompt = coroutine.create(function(self)
       U.debug("Bid recieved, resuming coroutine.", 1)
-      local bid = tonumber(promptBidValue)
+      local bid = tonumber(bidAmount)
       if bid < 30 and bid ~= 10 and bid ~= 20 then
         U.debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
         return
@@ -177,7 +177,7 @@ local function createGUI()
         U.debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
       end
       U.debug("Passed info onto FALoot:itemBid().", 1);
-      FALoot:itemBid(itemString, bid)
+      F.items.bid(itemString, bid)
     end)
     StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
     StaticPopup_Show("FALOOT_BID");
@@ -234,6 +234,8 @@ local function createGUI()
   statusText:SetHeight(20)
   statusText:SetJustifyH("LEFT")
   statusText:SetText("")
+  
+  UI.itemWindow.status = statusText;
 
   -- Create the background of the title
   local titlebg = frame:CreateTexture(frame:GetName().."TitleBackground", "OVERLAY")
@@ -276,6 +278,49 @@ local function createGUI()
   titlebg_r:SetWidth(30)
   titlebg_r:SetHeight(40)
 end
+
+local function setStatus()
+  local bidding, rolling, only = 0, 0;
+  for itemString, v in pairs(SD.table_items) do
+    if SD.table_items[itemString]["bidStatus"] and SD.table_items[itemString]["status"] ~= "Ended" then
+      only = itemString;
+      if SD.table_items[itemString]["bidStatus"] == "Bid" then
+        bidding = bidding + 1;
+      elseif SD.table_items[itemString]["bidStatus"] == "Roll" then
+        rolling = rolling + 1;
+      end
+    end
+  end
+  
+  if bidding + rolling == 0 then
+    UI.itemWindow.status:SetText("");
+  elseif bidding + rolling == 1 then
+    local verb = "";
+    if bidding > 0 then
+      verb = "bid"
+    else
+      verb = "roll"
+    end
+    UI.itemWindow.status:SetText("Waiting to " .. verb .. " on " .. SD.table_items[only]["displayName"] .. ".")
+  else
+    if bidding > 0 and rolling > 0 then
+      local plural1, plural2 = "", "";
+      if bidding > 1 then
+        plural1 = "s";
+      end
+      if rolling > 1 then
+        plural2 = "s";
+      end
+      UI.itemWindow.status:SetText("Waiting to bid on " .. bidding .. " item" .. plural1 .. " and roll on " .. rolling .. " item" .. plural2 .. ".");
+    elseif bidding > 0 then
+      UI.itemWindow.status:SetText("Waiting to bid on " .. bidding .. " items.");
+    else
+      UI.itemWindow.status:SetText("Waiting to roll on " .. rolling .. " items.");
+    end
+  end
+end
+
+E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
 
 --[[ ==========================================================================
      Helper Functions
@@ -444,7 +489,7 @@ StaticPopupDialogs["FALOOT_END"] = {
      Item Functions
      ========================================================================== --]]
 
---   === itemAdd() ============================================================
+--   === items.add() ==========================================================
      
 F.items.add = function(itemString, checkCache)
   U.debug("itemAdd(), itemString = "..itemString, 1);
@@ -529,7 +574,7 @@ F.items.add = function(itemString, checkCache)
   return true
 end
 
---   === itemTakeTells() ======================================================
+--   === items.takeTells() ====================================================
 
 F.items.takeTells = function(itemString)
   U.debug("itemTakeTells(), itemString = "..itemString, 1);
@@ -552,7 +597,7 @@ F.items.takeTells = function(itemString)
   end
 end
 
---   === itemRequestTakeTells() ===============================================
+--   === items.requestTakeTells() =============================================
 
 F.items.requestTakeTells = function(itemString)
   U.debug("itemRequestTakeTells("..itemString..")", 1);
@@ -599,6 +644,43 @@ F.items.requestTakeTells = function(itemString)
     U.debug("Raid leader not found. Aborting.", 1);
     return;
   end
+end
+
+--   === items.bid() ==========================================================
+
+F.items.bid = function(itemString, bid)
+  bid = tonumber(bid)
+  U.debug("FALoot:itemBid("..itemString..", "..bid..")", 1)
+  if not SD.table_items[itemString] then
+    U.debug("Item not found! Aborting.", 1);
+    return;
+  end
+  
+  SD.table_items[itemString]["bid"] = bid;
+  SD.table_items[itemString]["bidStatus"] = "Bid";
+  U.debug("FALoot:itemBid(): Queued bid for "..SD.table_items[itemString]["itemLink"]..".", 1);
+  
+  F.items.processBids();
+end
+
+--   === items.processBids() ==================================================
+
+F.items.processBids = function()
+  for itemString, v in pairs(SD.table_items) do
+    if SD.table_items[itemString]["bidStatus"] and SD.table_items[itemString]["host"] and ((v["currentValue"] == 30 and v["bid"] >= 30) or v["currentValue"] == v["bid"]) then
+      if v["bidStatus"] == "Bid" and v["status"] == "Tells" then
+        SendChatMessage(tostring(v["bid"]), "WHISPER", nil, v["host"]);
+        SD.table_items[itemString]["bidStatus"] = "Roll";
+        U.debug("FALoot:itemBid(): Bid and queued roll for "..SD.table_items[itemString]["itemLink"]..".", 1);
+      elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
+        FARoll(v["bid"]);
+        SD.table_items[itemString]["bidStatus"] = nil;
+        U.debug("FALoot:itemBid(): Rolled for "..SD.table_items[itemString]["itemLink"]..".", 1);
+      end
+    end
+  end
+  
+  E.Trigger("ITEMWINDOW_STATUS_UPDATE")
 end
 
 --   === Item Table Update Function ===========================================
