@@ -320,8 +320,6 @@ local function setStatus()
   end
 end
 
-E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
-
 --[[ ==========================================================================
      Helper Functions
      ========================================================================== --]]
@@ -683,7 +681,15 @@ F.items.processBids = function()
   E.Trigger("ITEMWINDOW_STATUS_UPDATE")
 end
 
---   === Item Table Update Function ===========================================
+--[[ ==========================================================================
+     FALoot Events
+     ========================================================================== --]]
+
+--   === Status Bar Updater ===================================================
+
+E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
+
+--   === Item Table Updater ===================================================
 
 E.Register("ITEM_UPDATE", function()
   local t = {};
@@ -777,9 +783,13 @@ E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   end
 end)
 
--- === Item Cache manager =====================================================
+--[[ ==========================================================================
+     API Events
+     ========================================================================== --]]
 
 local eventFrame, events = CreateFrame("Frame"), {}
+
+-- === Item Cache manager =====================================================
 
 function events:GET_ITEM_INFO_RECEIVED()
   local limit, itemAdded = #SD.table_itemQuery;
@@ -790,6 +800,8 @@ function events:GET_ITEM_INFO_RECEIVED()
     end
   end
 end
+
+-- === GUI Initiator ==========================================================
 
 function events:PLAYER_LOGIN()
   createGUI();
