@@ -12,7 +12,7 @@ local bulkMessages = {};
      Communication Functions
      ========================================================================== --]]
      
-F.sendMessage = function(dist, target, mType, ...)
+F.sendMessage = function(dist, target, reqSameVersion, mType, ...)
   -- Determine priority
   local priority = "NORMAL";
   for i=1,#bulkMessages do
@@ -23,7 +23,14 @@ F.sendMessage = function(dist, target, mType, ...)
   
   -- Prep data in table form
   local data = {...};
+  
+  -- Assign message type
   data["type"] = mType;
+  
+  -- Specify version, if necessary
+  if reqSameVersion then
+    data["version"] = A.MVERSION;
+  end
   
   -- Serialize the data
   local serialized, msg = libSerialize:Serialize(data)

@@ -16,7 +16,11 @@ SD.table_itemQuery = {};
 SD.table_items = {};
 SD.table_icons = {};
 
+-- Init "items" functions subtable
 F.items = {};
+
+-- Init some item window variables
+local itemWindowSelection = nil;
 
 --[[ =======================================================
      GUI Creation
@@ -89,6 +93,43 @@ do
   scrollingTable:EnableSelection(true);
   scrollingTable.frame:SetPoint("TOP", iconFrame, "BOTTOM", 0, -20);
   scrollingTable.frame:SetScale(1.1);
+  
+  -- Setup onclick to trigger an ITEMWINDOW_SELECT_UPDATE event
+  scrollingTable:RegisterEvents({
+    ["OnClick"] = function(rowFrame, cellFrame, data, cols, row, realrow, column, scrollingTable, ...)
+      -- if the user clicked on a content cell
+      if row and realrow then
+        -- if the row clicked is already the one selected
+        if scrollingTable:GetSelection() == realrow then
+          -- then deselect the row
+          scrollingTable:ClearSelection();
+          -- then trigger an event
+          E.Trigger("ITEMWINDOW_SELECT_UPDATE");
+        else
+          -- else select the row
+          scrollingTable:SetSelection(realrow);
+          
+          -- determine then item's id
+          local j = 0;
+          local item;
+          for i, v in pairs(SD.table_items) do
+            j = j + 1;
+            if j == realrow then
+              item = i;
+              break;
+            end
+          end
+          U.debug("Clicked: "..item..", "..SD.table_items[item]["itemLink"], 2);
+          
+          -- then trigger an event
+          E.Trigger("ITEMWINDOW_SELECT_UPDATE", item);
+        end
+        
+        -- and override the default handler
+        return true;
+      end
+    end,
+  });
   
   UI.itemWindow.scrollingTable = scrollingTable;
 
@@ -247,7 +288,9 @@ local function generateIcons()
   local lasticon = nil -- reference value for anchoring to the most recently constructed icon
   local firsticon = nil -- reference value for anchoring the first constructed icon
   local k = 0 -- this variable contains the number of the icon we're currently constructing, necessary because we need to be able to create multiple icons per entry in the table
-  for i=1,PD.maxIcons do -- loop through the table of icons and reset everything
+  
+  -- loop through the table of icons and reset everything
+  for i=1,PD.maxIcons do
     SD.table_icons[i]:Hide()
     SD.table_icons[i]:ClearAllPoints()
     SD.table_icons[i]:SetBackdrop({
@@ -256,16 +299,24 @@ local function generateIcons()
     SD.table_icons[i]:SetScript("OnEnter", nil)
     SD.table_icons[i]:SetScript("OnLeave", nil)
   end
-  for i, v in pairs(SD.table_items) do -- loop through each row of data
+  
+  -- loop through each row of data
+  for i, v in pairs(SD.table_items) do
     for j=1,v["quantity"] do
-      if k < #SD.table_icons then -- if we're constructing an icon number that's higher than what we're setup to display then just skip it
-        k = k + 1 -- increment k by 1 before starting to construct
-        SD.table_icons[k]:SetBackdrop({ -- set the texture of the icon
+      -- if we're constructing an icon number that's higher than what we're setup to display then just skip it
+      if k < #SD.table_icons then
+        -- increment k by 1 before starting to construct
+        k = k + 1
+        
+        -- set the texture of the icon
+        SD.table_icons[k]:SetBackdrop({ 
           bgFile = v["texture"],
         })
-        SD.table_icons[k]:SetScript("OnEnter", function(self, button) -- set code that triggers on mouse enter
+        
+        -- set the icon's scripts
+        SD.table_icons[k]:SetScript("OnEnter", function(self, button)
           -- store what row was selected so we can restore it later
-          iconSelect = UI.itemWindow.scrollingTable:GetSelection() or 0;
+          itemWindowSelection = UI.itemWindow.scrollingTable:GetSelection() or 0;
           
           -- retrieve the row id that corresponds to the icon we're mousedover
           local row = 0;
@@ -283,14 +334,16 @@ local function generateIcons()
           GameTooltip:SetHyperlink(v["tooltipItemLink"])
           GameTooltip:Show()
         end)
-        SD.table_icons[k]:SetScript("OnLeave", function(self, button) -- set code that triggers on mouse exit
+        
+        SD.table_icons[k]:SetScript("OnLeave", function(self, button)
           -- restore the row that was selected before we mousedover this icon
-          UI.itemWindow.scrollingTable:SetSelection(iconSelect);
-          iconSelect = nil;
+          UI.itemWindow.scrollingTable:SetSelection(itemWindowSelection);
+          itemWindowSelection = nil;
           
-          GameTooltip:Hide()
+          GameTooltip:Hide();
         end)
-        SD.table_icons[k]:SetScript("OnMouseUp", function(self, button) -- set code that triggers on clicks
+        
+        SD.table_icons[k]:SetScript("OnMouseUp", function(self, button)
           if button == "LeftButton" then -- left click: Selects the clicked row
             if IsModifiedClick("CHATLINK") then
               ChatEdit_InsertLink(v["itemLink"])
@@ -299,12 +352,13 @@ local function generateIcons()
             else
               -- retrieve the row id that corresponds to the icon we're mousedover
               local row = 0;
-              for l, w in pairs(table_items) do
+              for l, w in pairs(SD.table_items) do
                 row = row + 1;
                 if i == l then
                   -- set iconSelect so that after the user finishes mousing over icons
                   -- the row corresponding to this one gets selected
-                  iconSelect = row;
+                  itemWindowSelection = row;
+                  E.Trigger("ITEMWINDOW_SELECT_UPDATE", l);
                   break;
                 end
               end
@@ -313,33 +367,34 @@ local function generateIcons()
             endPrompt = coroutine.create( function()
               U.debug("Ending item "..v["itemLink"]..".", 1);
               if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-                FALoot:sendMessage(ADDON_MSG_PREFIX, {
-                  ["reqVersion"] = ADDON_MVERSION, 
-                  ["end"] = i,
-                }, "RAID")
+                F.sendMessage("RAID", nil, true, "itemEnd", i);
               end
-              FALoot:itemEnd(i)
+              FALoot:itemEnd(i);
             end)
             if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-              StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?"
+              StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?";
             else
-              StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?"
+              StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].."?";
             end
-            StaticPopup_Show("FALOOT_END")
+            StaticPopup_Show("FALOOT_END");
           end
         end)
-        if lasticon then -- if this isn't the first icon then anchor it to the previous icon
+        
+        -- if this isn't the first icon then anchor it to the previous icon
+        if lasticon then
           SD.table_icons[k]:SetPoint("LEFT", lasticon, "RIGHT", 1, 0)
         end
-        SD.table_icons[k]:Show() -- show the icon we just constructed
-        lasticon = SD.table_icons[k] -- set the icon we just constructed as the most recently constructed icon
+        -- show the icon we just constructed
+        SD.table_icons[k]:Show() 
+        -- set the icon we just constructed as the most recently constructed icon
+        lasticon = SD.table_icons[k];
       end
     end
   end
-  SD.table_icons[1]:SetPoint("LEFT", UI.itemWindow.iconFrame, "LEFT", (501-(k*(40+1)))/2, 0) -- anchor the first icon in the row so that the row is centered in the window
+  
+  -- anchor the first icon in the row so that the row is centered in the window
+  SD.table_icons[1]:SetPoint("LEFT", UI.itemWindow.iconFrame, "LEFT", (501-(k*(40+1)))/2, 0)
 end
-
-F.generateIcons = generateIcons;
 
 --[[ =======================================================
      Item Functions
@@ -392,7 +447,7 @@ F.items.add = function(itemString, checkCache)
     local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
     local displayName = itemLink
     if isThunderforged(iLevel) then
-      displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
+      displayName = string.gsub(displayName, "|c%x+|", "|c"..SD.THUNDERFORGED_COLOR.."|");
     end
     if SD.table_items[itemString]["quantity"] > 1 then
       displayName = displayName .. " x" .. SD.table_items[itemString]["quantity"];
@@ -402,7 +457,7 @@ F.items.add = function(itemString, checkCache)
     local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
     local displayName = itemLink
     if isThunderforged(iLevel) then
-      displayName = string.gsub(displayName, "|c%x+|", "|c"..THUNDERFORGED_COLOR.."|");
+      displayName = string.gsub(displayName, "|c%x+|", "|c"..SD.THUNDERFORGED_COLOR.."|");
     end
     SD.table_items[itemString] = {
       ["quantity"] = 1,
@@ -488,9 +543,7 @@ F.items.requestTakeTells = function(itemString)
     if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and debugOn > 0) then
       -- Ask raid leader for permission to start item
       U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
-      FALoot:sendMessage(ADDON_MSG_PREFIX, {
-        ["postRequest"] = itemString,
-      }, "WHISPER", raidLeader);
+      F.sendMessage("WHISPER", raidLeader, false, "postRequest", itemString);
       -- Set request timer
       postRequestTimer = GetTime();
     else
@@ -579,9 +632,24 @@ E.Register("ITEM_UPDATE", function()
   end
 end)
 
+--   === Item Select Reaction =================================================
 
-
-
+E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
+  if item then
+    if (not SD.table_items[item]["status"] or SD.table_items[item]["status"] == "") and not SD.tellsInProgress then
+      --U.debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
+      UI.itemWindow.tellsButton:Enable();
+    else
+      UI.itemWindow.tellsButton:Disable();
+    end
+    
+    -- TODO: make this only enable if the item can be bid on
+    UI.itemWindow.bidButton:Enable();
+  else
+    UI.itemWindow.tellsButton:Disable();
+    UI.itemWindow.bidButton:Disable();
+  end
+end)
 
 
 

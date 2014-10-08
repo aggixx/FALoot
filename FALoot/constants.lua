@@ -13,5 +13,3 @@ SD.HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:
 SD.THUNDERFORGED_COLOR = "FFFF8000";
 SD.PLAYER_REALM = GetRealmName();
 SD.PLAYER_NAME = UnitName("player") .. "-" .. SD.PLAYER_REALM;
-
-SD.debugOn = 1;

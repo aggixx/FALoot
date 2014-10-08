@@ -6,7 +6,7 @@ local PD = A.pData;
      ======================================================= --]]
 
 -- Saved Variables
-PD.debugOn = 0;    -- Debug threshold
+PD.debugOn = 5;    -- Debug threshold
 PD.expTime = 15;   -- Amount of time before an ended item is removed from the window, in seconds.
 PD.autolootToggle = nil;
 PD.autolootKey = nil;

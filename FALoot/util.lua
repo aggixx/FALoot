@@ -30,7 +30,7 @@ U.debug = function(msg, verbosity)
     output = msg;
   elseif type(msg) == "table" then
     if DevTools_Dump then
-      if not verbosity or debugOn >= verbosity then
+      if not verbosity or PD.debugOn >= verbosity then
         DevTools_Dump(msg);
       end
       return;
@@ -46,7 +46,7 @@ U.debug = function(msg, verbosity)
     ["threshold"] = verbosity or 0,
   });
   if not verbosity or PD.debugOn >= verbosity then
-    print(ADDON_CHAT_HEADER..output);
+    print(A.CHAT_HEADER..output);
   end
 end
 
@@ -115,22 +115,25 @@ U.GetCurrentServerTime = function()
 end
 
 U.ItemLinkStrip = function(itemLink)
-  if itemLink then
-    local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
-    string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
-    if itemId and suffixId then
-      suffixId = tonumber(suffixId);
-      -- super hacky workaround for blizzard's weird suffixId system
-      if suffixId > 60000 then
-        suffixId = suffixId - 65536;
-      end
-      local s = itemId..":"..suffixId;
-      -- U.debug(s, 3);
-      return s;
-    end
-  else
-    U.debug("ItemLinkStrip was passed a nil value!", 1);
+  if not itemLink then
+    U.debug("util.ItemLinkStrip was passed a nil value!", 1);
     return;
+  elseif type(itemLink) ~= "string" then
+    U.debug("util.ItemLinkStrip was passed a non-string value!", 1);
+    return;
+  end
+  
+  local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
+  string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+  if itemId and suffixId then
+    suffixId = tonumber(suffixId);
+    -- super hacky workaround for blizzard's weird suffixId system
+    if suffixId > 60000 then
+      suffixId = suffixId - 65536;
+    end
+    local s = itemId..":"..suffixId;
+    -- U.debug(s, 3);
+    return s;
   end
 end
 
