@@ -89,7 +89,74 @@ local O = PD.options;
 A.functions = {};
 local F = A.functions;
 
+-- Define UI
 A.UI = {};
+
+-- Define slash commands
+A.commands = {};
+local C = A.commands;
+C.list = {};
+
+C.Register = function(command, handler, desc)
+	if type(command) ~= "string" then
+		A.util.debug('commands.Register passed a bad value for parameter "command".');
+		return;
+	elseif type(handler) ~= "function" then
+		A.util.debug('commands.Register passed a bad value for parameter "handler".');
+		return;
+	end
+	
+	command = string.lower(command);
+	
+	C.list[command] = {
+		["handler"] = handler,
+		["desc"] = desc,
+	};
+end
+
+SLASH_FALOOT1 = "/faloot";
+SLASH_FA1 = "/fa";
+
+local function commandHandler(msg, editbox)
+	if msg == "" then
+		if A.UI.itemWindow then
+			A.UI.itemWindow.frame:Show();
+		end
+	else
+		local command = string.lower(string.match(msg, "^(%S+)"));
+		
+		if command and C.list[command] then
+			-- Prepare params
+			local params, t = string.match(msg, "^%S+%s+(.+)"), {};
+			
+			if params then
+				for x in string.gmatch(params, "%S+") do
+					table.insert(t, x);
+				end
+			end
+			
+			-- Pass params to handler
+			C.list[command].handler(unpack(t));
+			
+			return;
+		end
+		
+		-- No match, construct help
+		local s = "Command not recognized. The following commands are allowed:\n";
+		for i,v in pairs(C.list) do
+			s = s .. "/fa " .. i .. " ";
+			if v.desc then
+				s = s .. v.desc;
+			end
+			s = s .. "\n"
+		end
+		A.util.debug(s);
+	end
+end
+
+SlashCmdList["FALOOT"] = commandHandler;
+SlashCmdList["FA"] = commandHandler;
+
 
 --[[ ==========================================================================
      Addon Definition & Properties
