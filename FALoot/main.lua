@@ -31,7 +31,7 @@ local ADDON_NAME = "FALoot";
      ======================================================= --]]
 
 local ADDON_MVERSION = 6; -- Addons only communicate with users of the same major version.
-local ADDON_REVISION = 2; -- Specific code revision for identification purposes.
+local ADDON_REVISION = 3; -- Specific code revision for identification purposes.
 
 --[[ =======================================================
 	Libraries
@@ -331,66 +331,86 @@ local function isGuildGroup(threshold)
 			end
 		end
 	end
-	if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
-		return true
-	else
-		return false
-	end
+	local ratio = numguildies / ( GetNumGroupMembers() - numOffline );
+	
+	if threshold then
+  	return ratio >= threshold;
+  else
+    return ratio;
+  end
 end
 
 local function isMainRaid()
+	-- Refresh guild roster
 	GuildRoster()
-	local groupType
-	if IsInRaid() then
-		groupType = "raid"
-	else
-		groupType = "party"
-	end
-	local aspects, drakes = 0, 0;
-	local showOffline = GetGuildRosterShowOffline();
-	SetGuildRosterShowOffline(false);
+	
+	-- Set some variables
+	local groupType = (IsInRaid() and "raid") or "party";
+	local officers, drakes = 0, 0;
+	
+	-- Filter to only online players & save current setting for later restoration
+	local showOffline = GetGuildRosterShowOffline(); 
+	
+	-- Loop through the raid and count the number of drakes and aspects
 	for i=1,40 do
 		if UnitExists(groupType..i) then
-			local name = GetRaidRosterInfo(i)
-			local _, onlineguildies = GetNumGuildMembers()
-			for j=1,onlineguildies do
-				local _, rankName, rankIndex = GetGuildRosterInfo(j)
-				if string.match(rankName, "Aspect") then
-					aspects = aspects + 1
-				elseif  string.match(rankName, "Drake") then
-					drakes = drakes + 1
+			local uName = GetRaidRosterInfo(i)
+			
+			-- Set Show Offline bool appropriately
+			local numOnline;
+			if UnitIsConnected(groupType..i) then
+				SetGuildRosterShowOffline(false);
+				numOnline = select(2, GetNumGuildMembers());
+			else
+				SetGuildRosterShowOffline(true);
+				numOnline = GetNumGuildMembers();
+			end
+			
+			for j=1,numOnline do
+				local gName, rank = GetGuildRosterInfo(j)
+				if uName == gName then
+					-- Increment appropriate counter
+					if rank == "Aspect" or rank == "Aspects" or rank == "Dragon" then
+						officers = officers + 1;
+					elseif rank == "Drake" then
+						drakes = drakes + 1;
+					end
+					
+					-- Move on to the next unit
+					break;
 				end
 			end
 		end
 	end
+
+	-- Restore show offline setting
 	SetGuildRosterShowOffline(showOffline);
-	if aspects >= 2 and drakes >= 5 then
-		return true
-	else
-		return false
-	end
+	
+	return officers >= 2 and drakes >= 4;
 end
 
 function FALoot:addonEnabled(overrideDebug)
 	if not overrideDebug and debugOn > 0 then
-		return 1
+		return 1;
 	end
-	
-	local _, instanceType = IsInInstance()
 	
 	if not isGuildGroup(0.60) then
-		return nil, "not guild group"
+		return nil, "not guild group";
 	elseif not isMainRaid() then
-		return nil, "not enough officers"
-	elseif instanceType ~= "raid" then
-		return nil, "wrong instance type"
-	elseif not (GetRaidDifficultyID() == 4 or GetRaidDifficultyID() == 6) then
-		return nil, "wrong instance difficulty"
-	elseif GetNumGroupMembers() < 20 then
-		return nil, "not enough group members"
-	else
-		return 1
+		return nil, "not enough officers";
 	end
+	
+	local _, iType, iDifficulty = GetInstanceInfo()
+	
+	if iType ~= "raid" then
+		return nil, "wrong instance type";
+	elseif not ( iDifficulty == 15 or iDifficulty == 16 ) then -- Heroic or Mythic
+		return nil, "wrong instance difficulty";
+	elseif GetNumGroupMembers() < 15 then
+		return nil, "not enough group members";
+	end
+	
+	return 1;
 end
 
 function FALoot:checkFilters(itemString, checkItemLevel)
@@ -1374,11 +1394,7 @@ function FALoot:createGUI()
 	tellsFrameAwardButton:SetText("Award Item")
 	tellsFrameAwardButton:SetScript("OnClick", function(frame)
 		local selection = tellsTable:GetSelection();
-		if selection then
-			-- Send a chat message with the winner for those that don't have the addon
-			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
-			
+		if selection and tellsInProgress then
 			-- Send an addon message for those with the addon
 			local cST = GetCurrentServerTime();
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
@@ -1389,7 +1405,14 @@ function FALoot:createGUI()
 					["time"] = cST,
 				},
 			}, "RAID");
+			
+			-- Calling the next function fucks up the value for some reason I don't understand so lets save a copy here
+			local tellsInProgressCopy = tellsInProgress;
+			
 			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
+			
+			-- Restore the copy
+			tellsInProgress = tellsInProgressCopy;
 			
 			-- Announce winner and bid amount to aspects chat
 			local channels, channelNum = {GetChannelList()};
@@ -1399,13 +1422,17 @@ function FALoot:createGUI()
 					break;
 				end
 			end
+			
 			if channelNum then
-				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
 				local link = table_items[tellsInProgress]["itemLink"];
 				local winner = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
 				local bid = table_items[tellsInProgress]["tells"][selection][3];
 				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
+			
+			-- Send a chat message with the winner for those that don't have the addon
+			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
 			
 			table.remove(table_items[tellsInProgress]["tells"], selection);
 		end
@@ -2289,20 +2316,20 @@ function FALoot:itemAddWinner(itemString, winner, bid, time)
 		debug(itemString.." is not a valid active item!", 1);
 		return;
 	end
+	
+	local entry = table_items[itemString];
 		
 	-- check if the player was the winner of the item
 	if winner == PLAYER_NAME then
 		debug("The player won an item!", 1);
-		LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
+		LootWonAlertFrame_ShowAlert(entry["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
 	
 	-- create a table entry for that pricepoint
-	if not table_items[itemString]["winners"][bid] then
-		table_items[itemString]["winners"][bid] = {};
-	end
+	entry["winners"][bid] = entry["winners"][bid] or {};
 	
 	-- insert this event into the winners table
-	table.insert(table_items[itemString]["winners"][bid], winner);
+	table.insert(entry["winners"][bid], winner);
 	
 	-- insert into item history
 	table.insert(table_itemHistory, {
@@ -2314,11 +2341,11 @@ function FALoot:itemAddWinner(itemString, winner, bid, time)
 	
 	-- if # of winners >= item quantity then auto end the item
 	local numWinners = 0;
-	for j, v in pairs(table_items[itemString]["winners"]) do
+	for j, v in pairs(entry["winners"]) do
 		numWinners = numWinners + #v;
 	end
 	debug("numWinners = "..numWinners, 3);
-	if numWinners >= table_items[itemString]["quantity"] then
+	if numWinners >= entry["quantity"] then
 		FALoot:itemEnd(itemString);
 	end
 end

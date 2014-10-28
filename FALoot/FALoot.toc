@@ -1,4 +1,4 @@
-## Interface: 50400
+## Interface: 60000
 ## Title: FA Loot
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
 ## Version: v4.2
