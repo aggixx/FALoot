@@ -97,6 +97,7 @@ A.commands = {};
 local C = A.commands;
 C.list = {};
 
+-- Define slash command register function
 C.Register = function(command, handler, desc)
 	if type(command) ~= "string" then
 		A.util.debug('commands.Register passed a bad value for parameter "command".');
@@ -114,6 +115,7 @@ C.Register = function(command, handler, desc)
 	};
 end
 
+-- Create and register slash command handler
 SLASH_FALOOT1 = "/faloot";
 SLASH_FA1 = "/fa";
 
