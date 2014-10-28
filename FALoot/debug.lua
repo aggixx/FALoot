@@ -1,11 +1,13 @@
+local A = FALoot;
+local F = A.functions
+local SD = A.sData;
+local PD = A.pData;
+local U = A.util;
+local C = A.commands;
+  
 local frame = CreateFrame("Frame");
 
 frame:SetScript("OnEvent", function(self, event, ...)
-  local A = FALoot;
-  local F = A.functions
-  local SD = A.sData;
-  local PD = A.pData;
-  local U = A.util;
 
   if PD.debugOn > 0 then
     F.items.add("96379:0")
@@ -21,3 +23,26 @@ frame:SetScript("OnEvent", function(self, event, ...)
 end)
 
 frame:RegisterEvent("PLAYER_ENTERING_WORLD");
+
+C.Register("debug", function(level)
+	if type(level) ~= "string" then
+		return;
+	end
+	
+	level = tonumber(level);
+	
+	if type(level) ~= "number" then
+		return;
+	end
+	
+	PD.debugOn = level;
+	
+	if PD.debugOn > 0 then
+		U.debug("Debug is now ON ("..PD.debugOn..").");
+	else
+		U.debug("Debug is now OFF.");
+	end
+	
+	-- TODO
+	--FALoot:setLeaderUIVisibility();
+end, "level -- sets the debug level.");
