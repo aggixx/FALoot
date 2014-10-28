@@ -1,5 +1,7 @@
 local A = FALoot;
 local F = A.functions;
+local SD = A.sData;
+local PD = A.pData;
 
 -- Load libraries
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");

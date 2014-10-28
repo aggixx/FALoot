@@ -14,6 +14,7 @@ util.lua
 constants.lua
 options.lua
 items.lua
+tells.lua
 comms.lua
 
 debug.lua

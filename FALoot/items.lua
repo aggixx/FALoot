@@ -572,78 +572,6 @@ F.items.add = function(itemString, checkCache)
   return true
 end
 
---   === items.takeTells() ====================================================
-
-F.items.takeTells = function(itemString)
-  U.debug("itemTakeTells(), itemString = "..itemString, 1);
-  -- itemString must be a string!
-  if type(itemString) ~= "string" then
-    U.debug("itemTakeTells was passed a non-string value!", 1);
-    return;
-  end
-  
-  if SD.table_items[itemString] and not SD.table_items[itemString]["status"] then
-    SD.table_items[itemString]["tells"] = {};
-    tellsInProgress = itemString;
-    tellsTitleText:SetText(SD.table_items[itemString]["displayName"]);
-    tellsTitleBg:SetWidth((tellsTitleText:GetWidth() or 0) + 10);
-    E.Trigger("TELLS_UPDATE");
-    SendChatMessage(SD.table_items[itemString]["itemLink"].." 30", "RAID");
-    UI.itemTells:Disable();
-  else
-    U.debug("Item does not exist or is already in progress!", 1);
-  end
-end
-
---   === items.requestTakeTells() =============================================
-
-F.items.requestTakeTells = function(itemString)
-  U.debug("itemRequestTakeTells("..itemString..")", 1);
-
-  -- Make sure that this is an item we can actually take tells on before trying to submit a request
-  if not SD.table_items[itemString] or SD.table_items[itemString]["status"] or SD.table_items[itemString]["host"] then
-    U.debug("Invalid itemString, aborting.", 1);
-    return;
-  end
-  -- Acquire name of raid leader
-  local raidLeader, raidLeaderUnitID;
-  if IsInRaid() then
-    for i=1,GetNumGroupMembers() do
-      if UnitIsGroupLeader("raid"..i) and UnitIsConnected("raid"..i) then
-        raidLeader = U.UnitName("raid"..i, true);
-        raidLeaderUnitID = "raid"..i;
-        break;
-      end
-    end
-  elseif debugOn > 0 then
-    -- For testing purposes, let's let the player act as the raid leader.
-    raidLeader = SD.PLAYER_NAME;
-  else
-    return;
-  end
-  if raidLeader and raidLeader == "Unknown" then
-    U.debug("Raid leader was found, but returned name Unknown. Aborting.", 1);
-    return;
-  elseif raidLeader then
-    -- Set itemString to become the active tells item
-    tellsInProgress = itemString;
-    if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and debugOn > 0) then
-      -- Ask raid leader for permission to start item
-      U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
-      F.sendMessage("WHISPER", raidLeader, false, "postRequest", itemString);
-      -- Set request timer
-      postRequestTimer = GetTime();
-    else
-      -- Leader is offline, so let's just go ahead post the item.
-      U.debug('Raid leader "' .. raidLeader .. '" is offline, skipping redundancy check.', 1);
-      FALoot:itemTakeTells(itemString);
-    end
-  else
-    U.debug("Raid leader not found. Aborting.", 1);
-    return;
-  end
-end
-
 --   === items.bid() ==========================================================
 
 F.items.bid = function(itemString, bid)
@@ -678,7 +606,7 @@ F.items.processBids = function()
     end
   end
   
-  E.Trigger("ITEMWINDOW_STATUS_UPDATE")
+  E.Trigger("ITEMWINDOW_STATUS_UPDATE");
 end
 
 --[[ ==========================================================================
@@ -813,7 +741,3 @@ end)
 for k, v in pairs(events) do
   eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end
-
-
-
-

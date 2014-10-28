@@ -1,5 +1,6 @@
 local A = FALoot;
-local F = A.functions
+local E = A.events;
+local F = A.functions;
 local SD = A.sData;
 local PD = A.pData;
 local U = A.util;
@@ -43,6 +44,5 @@ C.Register("debug", function(level)
 		U.debug("Debug is now OFF.");
 	end
 	
-	-- TODO
-	--FALoot:setLeaderUIVisibility();
+	E.Trigger("TELLSBUTTON_UPDATE");
 end, "level -- sets the debug level.");

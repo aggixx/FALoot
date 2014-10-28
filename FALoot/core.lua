@@ -31,6 +31,7 @@ E.Register = function(event, func)
 end
 
 E.Trigger = function(event, ...)
+  A.util.debug('Event "'..event..'" triggered.', 2);
   if E.list[event] then
     for i=1,#E.list[event] do
       E.list[event][i](...);
@@ -64,6 +65,7 @@ M.Unregister = function(event)
 end
 
 M.Trigger = function(mEvent, msg, channel, source, ...)
+  A.util.debug('Message event "'..mEvent..'" triggered.', 2);
   if M.list[mEvent] then
     M.list[mEvent](msg, channel, source, ...);
   end
