@@ -258,11 +258,11 @@ local function createGUI()
 			end
 		end
 	end)
-	tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
 	tellsButton:SetHeight(20);
 	tellsButton:SetWidth(80);
 	tellsButton:SetText("Take Tells");
-	tellsButton:SetFrameLevel(UI.itemWindow.scrollingTable.frame:GetFrameLevel()+1);
+	tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
+	--tellsButton:SetFrameLevel(UI.itemWindow.scrollingTable.frame:GetFrameLevel()+1);
 	--tellsButton:Disable();
 	--tellsButton:Hide();
 	
@@ -360,6 +360,17 @@ E.Register("TELLSBUTTON_UPDATE", function()
 		UI.itemWindow.tellsButton:Hide();
 	end
 end)
+
+-- === GUI Initiator ==========================================================
+
+E.Register("PLAYER_LOGIN", function()
+	createGUI();
+	E.Trigger("TELLSBUTTON_UPDATE");
+end);
+
+--[[E.Register("PLAYER_LOGIN", function()
+	UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
+end);--]]
      
 --[[ ==========================================================================
      API Events
@@ -376,17 +387,10 @@ end
 function events:RAID_ROSTER_UPDATE()
   E.Trigger("TELLSBUTTON_UPDATE");
 end
-     
--- === GUI Initiator ==========================================================
-
-function events:PLAYER_LOGIN()
-  createGUI();
-  E.Trigger("TELLSBUTTON_UPDATE");
-end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
   events[event](self, ...) -- call one of the functions above
-end)
+end);
 for k, v in pairs(events) do
   eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end

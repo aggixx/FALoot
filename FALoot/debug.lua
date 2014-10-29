@@ -5,10 +5,8 @@ local SD = A.sData;
 local PD = A.pData;
 local U = A.util;
 local C = A.commands;
-  
-local frame = CreateFrame("Frame");
 
-frame:SetScript("OnEvent", function(self, event, ...)
+E.Register("PLAYER_LOGIN", function()
 
   if PD.debugOn > 0 then
     F.items.add("96379:0")
@@ -19,11 +17,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
     F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
     F.items.add("96384:0")
   end
-  
-  self:UnregisterEvent("PLAYER_ENTERING_WORLD");
 end)
-
-frame:RegisterEvent("PLAYER_ENTERING_WORLD");
 
 C.Register("debug", function(level)
 	if type(level) ~= "string" then

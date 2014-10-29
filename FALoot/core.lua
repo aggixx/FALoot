@@ -28,12 +28,16 @@ E.Register = function(event, func)
     E.list[event] = {};
   end
   table.insert(E.list[event], func);
+  
+  -- Return the ID of the newly inserted function
+  return #E.list[event];
 end
 
 E.Trigger = function(event, ...)
   A.util.debug('Event "'..event..'" triggered.', 2);
   if E.list[event] then
     for i=1,#E.list[event] do
+      A.util.debug('Calling "'..event..'" function #'..i..'.', 3);
       E.list[event][i](...);
     end
   end
@@ -178,6 +182,44 @@ A.CHAT_HEADER  = "|c" .. A.COLOR .. "FA Loot:|r ";
 A.MSG_PREFIX = "FALoot";
 A.DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
+--[[ ==========================================================================
+     API Events
+     ========================================================================== --]]
+
+local eventFrame, events = CreateFrame("Frame"), {}
+
+-- === PLAYER_LOGIN Event =================================================
+
+function events:PLAYER_ENTERING_WORLD()
+	E.Trigger("PLAYER_LOGIN");
+end
+
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+  events[event](self, ...) -- call one of the functions above
+end)
+for k, v in pairs(events) do
+  eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
+end
+
+
+
+
+
+local OUframe = CreateFrame("Frame");
+
+OUframe:SetScript("OnUpdate", function()
+	if A.UI.itemWindow and A.UI.itemWindow.tellsButton then
+		local data = {A.UI.itemWindow.tellsButton:GetPoint(1)};
+		local name;
+		if data and data[2] then
+			name = data[2]:GetName();
+		end
+		if name then
+			A.util.debug(name);
+			debug_counter = (debug_counter or 0) + 1;
+		end
+	end
+end);
 
 
 

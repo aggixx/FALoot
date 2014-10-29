@@ -186,32 +186,6 @@ local function createGUI()
   bidButton:Disable();
   
   UI.itemWindow.bidButton = bidButton;
-  
-  -- Create the "Take Tells" button
-  local tellsButton = CreateFrame("Button", frame:GetName().."TellsButton", frame, "UIPanelButtonTemplate");
-  tellsButton:SetScript("OnClick", function(self, event)
-    local id = scrollingTable:GetSelection()
-    local j = 0;
-    for i, v in pairs(SD.table_items) do
-      j = j + 1;
-      if j == id then
-        -- We've figured out the item string of the corresponding item (i), so now let's ask for permission to post it.
-        F.itemRequestTakeTells(i);
-        -- While we're waiting for a request to our response, let's make sure the user can't take tells on any more items.
-        FALoot:onTableSelect(scrollingTable:GetSelection());
-        break;
-      end
-    end
-  end)
-  tellsButton:SetPoint("BOTTOM", bidButton, "TOP");
-  tellsButton:SetHeight(20);
-  tellsButton:SetWidth(80);
-  tellsButton:SetText("Take Tells");
-  tellsButton:SetFrameLevel(scrollingTable.frame:GetFrameLevel()+1);
-  tellsButton:Disable();
-  tellsButton:Hide(); -- hide by default, we can reshow it later if we need to
-  
-  UI.itemWindow.tellsButton = tellsButton;
 
   -- Create the background of the Status Bar
   local statusbg = CreateFrame("Button", frame:GetName().."StatusBar", frame)
@@ -613,6 +587,12 @@ end
      FALoot Events
      ========================================================================== --]]
 
+-- === GUI Initiator ==========================================================
+
+E.Register("PLAYER_LOGIN", function()
+	createGUI();
+end);
+
 --   === Status Bar Updater ===================================================
 
 E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
@@ -727,12 +707,6 @@ function events:GET_ITEM_INFO_RECEIVED()
       itemAdded = result;
     end
   end
-end
-
--- === GUI Initiator ==========================================================
-
-function events:PLAYER_LOGIN()
-  createGUI();
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
