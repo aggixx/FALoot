@@ -190,7 +190,7 @@ local eventFrame, events = CreateFrame("Frame"), {}
 
 -- === PLAYER_LOGIN Event =================================================
 
-function events:PLAYER_ENTERING_WORLD()
+function events:PLAYER_LOGIN()
 	E.Trigger("PLAYER_LOGIN");
 end
 
@@ -200,29 +200,3 @@ end)
 for k, v in pairs(events) do
   eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end
-
-
-
-
-
-local OUframe = CreateFrame("Frame");
-
-OUframe:SetScript("OnUpdate", function()
-	if A.UI.itemWindow and A.UI.itemWindow.tellsButton then
-		local data = {A.UI.itemWindow.tellsButton:GetPoint(1)};
-		local name;
-		if data and data[2] then
-			name = data[2]:GetName();
-		end
-		if name then
-			A.util.debug(name);
-			debug_counter = (debug_counter or 0) + 1;
-		end
-	end
-end);
-
-
-
-
-
-

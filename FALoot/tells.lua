@@ -262,7 +262,7 @@ local function createGUI()
 	tellsButton:SetWidth(80);
 	tellsButton:SetText("Take Tells");
 	tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
-	--tellsButton:SetFrameLevel(UI.itemWindow.scrollingTable.frame:GetFrameLevel()+1);
+	tellsButton:SetFrameLevel(UI.itemWindow.scrollingTable.frame:GetFrameLevel()+1);
 	--tellsButton:Disable();
 	--tellsButton:Hide();
 	
@@ -367,10 +367,6 @@ E.Register("PLAYER_LOGIN", function()
 	createGUI();
 	E.Trigger("TELLSBUTTON_UPDATE");
 end);
-
---[[E.Register("PLAYER_LOGIN", function()
-	UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
-end);--]]
      
 --[[ ==========================================================================
      API Events
