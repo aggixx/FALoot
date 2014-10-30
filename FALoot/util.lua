@@ -24,10 +24,10 @@ end;
 
 U.debug = function(msg, verbosity)
   local output;
-  if type(msg) == "string" or type(msg) == "number" or type(msg) == nil then
+  if type(msg) == "string" or type(msg) == "number" or type(msg) == "nil" then
     output = msg or "nil";
   elseif type(msg) == "boolean" then
-    output = msg;
+    output = (msg and "true") or "false";
   elseif type(msg) == "table" then
     if DevTools_Dump then
       if not verbosity or PD.debugOn >= verbosity then
@@ -89,7 +89,7 @@ end
 U.UnitName = function(unit, showServer)
   local name = UnitName(unit, showServer);
   if showServer and name and not string.match(name, "-") then
-    name = name .. "-" .. PLAYER_REALM;
+    name = name .. "-" .. SD.PLAYER_REALM;
   end
   return name;
 end

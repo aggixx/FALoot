@@ -14,6 +14,10 @@ local ScrollingTable = LibStub("ScrollingTable");
 -- Init some tables
 SD.table_tells = {};
 
+-- Local variables
+local tellsInProgress;
+local requestPending;
+
 --[[ ==========================================================================
      GUI Creation
      ========================================================================== --]]
@@ -251,8 +255,9 @@ local function createGUI()
 			j = j + 1;
 			if j == id then
 				-- We've figured out the item string of the corresponding item (i), so now let's ask for permission to post it.
-				F.item.requestTakeTells(i);
+				F.items.requestTakeTells(i);
 				-- While we're waiting for a request to our response, let's make sure the user can't take tells on any more items.
+				-- FIXME
 				self:Disable();
 				break;
 			end
@@ -276,21 +281,19 @@ end
 --   === items.takeTells() ====================================================
 
 F.items.takeTells = function(itemString)
-  U.debug("itemTakeTells(), itemString = "..itemString, 1);
   -- itemString must be a string!
   if type(itemString) ~= "string" then
-    U.debug("itemTakeTells was passed a non-string value!", 1);
-    return;
+    error('Usage: items.takeTells("itemString")');
   end
   
   if SD.table_items[itemString] and not SD.table_items[itemString]["status"] then
     SD.table_items[itemString]["tells"] = {};
     tellsInProgress = itemString;
     UI.tellsWindow.title:SetText(SD.table_items[itemString]["displayName"]);
-    UI.tellsWindow.titleBg:SetWidth((tellsTitleText:GetWidth() or 0) + 10);
+    UI.tellsWindow.titleBg:SetWidth((UI.tellsWindow.title:GetWidth() or 0) + 10);
     E.Trigger("TELLS_UPDATE");
     SendChatMessage(SD.table_items[itemString]["itemLink"].." 30", "RAID");
-    UI.itemTells:Disable();
+    UI.itemWindow.tellsButton:Disable();
   else
     U.debug("Item does not exist or is already in progress!", 1);
   end
@@ -299,12 +302,9 @@ end
 --   === items.requestTakeTells() =============================================
 
 F.items.requestTakeTells = function(itemString)
-  U.debug("itemRequestTakeTells("..itemString..")", 1);
-
   -- Make sure that this is an item we can actually take tells on before trying to submit a request
-  if not SD.table_items[itemString] or SD.table_items[itemString]["status"] or SD.table_items[itemString]["host"] then
-    U.debug("Invalid itemString, aborting.", 1);
-    return;
+  if type(itemString) ~= "string" or not SD.table_items[itemString] or SD.table_items[itemString]["status"] or SD.table_items[itemString]["host"] then
+    error('Usage: items.requestTakeTells("itemString")');
   end
   -- Acquire name of raid leader
   local raidLeader, raidLeaderUnitID;
@@ -316,32 +316,38 @@ F.items.requestTakeTells = function(itemString)
         break;
       end
     end
-  elseif debugOn > 0 then
+  elseif PD.debugOn > 0 then
     -- For testing purposes, let's let the player act as the raid leader.
     raidLeader = SD.PLAYER_NAME;
   else
+    U.debug("You must be in a raid to do that.");
     return;
   end
   if raidLeader and raidLeader == "Unknown" then
-    U.debug("Raid leader was found, but returned name Unknown. Aborting.", 1);
-    return;
+    error("Raid leader was found, but returned name Unknown.");
   elseif raidLeader then
     -- Set itemString to become the active tells item
     tellsInProgress = itemString;
-    if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and debugOn > 0) then
+    if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and PD.debugOn > 0) then
       -- Ask raid leader for permission to start item
       U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
       F.sendMessage("WHISPER", raidLeader, false, "postRequest", itemString);
       -- Set request timer
-      postRequestTimer = GetTime();
+      requestPending = true;
+      C_Timer.After(PD.postRequestMaxWait, function()
+        if requestPending then
+          U.debug(PD.postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. tellsInProgress .. ") anyway.", 1);
+          F.items.takeTells(tellsInProgress);
+	  requestPending = nil;
+	end
+      end);
     else
       -- Leader is offline, so let's just go ahead post the item.
       U.debug('Raid leader "' .. raidLeader .. '" is offline, skipping redundancy check.', 1);
-      F.item.takeTells(itemString);
+      F.items.takeTells(itemString);
     end
   else
-    U.debug("Raid leader not found. Aborting.", 1);
-    return;
+    error("Could not find Raid leader.");
   end
 end
      
@@ -372,6 +378,52 @@ E.Register("PLAYER_LOGIN", function()
 		UI.itemWindow.tellsButton:ClearAllPoints();
 		UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
 	end);
+end);
+
+-- postRequest message handler ================================================
+
+M.Register("postRequest", function(channel, sender, requestedItem)
+  -- validate input
+  if requestedItem then
+    U.debug("Requested item: " .. requestedItem, 1);
+  else
+    return;
+  end
+
+  local okay = false;
+  
+  if not SD.table_items[requestedItem] then
+    U.debug("Item does not exist, denying request.", 1);
+  elseif SD.table_items[requestedItem]["status"] then
+    U.debug("Item is already in progress, denying request.", 1);
+  elseif SD.table_items[requestedItem]["host"] then
+    U.debug('Item has already been claimed for posting by "' .. SD.table_items[requestedItem]["host"] .. '", denying request.', 1);
+  else
+    U.debug('Request granted.', 1);
+    SD.table_items[requestedItem]["host"] = sender;
+    okay = true;
+  end
+  
+  F.sendMessage("WHISPER", sender, false, "postReply", okay);
+end);
+
+-- postReply message handler ==================================================
+
+M.Register("postReply", function(_, _, allowed)
+  if tellsInProgress and requestPending then
+    if allowed then
+      U.debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);
+      F.items.takeTells(tellsInProgress);
+    else
+      U.debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
+      -- cancel the item in progress
+      tellsInProgress = nil;
+      -- force a button state update
+      E.Trigger("TELLSBUTTON_UPDATE");
+    end
+    
+    requestPending = nil;
+  end
 end);
      
 --[[ ==========================================================================

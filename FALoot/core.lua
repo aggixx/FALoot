@@ -68,10 +68,10 @@ M.Unregister = function(event)
   M.list[event] = nil;
 end
 
-M.Trigger = function(mEvent, msg, channel, source, ...)
+M.Trigger = function(mEvent, channel, sender, ...)
   A.util.debug('Message event "'..mEvent..'" triggered.', 2);
   if M.list[mEvent] then
-    M.list[mEvent](msg, channel, source, ...);
+    M.list[mEvent](channel, sender, ...);
   end
 end
 

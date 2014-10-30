@@ -2,6 +2,9 @@ local A = FALoot;
 local F = A.functions;
 local SD = A.sData;
 local PD = A.pData;
+local U = A.util;
+local E = A.events;
+local M = A.messages;
 
 -- Load libraries
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
@@ -20,6 +23,7 @@ F.sendMessage = function(dist, target, reqSameVersion, mType, ...)
   for i=1,#bulkMessages do
     if mType == bulkMessages[i] then
       priority = "BULK";
+      break;
     end
   end
   
@@ -35,26 +39,24 @@ F.sendMessage = function(dist, target, reqSameVersion, mType, ...)
   end
   
   -- Serialize the data
-  local serialized, msg = libSerialize:Serialize(data)
+  local serialized, msg = libSerialize:Serialize(data);
   if serialized then
-    data = serialized
+    data = serialized;
   else
-    U.debug("Serialization of data failed!");
-    return false, "serialization of data failed";
+    error("Serialization of data failed!");
   end
   
   -- Encode the data
-  local encoded, msg = libEncode:Encode(data)
+  local encoded, msg = libEncode:Encode(data);
   if encoded then
-    data = encoded
+    data = encoded;
   else
-    U.debug("Encoding of data failed!");
-    return false, "encoding of data failed";
+    error("Encoding of data failed!");
   end
   
   -- Validate whisper target to prevent errors for the user.
   if string.upper(dist) == "WHISPER" then
-    local groupType = ("raid" and IsInRaid()) or "party";
+    local groupType = (IsInRaid() and "raid") or "party";
     for i=1,GetNumGroupMembers() do
       if U.UnitName(groupType..i, true) == target then
         if not UnitIsConnected(groupType..i) then
@@ -67,18 +69,27 @@ F.sendMessage = function(dist, target, reqSameVersion, mType, ...)
   end
   
   -- Send the prepared message
-  A.stub:SendCommMessage(A.MESSAGE_PREFIX, data, dist, target, prio)
+  A.stub:SendCommMessage(A.MSG_PREFIX, data, dist, target, priority)
   return true;
 end
 
+--[[ ==========================================================================
+     FALoot Events
+     ========================================================================== --]]
 
+-- === Enable Incoming Messages  ==============================================
 
+E.Register("PLAYER_LOGIN", function()
+	RegisterAddonMessagePrefix(A.MSG_PREFIX);
+end);
 
-
+--[[ ==========================================================================
+     API Events
+     ========================================================================== --]]
 
 local eventFrame, events = CreateFrame("Frame"), {}
 
-function events:LOOT_OPENED(...)
+function events:LOOT_READY(...)
   if not A.isEnabled() then
     return;
   end
@@ -128,8 +139,7 @@ function events:LOOT_OPENED(...)
   -- check data integrity
   for i, v in pairs(loot) do
     if not (v["checkSum"] and v["checkSum"] == #v) then
-      U.debug("Self assembled loot data failed the integrity check.");
-      return;
+      error("Self assembled loot data failed the integrity check.");
     end
     if #v == 0 then
       loot[i] = nil;
@@ -189,6 +199,46 @@ function events:CHAT_MSG_WHISPER(msg, author)
   if tellsInProgress then
     FALoot:parseWhisper(msg, author);
   end
+end
+function events:CHAT_MSG_ADDON(prefix, msg, channel, sender)
+  if prefix == A.MSG_PREFIX then
+    -- Decode the data
+    local msg = libEncode:Decode(msg);
+	
+    -- Deserialize the data
+    local success, deserialized = libSerialize:Deserialize(msg);
+    if success then
+      msg = deserialized;
+    else
+      error("Deserialization of data failed.");
+    end
+    
+    -- Constrain sender to Name-Realm format
+    if not string.match(sender, "-") then
+      sender = sender.."-"..SD.PLAYER_REALM;
+    end
+    
+    -- If required by the sender, validate that the reciever has the correct version
+    if msg["version"] and msg["version"] ~= A.MVERSION then
+      return;
+    end
+    
+    msg["version"] = nil;
+    
+    local mType = msg["type"];
+    msg["type"] = nil;
+    
+    if not mType then
+      return;
+    end
+    
+    U.debug('Recieved "'..mType..'" message from '..(sender or "Unknown")..".", 1);
+    
+    M.Trigger(mType, channel, sender, unpack(msg));
+  end
+end
+function events:BN_CHAT_MSG_ADDON(prefix, msg, _, sender)
+  events:CHAT_MSG_ADDON(prefix, msg, "BN_WHISPER", sender);
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
