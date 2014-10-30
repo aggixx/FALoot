@@ -366,6 +366,12 @@ end)
 E.Register("PLAYER_LOGIN", function()
 	createGUI();
 	E.Trigger("TELLSBUTTON_UPDATE");
+	
+	-- Horrible kludge to fix tellsButton not anchoring correctly.
+	C_Timer.After(1, function()
+		UI.itemWindow.tellsButton:ClearAllPoints();
+		UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
+	end);
 end);
      
 --[[ ==========================================================================
