@@ -51,6 +51,7 @@ local function createGUI()
   frame:SetWidth(500);
   frame:SetHeight(270);
   frame:SetPoint("CENTER");
+  frame:Hide();
   
   UI.itemWindow.frame = frame;
 
@@ -391,7 +392,7 @@ local function generateIcons()
               if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
                 F.sendMessage("RAID", nil, true, "itemEnd", i);
               end
-              FALoot:itemEnd(i);
+              F.items.finish(i);
             end)
             if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
               StaticPopupDialogs["FALOOT_END"]["text"] = "Are you sure you want to manually end "..v["itemLink"].." for all players in the raid?";
@@ -535,7 +536,7 @@ F.items.add = function(itemString, checkCache)
       showAfterCombat = true
       U.debug(itemLink.." was found but the player is in combat.");
     else
-      frame:Show()
+      UI.itemWindow.frame:Show()
     end
   end
   

@@ -17,6 +17,8 @@ E.Register("PLAYER_LOGIN", function()
     F.items.add("113971:0:450:565");
     
     E.Trigger("ITEM_UPDATE");
+    
+    UI.itemWindow.frame:Show();
   end
 end)
 
