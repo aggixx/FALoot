@@ -692,6 +692,82 @@ end)
 
 local eventFrame, events = CreateFrame("Frame"), {}
 
+-- === Loot Comm Handler ======================================================
+
+function events:LOOT_READY(...)
+  if not A.isEnabled() then
+    return;
+  end
+  local loot = {} -- create a temporary table to organize the loot on the mob
+  for i=1,GetNumLootItems() do -- loop through all items in the window
+    local sourceInfo = {GetLootSourceInfo(i)}
+    for j=1,#sourceInfo/2 do
+      local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
+      if mobID and not hasBeenLooted[mobID] and not string.match(mobID, "0x4") then -- ignore items from sources that have already been looted or from item-based sources
+        if not loot[mobID] then
+          loot[mobID] = {};
+        end
+        
+        local itemString = U.ItemLinkStrip(GetLootSlotLink(i));
+        if itemString and U.checkFilters(itemString) then
+          for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
+            -- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
+            -- GetLootSourceInfo may also return multiple quantity when there is actually only
+            -- one of the item, but there's not much we can do about that.
+            table.insert(loot[mobID], itemString);
+          end
+        end
+      end
+    end
+  end
+  
+  -- prune enemies with no loot
+  for i, v in pairs(loot) do
+    if #v == 0 then
+      loot[i] = nil;
+    end
+  end
+  
+  -- stop now if there's no loot
+  if loot == {} then
+    U.debug("There is no loot on this mob!", 1);
+    return;
+  end
+  
+  -- add an item count for each GUID so that other clients may verify data integrity
+  for i, v in pairs(loot) do
+    loot[i]["checkSum"] = #v;
+  end
+  
+  U.debug(loot, 2);
+  
+  -- check data integrity
+  for i, v in pairs(loot) do
+    if not (v["checkSum"] and v["checkSum"] == #v) then
+      error("Self assembled loot data failed the integrity check.");
+    end
+    if #v == 0 then
+      loot[i] = nil;
+    end
+  end
+  
+  -- send addon message to tell others to add this to their window
+  FALoot:sendMessage(ADDON_MSG_PREFIX, {
+    ["reqVersion"] = ADDON_MVERSION,
+    ["loot"] = loot,
+  }, "RAID", nil, "BULK");
+  
+  for i, v in pairs(loot) do
+    for j=1,#v do
+      -- we can assume that everything in the table is not on the HBL
+      itemAdd(v[j])
+    end
+    hasBeenLooted[i] = true;
+  end
+  
+  FALoot:itemTableUpdate();
+end
+
 -- === Item Cache manager =====================================================
 
 function events:GET_ITEM_INFO_RECEIVED()
