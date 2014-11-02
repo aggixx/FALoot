@@ -606,7 +606,7 @@ F.items.finish = function(itemString)
   end);
   
   E.Trigger("ITEM_UPDATE");
-  --FALoot:generateStatusText();
+  E.Trigger("ITEMWINDOW_STATUS_UPDATE");
 end
 
 --[[ ==========================================================================
