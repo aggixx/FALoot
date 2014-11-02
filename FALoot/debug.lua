@@ -15,6 +15,8 @@ E.Register("PLAYER_LOGIN", function()
     F.items.add("113939:0:450:565:40");
     F.items.add("113985:0:450:448");
     F.items.add("113971:0:450:565");
+    
+    E.Trigger("ITEM_UPDATE");
   end
 end)
 

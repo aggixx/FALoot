@@ -23,6 +23,9 @@ F.items = {};
 local itemWindowSelection = nil;
 local bidAmount = nil;
 
+-- Init mob loot blacklist
+local hasBeenLooted = {};
+
 --[[ ==========================================================================
      GUI Creation
      ========================================================================== --]]
@@ -535,8 +538,8 @@ F.items.add = function(itemString, checkCache)
     end
   end
   
-  E.Trigger("ITEM_ADD");
-  E.Trigger("ITEM_UPDATE");
+  --[[ Don't call ITEM_UPDATE here, leave that up to the place where
+       this method is called from for efficiency's sake --]]
   
   return true
 end
@@ -588,11 +591,11 @@ E.Register("PLAYER_LOGIN", function()
 	createGUI();
 end);
 
---   === Status Bar Updater ===================================================
+-- === Status Bar Updater =====================================================
 
 E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
 
---   === Item Table Updater ===================================================
+-- === Item Table Updater =====================================================
 
 E.Register("ITEM_UPDATE", function()
   local t = {};
@@ -667,7 +670,7 @@ E.Register("ITEM_UPDATE", function()
   end
 end)
 
---   === Item Select Reaction =================================================
+-- === Item Select Reaction ===================================================
 
 E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   if item then
@@ -686,6 +689,35 @@ E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   end
 end)
 
+-- === Loot Msg Handler =======================================================
+
+M.Register("loot", function(channel, sender, loot)
+  if not A.isEnabled() then
+    return;
+  end
+
+  -- check data integrity
+  for i, v in pairs(loot) do
+    if not (v["checkSum"] and v["checkSum"] == #v) then
+      error("Loot data recieved via an addon message failed the integrity check.");
+    end
+  end
+
+  for i, v in pairs(loot) do
+    if not hasBeenLooted[i] then
+      for j=1,#v do
+        U.debug("Added "..v[j].." to the loot window via addon message.", 2);
+        F.items.add(v[j]);
+      end
+      hasBeenLooted[i] = true;
+    else
+      U.debug(i.." has already been looted.", 2);
+    end
+  end
+
+  E.Trigger("ITEM_UPDATE");
+end);
+
 --[[ ==========================================================================
      API Events
      ========================================================================== --]]
@@ -698,7 +730,9 @@ function events:LOOT_READY(...)
   if not A.isEnabled() then
     return;
   end
+  
   local loot = {} -- create a temporary table to organize the loot on the mob
+  
   for i=1,GetNumLootItems() do -- loop through all items in the window
     local sourceInfo = {GetLootSourceInfo(i)}
     for j=1,#sourceInfo/2 do
@@ -707,30 +741,34 @@ function events:LOOT_READY(...)
         if not loot[mobID] then
           loot[mobID] = {};
         end
-        
-        local itemString = U.ItemLinkStrip(GetLootSlotLink(i));
-        if itemString and U.checkFilters(itemString) then
-          for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
-            -- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
-            -- GetLootSourceInfo may also return multiple quantity when there is actually only
-            -- one of the item, but there's not much we can do about that.
-            table.insert(loot[mobID], itemString);
+        local item = GetLootSlotLink(i);
+        if item then
+          local itemString = U.ItemLinkStrip(item);
+          if itemString and U.checkFilters(itemString) then
+            for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
+              -- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
+              -- GetLootSourceInfo may also return multiple quantity when there is actually only
+              -- one of the item, but there's not much we can do about that.
+              table.insert(loot[mobID], itemString);
+            end
           end
         end
       end
     end
   end
   
+  local empty = true;
   -- prune enemies with no loot
   for i, v in pairs(loot) do
     if #v == 0 then
       loot[i] = nil;
+    else
+      empty = false;
     end
   end
   
   -- stop now if there's no loot
-  if loot == {} then
-    U.debug("There is no loot on this mob!", 1);
+  if empty then
     return;
   end
   
@@ -739,33 +777,27 @@ function events:LOOT_READY(...)
     loot[i]["checkSum"] = #v;
   end
   
-  U.debug(loot, 2);
+  U.debug(loot, 3);
   
   -- check data integrity
   for i, v in pairs(loot) do
     if not (v["checkSum"] and v["checkSum"] == #v) then
       error("Self assembled loot data failed the integrity check.");
     end
-    if #v == 0 then
-      loot[i] = nil;
-    end
   end
   
   -- send addon message to tell others to add this to their window
-  FALoot:sendMessage(ADDON_MSG_PREFIX, {
-    ["reqVersion"] = ADDON_MVERSION,
-    ["loot"] = loot,
-  }, "RAID", nil, "BULK");
+  F.sendMessage("RAID", nil, true, "loot", loot);
   
   for i, v in pairs(loot) do
     for j=1,#v do
       -- we can assume that everything in the table is not on the HBL
-      itemAdd(v[j])
+      F.items.add(v[j])
     end
     hasBeenLooted[i] = true;
   end
   
-  FALoot:itemTableUpdate();
+  E.Trigger("ITEM_UPDATE");
 end
 
 -- === Item Cache manager =====================================================
