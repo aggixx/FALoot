@@ -13,6 +13,10 @@ local libEncode = libCompress:GetAddonEncodeTable();
 
 local bulkMessages = {};
 
+local selfBlacklist = {
+  ["loot"] = true,
+};
+
 --[[ ==========================================================================
      Communication Functions
      ========================================================================== --]]
@@ -156,6 +160,11 @@ function events:CHAT_MSG_ADDON(prefix, msg, channel, sender)
     msg["type"] = nil;
     
     if not mType then
+      return;
+    end
+
+    -- Check if this message type is blacklisted when sent from self
+    if selfBlacklist[mType] and sender == SD.PLAYER_NAME then
       return;
     end
     
