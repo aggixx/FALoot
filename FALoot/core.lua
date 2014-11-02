@@ -24,6 +24,7 @@ E.Register = function(event, func)
     error("events.Register passed a non-function value for func");
     return;
   end
+  
   if not E.list[event] then
     E.list[event] = {};
   end
@@ -35,6 +36,7 @@ end
 
 E.Trigger = function(event, ...)
   A.util.debug('Event "'..event..'" triggered.', 2);
+  
   if E.list[event] then
     for i=1,#E.list[event] do
       A.util.debug('Calling "'..event..'" function #'..i..'.', 3);
@@ -61,6 +63,7 @@ M.Register = function(event, func)
     error("messages.Register passed a non-function value for func");
     return;
   end
+  
   M.list[event] = func;
 end
 
@@ -70,6 +73,7 @@ end
 
 M.Trigger = function(mEvent, channel, sender, ...)
   A.util.debug('Message event "'..mEvent..'" triggered.', 2);
+  
   if M.list[mEvent] then
     M.list[mEvent](channel, sender, ...);
   end

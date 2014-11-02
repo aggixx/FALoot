@@ -114,31 +114,6 @@ U.GetCurrentServerTime = function()
   return currentServerTime;
 end
 
-U.ItemLinkStrip = function(itemLink)
-  if not itemLink then
-    U.debug("util.ItemLinkStrip was passed a nil value!", 1);
-    return;
-  elseif type(itemLink) ~= "string" then
-    U.debug("util.ItemLinkStrip was passed a non-string value!", 1);
-    return;
-  end
-  
-  local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
-  string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
-  if itemId and suffixId then
-    suffixId = tonumber(suffixId);
-    -- super hacky workaround for blizzard's weird suffixId system
-    if suffixId > 60000 then
-      suffixId = suffixId - 65536;
-    end
-    local s = itemId..":"..suffixId;
-    -- U.debug(s, 3);
-    return s;
-  end
-end
-
--- "|cffa335ee|Hitem:105408:4227:4587:0:0:0:0:466856960:90:505:0:0|h[Trident of Corrupted Waters]|h|r"
-
 -- As of 6.0.2:
 -- itemID:enchant:gem1:gem2:gem3:gem4:suffixID:uniqueID:level:upgradeId:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...
 
@@ -201,8 +176,6 @@ U.ItemLinkAssemble = function(itemString)
   if j > 0 then
     s = s .. ":" .. j .. bonusIDs;
   end
-  
-  U.debug(s, 3);
       
   local _, link = GetItemInfo(s);
   if not link then
