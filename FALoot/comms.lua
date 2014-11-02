@@ -141,7 +141,7 @@ function events:CHAT_MSG_ADDON(prefix, msg, channel, sender)
     if success then
       msg = deserialized;
     else
-      error("Deserialization of data failed.");
+      error("Deserialization of incoming addon message failed.");
     end
     
     -- Constrain sender to Name-Realm format
