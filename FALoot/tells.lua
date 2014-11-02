@@ -4,7 +4,7 @@ local SD = A.sData;
 local PD = A.pData;
 local O = A.options;
 local E = A.events;
-local M = A.messages;
+local AM = A.addonMessages;
 local F = A.functions;
 local UI = A.UI;
 
@@ -382,7 +382,7 @@ end);
 
 -- postRequest message handler ================================================
 
-M.Register("postRequest", function(channel, sender, requestedItem)
+AM.Register("postRequest", function(channel, sender, requestedItem)
   -- validate input
   if requestedItem then
     U.debug("Requested item: " .. requestedItem, 1);
@@ -409,7 +409,7 @@ end);
 
 -- postReply message handler ==================================================
 
-M.Register("postReply", function(_, _, allowed)
+AM.Register("postReply", function(_, _, allowed)
   if tellsInProgress and requestPending then
     if allowed then
       U.debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);

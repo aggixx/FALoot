@@ -4,7 +4,8 @@ local SD = A.sData;
 local PD = A.pData;
 local U = A.util;
 local E = A.events;
-local M = A.messages;
+local AM = A.addonMessages;
+local CM = A.chatMessages;
 
 -- Load libraries
 local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
@@ -94,42 +95,16 @@ end);
 local eventFrame, events = CreateFrame("Frame"), {}
 
 function events:CHAT_MSG_RAID(msg, author)
-  FALoot:parseChat(msg, author)
+  CM.Trigger("RAID", author, msg);
 end
 function events:CHAT_MSG_RAID_LEADER(msg, author)
-  FALoot:parseChat(msg, author)
+  CM.Trigger("RAID", author, msg);
 end
 function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
-  if channelName == "aspects" then
-    if not msg then
-      return;
-    end
-    local itemLink = string.match(msg, SD.HYPERLINK_PATTERN);
-    if not itemLink then
-      return;
-    end
-    local itemString = U.ItemLinkStrip(itemLink);
-    local msg = string.match(msg, SD.HYPERLINK_PATTERN.."(.+)"); -- now remove the link
-    if not msg or msg == "" then
-      return;
-    end
-    local msg = string.lower(msg) -- put in lower case
-    local msg = " "..string.gsub(msg, "[/,]", " ").." "
-    if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
-      if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-        FALoot:sendMessage(ADDON_MSG_PREFIX, {
-          ["reqVersion"] = ADDON_MVERSION,
-          ["end"] = itemString,
-        }, "RAID")
-      end
-      FALoot:itemEnd(itemString);
-    end
-  end
+  CM.Trigger("CHANNEL", author, msg);
 end
 function events:CHAT_MSG_WHISPER(msg, author)
-  if tellsInProgress then
-    FALoot:parseWhisper(msg, author);
-  end
+  CM.Trigger("WHISPER", author, msg);
 end
 function events:CHAT_MSG_ADDON(prefix, msg, channel, sender)
   if prefix == A.MSG_PREFIX then

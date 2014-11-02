@@ -4,7 +4,7 @@ local SD = A.sData;
 local PD = A.pData;
 local O = A.options;
 local E = A.events;
-local M = A.messages;
+local AM = A.addonMessages;
 local F = A.functions;
 local UI = A.UI;
 
@@ -691,7 +691,7 @@ end)
 
 -- === Loot Msg Handler =======================================================
 
-M.Register("loot", function(channel, sender, loot)
+AM.Register("loot", function(channel, sender, loot)
   if not A.isEnabled() then
     return;
   end

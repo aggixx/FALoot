@@ -39,23 +39,58 @@ E.Trigger = function(event, ...)
   
   if E.list[event] then
     for i=1,#E.list[event] do
-      A.util.debug('Calling "'..event..'" function #'..i..'.', 3);
       E.list[event][i](...);
     end
   end
 end
 
 --[[
-   Define messages, events subfunction
+   Define chat messages
+   
+   A single unique event may have several methods called when it is triggered. These methods
+   cannot be unregistered once registered.
+--]]
+A.chatMessages = {};
+local CM = A.chatMessages;
+CM.list = {};
+
+CM.Register = function(channel, func)
+  if type(channel) ~= "string" then
+    error("events.Register passed a non-string value for channel");
+    return;
+  elseif type(func) ~= "function" then
+    error("events.Register passed a non-function value for func");
+    return;
+  end
+  
+  if not CM.list[channel] then
+    CM.list[channel] = {};
+  end
+  table.insert(CM.list[channel], func);
+  
+  -- Return the ID of the newly inserted function
+  return #CM.list[channel];
+end
+
+CM.Trigger = function(channel, sender, msg)
+  if CM.list[channel] then
+    for i=1,#CM.list[channel] do
+      CM.list[channel][i](sender, msg);
+    end
+  end
+end
+
+--[[
+   Define addon messages
 
    Each unique message type may be set to have exactly one methods called when it is triggered.
    A method can be unregistered by calling the Unregister() method on the event.
--]]
-A.messages = {};
-local M = A.messages;
-M.list = {};
+--]]
+A.addonMessages = {};
+local AM = A.addonMessages;
+AM.list = {};
 
-M.Register = function(event, func)
+AM.Register = function(event, func)
   if type(event) ~= "string" then
     error("messages.Register passed a non-string value for event");
     return;
@@ -64,18 +99,18 @@ M.Register = function(event, func)
     return;
   end
   
-  M.list[event] = func;
+  AM.list[event] = func;
 end
 
-M.Unregister = function(event)
-  M.list[event] = nil;
+AM.Unregister = function(event)
+  AM.list[event] = nil;
 end
 
-M.Trigger = function(mEvent, channel, sender, ...)
+AM.Trigger = function(mEvent, channel, sender, ...)
   A.util.debug('Message event "'..mEvent..'" triggered.', 2);
   
-  if M.list[mEvent] then
-    M.list[mEvent](channel, sender, ...);
+  if AM.list[mEvent] then
+    AM.list[mEvent](channel, sender, ...);
   end
 end
 
