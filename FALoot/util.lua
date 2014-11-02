@@ -137,17 +137,79 @@ U.ItemLinkStrip = function(itemLink)
   end
 end
 
-U.ItemLinkAssemble = function(itemString)
-  if string.match(itemString, "^%d+:%-?%d+") then
-    local itemId, suffixId, srcGUID = string.match(itemString, "^(%d+):(%-?%d+)");
-    local fullItemString = "item:"..itemId..":0:0:0:0:0:"..suffixId;
-    local _, link = GetItemInfo(fullItemString);
-    if not link then
-      return;
-    end
-    U.debug(link, 3);
-    return link;
+-- "|cffa335ee|Hitem:105408:4227:4587:0:0:0:0:466856960:90:505:0:0|h[Trident of Corrupted Waters]|h|r"
+
+-- As of 6.0.2:
+-- itemID:enchant:gem1:gem2:gem3:gem4:suffixID:uniqueID:level:upgradeId:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...
+
+U.ItemLinkStrip = function(itemLink)
+  if not itemLink then
+    U.debug("util.ItemLinkStrip was passed a nil value!", 1);
+    return;
+  elseif type(itemLink) ~= "string" then
+    U.debug("util.ItemLinkStrip was passed a non-string value!", 1);
+    return;
   end
+  
+  local itemString = string.match(itemLink, "|c%x+|Hitem:(.-)|h%[.-]|h|r");
+  local out = "";
+  local i = 1;
+  
+  for id in string.gmatch(itemString, "(%-?%d+):?") do
+    id = tonumber(id);
+    
+    if i == 1 -- itemID
+    or i == 7 -- suffixID
+    or i > 12 -- bonusIDs
+    then
+      if i ~= 1 then
+        out = out .. ":";
+      end
+      if i == 7 and id > 60000 then -- ugly hack to account for suffix system
+        id = id - 65536;
+      end
+      out = out .. id;
+    end
+    
+    i = i + 1;
+  end
+  
+  return out;
+end
+
+U.ItemLinkAssemble = function(itemString)
+  local i = 1;
+  local j = 0;
+  local s = "item:";
+  local bonusIDs = "";
+  for id in string.gmatch(itemString, "(%-?%d+):?") do
+    if i == 1 then
+      s = s .. id;
+    elseif i == 2 then
+      s = s .. ":0:0:0:0:0:" .. id;
+    else
+      if i == 3 then
+        s = s .. ":0:0:0:0";
+      end
+      j = j + 1;
+      bonusIDs = bonusIDs .. ":".. id;
+    end
+    
+    i = i + 1;
+  end
+  
+  if j > 0 then
+    s = s .. ":" .. j .. bonusIDs;
+  end
+  
+  U.debug(s, 3);
+      
+  local _, link = GetItemInfo(s);
+  if not link then
+    return;
+  end
+    
+  return link;
 end
 
 U.isNameInGuild = function(name)

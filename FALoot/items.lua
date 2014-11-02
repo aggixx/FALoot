@@ -498,11 +498,6 @@ F.items.add = function(itemString, checkCache)
     return;
   end
   
-  -- Workaround for random suffix items with broken item links
-  local tooltipItemLink = itemLink;
-  itemString = string.gsub(itemString, "%-?%d+$", "0");
-  itemLink = U.ItemLinkAssemble(itemString);
-  
   if SD.table_items[itemString] then
     SD.table_items[itemString]["quantity"] = SD.table_items[itemString]["quantity"] + 1;
     local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
@@ -527,7 +522,7 @@ F.items.add = function(itemString, checkCache)
       ["texture"] = texture,
       ["currentValue"] = 30,
       ["winners"] = {},
-      ["tooltipItemLink"] = tooltipItemLink,
+      ["tooltipItemLink"] = itemLink,
     }
   end
   
