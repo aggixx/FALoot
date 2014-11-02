@@ -30,8 +30,8 @@ local ADDON_NAME = "FALoot";
 	Versioning
      ======================================================= --]]
 
-local ADDON_MVERSION = 6; -- Addons only communicate with users of the same major version.
-local ADDON_REVISION = 3; -- Specific code revision for identification purposes.
+local ADDON_MVERSION = 7; -- Addons only communicate with users of the same major version.
+local ADDON_REVISION = 0; -- Specific code revision for identification purposes.
 
 --[[ =======================================================
 	Libraries
@@ -55,11 +55,8 @@ local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
-local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r";
--- |c COLOR    |H linkType : itemId : enchantId : gemId1 : gemId2 : gemId3 : gemId4 : suffixId : uniqueId  : linkLevel : reforgeId :      :      :      :      :      |h itemName            |h|r
--- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    : ?%d*      : ?%d*      : ?%d* : ?%d* : ?%d* : ?%d* : ?%d* |h .-                  |h|r"
--- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
--- |c ffa335ee |H item     : 96740  : 0         : 0      : 0      : 0      : 0      : 0        : 0         : 90        : 0         : 0                                |h[ Sign of the Bloodied God] |h|r 30
+local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*\124h.-\124h\124r";
+
 local THUNDERFORGED_COLOR = "FFFF8000";
 local PLAYER_REALM = GetRealmName();
 local PLAYER_NAME = UnitName("player") .. "-" .. PLAYER_REALM;
@@ -265,36 +262,71 @@ local function GetCurrentServerTime()
 end
 
 local function ItemLinkStrip(itemLink)
-	if itemLink then
-		local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
-		string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
-		if itemId and suffixId then
-			suffixId = tonumber(suffixId);
-			-- super hacky workaround for blizzard's weird suffixId system
-			if suffixId > 60000 then
-				suffixId = suffixId - 65536;
-			end
-			local s = itemId..":"..suffixId;
-			debug(s, 3);
-			return s;
-		end
-	else
-		debug("ItemLinkStrip was passed a nil value!", 1);
-		return;
-	end
+  if not itemLink then
+    debug("ItemLinkStrip was passed a nil value!", 1);
+    return;
+  elseif type(itemLink) ~= "string" then
+    debug("ItemLinkStrip was passed a non-string value!", 1);
+    return;
+  end
+  
+  local itemString = string.match(itemLink, "|c%x+|Hitem:(.-)|h%[.-]|h|r");
+  local out = "";
+  local i = 1;
+  
+  for id in string.gmatch(itemString, "(%-?%d+):?") do
+    id = tonumber(id);
+    
+    if i == 1 -- itemID
+    or i == 7 -- suffixID
+    or i > 12 -- bonusIDs
+    then
+      if i ~= 1 then
+        out = out .. ":";
+      end
+      if i == 7 and id > 60000 then -- ugly hack to account for suffix system
+        id = id - 65536;
+      end
+      out = out .. id;
+    end
+    
+    i = i + 1;
+  end
+  
+  return out;
 end
 
 local function ItemLinkAssemble(itemString)
-	if string.match(itemString, "^%d+:%-?%d+") then
-		local itemId, suffixId, srcGUID = string.match(itemString, "^(%d+):(%-?%d+)");
-		local fullItemString = "item:"..itemId..":0:0:0:0:0:"..suffixId;
-		local _, link = GetItemInfo(fullItemString);
-		if not link then
-			return;
-		end
-		debug(link, 3);
-		return link;
-	end
+  local i = 1;
+  local j = 0;
+  local s = "item:";
+  local bonusIDs = "";
+  for id in string.gmatch(itemString, "(%-?%d+):?") do
+    if i == 1 then
+      s = s .. id;
+    elseif i == 2 then
+      s = s .. ":0:0:0:0:0:" .. id;
+    else
+      if i == 3 then
+        s = s .. ":0:0:0:0";
+      end
+      j = j + 1;
+      bonusIDs = bonusIDs .. ":".. id;
+    end
+    
+    i = i + 1;
+  end
+  
+  if j > 0 then
+    s = s .. ":" .. j .. bonusIDs;
+  end
+      
+  local _, link = GetItemInfo(s);
+  if not link then
+    return;
+  end
+    
+  return link;
 end
 
 local function isNameInGuild(name)
@@ -2803,13 +2835,12 @@ function events:PLAYER_LOGIN()
 	FALoot:setLeaderUIVisibility();
 
 	if debugOn > 0 then
-		itemAdd("96379:0")
-		itemAdd("96740:0")
-		itemAdd("96740:0")
-		itemAdd("96373:0")
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
-		itemAdd("96384:0")
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"));
+		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"));
+
+		itemAdd("113939:0:450:565:40");
+		itemAdd("113985:0:450:448");
+		itemAdd("113971:0:450:565");
 		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", PLAYER_NAME)
 		--FALoot:itemRequestTakeTells("96740:0");
 		--[[
