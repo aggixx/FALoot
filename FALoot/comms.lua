@@ -16,6 +16,7 @@ local bulkMessages = {};
 
 local selfBlacklist = {
   ["loot"] = true,
+  ["end"] = true,
 };
 
 --[[ ==========================================================================
@@ -101,7 +102,7 @@ function events:CHAT_MSG_RAID_LEADER(msg, author)
   CM.Trigger("RAID", author, msg);
 end
 function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
-  CM.Trigger("CHANNEL", author, msg);
+  CM.Trigger("CHANNEL", author, msg, channelName);
 end
 function events:CHAT_MSG_WHISPER(msg, author)
   CM.Trigger("WHISPER", author, msg);
@@ -145,7 +146,7 @@ function events:CHAT_MSG_ADDON(prefix, msg, channel, sender)
     
     U.debug('Recieved "'..mType..'" message from '..(sender or "Unknown")..".", 1);
     
-    M.Trigger(mType, channel, sender, unpack(msg));
+    AM.Trigger(mType, channel, sender, unpack(msg));
   end
 end
 function events:BN_CHAT_MSG_ADDON(prefix, msg, _, sender)

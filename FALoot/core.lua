@@ -72,10 +72,10 @@ CM.Register = function(channel, func)
   return #CM.list[channel];
 end
 
-CM.Trigger = function(channel, sender, msg)
+CM.Trigger = function(channel, sender, msg, channelName)
   if CM.list[channel] then
     for i=1,#CM.list[channel] do
-      CM.list[channel][i](sender, msg);
+      CM.list[channel][i](sender, msg, channelName);
     end
   end
 end

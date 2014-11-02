@@ -5,6 +5,7 @@ local PD = A.pData;
 local O = A.options;
 local E = A.events;
 local AM = A.addonMessages;
+local CM = A.chatMessages;
 local F = A.functions;
 local UI = A.UI;
 
@@ -544,7 +545,7 @@ F.items.add = function(itemString, checkCache)
   return true
 end
 
---   === items.bid() ==========================================================
+-- === items.bid() ============================================================
 
 F.items.bid = function(itemString, bid)
   bid = tonumber(bid)
@@ -561,7 +562,7 @@ F.items.bid = function(itemString, bid)
   F.items.processBids();
 end
 
---   === items.processBids() ==================================================
+-- === items.processBids() ====================================================
 
 F.items.processBids = function()
   for itemString, v in pairs(SD.table_items) do
@@ -581,6 +582,33 @@ F.items.processBids = function()
   E.Trigger("ITEMWINDOW_STATUS_UPDATE");
 end
 
+-- === items.finish() ============================================================
+
+F.items.finish = function(itemString)
+  if not type(itemString) == "string" then
+    error('Usage: items.finish("itemString")');
+  elseif not SD.table_items[itemString] then
+    return;
+  end
+  
+  SD.table_items[itemString]["status"] = "Ended";
+  
+  if SD.tellsInProgress and SD.tellsInProgress == itemString then
+    SD.tellsInProgress = nil;
+    UI.tellsWindow.frame:Hide();
+  end
+  
+  C_Timer.After(PD.expTime, function()
+    if SD.table_items[itemString]["status"] == "Ended" then
+      SD.table_items[itemString] = nil;
+      E.Trigger("ITEM_UPDATE");
+    end
+  end);
+  
+  E.Trigger("ITEM_UPDATE");
+  --FALoot:generateStatusText();
+end
+
 --[[ ==========================================================================
      FALoot Events
      ========================================================================== --]]
@@ -597,7 +625,7 @@ E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
 
 -- === Item Table Updater =====================================================
 
-E.Register("ITEM_UPDATE", function()
+E.Register("ITEM_UPDATE", function(itemString)
   local t = {};
   
   for i, v in pairs(SD.table_items) do
@@ -661,24 +689,32 @@ E.Register("ITEM_UPDATE", function()
   UI.itemWindow.scrollingTable:SetData(t, false);
   generateIcons();
   
-  if #t >= 8 then
-    UI.itemWindow.tellsButton:ClearAllPoints();
-    UI.itemWindow.tellsButton:SetPoint("TOP", UI.itemBid, "BOTTOM");
-  else
-    UI.itemWindow.tellsButton:ClearAllPoints();
-    UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemBid, "TOP");
+  if UI.itemWindow.tellsButton then
+    if #t >= 8 then
+      UI.itemWindow.tellsButton:ClearAllPoints();
+      UI.itemWindow.tellsButton:SetPoint("TOP", UI.itemWindow.bidButton, "BOTTOM");
+    else
+      UI.itemWindow.tellsButton:ClearAllPoints();
+      UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
+    end
   end
-end)
+  
+  if SD.tellsInProgress and SD.tellsInProgress == itemString then
+    E.Trigger("TELLSWINDOW_UPDATE");
+  end
+end);
 
 -- === Item Select Reaction ===================================================
 
 E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   if item then
-    if (not SD.table_items[item]["status"] or SD.table_items[item]["status"] == "") and not SD.tellsInProgress then
-      --U.debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
-      UI.itemWindow.tellsButton:Enable();
-    else
-      UI.itemWindow.tellsButton:Disable();
+    if UI.itemWindow.tellsButton then
+      if (not SD.table_items[item]["status"] or SD.table_items[item]["status"] == "") and not SD.tellsInProgress then
+        --U.debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
+        UI.itemWindow.tellsButton:Enable();
+      else
+        UI.itemWindow.tellsButton:Disable();
+      end
     end
     
     -- TODO: make this only enable if the item can be bid on
@@ -688,6 +724,12 @@ E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
     UI.itemWindow.bidButton:Disable();
   end
 end)
+
+-- === Item End Msg Handler ===================================================
+
+AM.Register("end", function(channel, sender, item)
+  F.items.finish(item);
+end);
 
 -- === Loot Msg Handler =======================================================
 
@@ -716,6 +758,94 @@ AM.Register("loot", function(channel, sender, loot)
   end
 
   E.Trigger("ITEM_UPDATE");
+end);
+
+-- === Item Status handler ====================================================
+
+CM.Register("RAID", function(sender, msg)
+	local rank = 0;
+	
+	if PD.debugOn == 0 then
+		for i=1,40 do
+			local name, currentRank = U.GetRaidRosterInfo(i);
+			if name == sender then
+				rank = currentRank;
+				break;
+			end
+		end
+	end
+	
+	if not (PD.debugOn > 0 or rank > 0) then
+		return;
+	end
+	
+	local linkless, replaces = string.gsub(msg, SD.HYPERLINK_PATTERN, "");
+	
+	if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
+		local itemLink = string.match(msg, SD.HYPERLINK_PATTERN); -- retrieve itemLink from the message
+		local itemString = U.ItemLinkStrip(itemLink);
+		msg = string.gsub(msg, "x%d+", ""); -- remove any "x2" or "x3"s from the string
+		if not msg then
+			return;
+		end
+		local value = string.match(msg, "]|h|r%s*(.+)"); -- take anything else after the link and any following spaces as the value
+		if not value then
+			return;
+		end
+		value = string.gsub(value, "%s+", " "); -- replace any double spaces with a single space
+		if not value then
+			return;
+		end
+		value = string.lower(value);
+		
+		if SD.table_items[itemString] then
+			if not SD.table_items[itemString]["host"] then
+				SD.table_items[itemString]["host"] = sender;
+			end
+			
+			if string.match(value, "roll") then
+				SD.table_items[itemString]["status"] = "Rolls";
+			elseif string.match(value, "[321]0") then
+				SD.table_items[itemString]["currentValue"] = tonumber(string.match(value, "[321]0"));
+				SD.table_items[itemString]["status"] = "Tells";
+			end
+			
+			E.Trigger("ITEM_UPDATE", itemString);
+			--FALoot:checkBids(); --TODO
+		else
+			U.debug("Hyperlink is not in item table.", 2);
+		end
+	end
+end);
+
+-- === DE'd Item Ender ========================================================
+
+CM.Register("CHANNEL", function(sender, msg, channel)
+	if string.lower(channel) ~= "aspects" then
+		return;
+	end
+	if not msg then
+		return;
+	end
+	
+	local itemLink = string.match(msg, SD.HYPERLINK_PATTERN);
+	if not itemLink then
+		return;
+	end
+	
+	local itemString = U.ItemLinkStrip(itemLink);
+	local msg = string.match(msg, SD.HYPERLINK_PATTERN.."(.+)"); -- now remove the link
+	if not msg or msg == "" then
+		return;
+	end
+	local msg = string.lower(msg) -- put in lower case
+	local msg = " "..string.gsub(msg, "[/,]", " ").." "
+	if string.match(msg, " d%s?e ") or string.match(msg, " disenchant ") then
+		if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
+			F.sendMessage("RAID", nil, true, "end", itemString);
+		end
+		F.items.finish(itemString);
+	end
 end);
 
 --[[ ==========================================================================

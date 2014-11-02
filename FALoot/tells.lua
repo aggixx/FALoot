@@ -15,7 +15,6 @@ local ScrollingTable = LibStub("ScrollingTable");
 SD.table_tells = {};
 
 -- Local variables
-local tellsInProgress;
 local requestPending;
 
 --[[ ==========================================================================
@@ -142,18 +141,18 @@ local function createGUI()
 		
 		flagMouseovers[i]:SetScript("OnEnter", function(self)
 			local num = tonumber(string.match(self:GetName(), "%d$"));
-			if tellsInProgress and table_items[tellsInProgress].tells[num] and (table_items[tellsInProgress].tells[num][5] or 0) > 0 then
+			if SD.tellsInProgress and SD.table_items[SD.tellsInProgress].tells[num] and (SD.table_items[SD.tellsInProgress].tells[num][5] or 0) > 0 then
 				GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
-				local player = table_items[tellsInProgress]["tells"][num][1];
+				local player = SD.table_items[SD.tellsInProgress]["tells"][num][1];
 				local currentServerTime = U.GetCurrentServerTime();
 				
 				GameTooltip:AddLine("Possible MS items won this raid: \n");
 				
-				for j=#table_itemHistory,1,-1 do
-					if currentServerTime-table_itemHistory[j].time <= 60*60*12 then
-						if table_itemHistory[j].winner == player and table_itemHistory[j].bid ~= 20 then
+				for j=#SD.table_itemHistory,1,-1 do
+					if currentServerTime-SD.table_itemHistory[j].time <= 60*60*12 then
+						if SD.table_itemHistory[j].winner == player and SD.table_itemHistory[j].bid ~= 20 then
 							-- Calculate and format time elapsed
-							local eSecs = currentServerTime-table_itemHistory[j].time;
+							local eSecs = currentServerTime-SD.table_itemHistory[j].time;
 							local eMins = math.ceil(eSecs/60);
 							local eHrs  = math.floor(eMins/60);
 							eMins       = eMins - 60*eHrs;
@@ -163,8 +162,8 @@ local function createGUI()
 							end
 							eStr = "~" .. eStr;
 							
-							GameTooltip:AddDoubleLine(U.ItemLinkAssemble(table_itemHistory[j].itemString), eStr);
-							GameTooltip:AddLine("  - Cost: " .. table_itemHistory[j].bid .. " DKP");
+							GameTooltip:AddDoubleLine(U.ItemLinkAssemble(SD.table_itemHistory[j].itemString), eStr);
+							GameTooltip:AddLine("  - Cost: " .. SD.table_itemHistory[j].bid .. " DKP");
 						else
 							U.debug("Entry is not from the appropriate player.", 1);
 						end
@@ -197,20 +196,20 @@ local function createGUI()
 		local selection = tellsTable:GetSelection();
 		if selection then
 			-- Send a chat message with the winner for those that don't have the addon
-			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
+			local winnerNoRealm = string.match(table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+			SendChatMessage(table_items[SD.tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
 			
 			-- Send an addon message for those with the addon
 			local cST = U.GetCurrentServerTime();
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["itemWinner"] = {
-					["itemString"] = tellsInProgress,
-					["winner"] = table_items[tellsInProgress]["tells"][selection][1],
-					["bid"] = table_items[tellsInProgress]["tells"][selection][3],
+					["itemString"] = SD.tellsInProgress,
+					["winner"] = table_items[SD.tellsInProgress]["tells"][selection][1],
+					["bid"] = table_items[SD.tellsInProgress]["tells"][selection][3],
 					["time"] = cST,
 				},
 			}, "RAID");
-			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
+			FALoot:itemAddWinner(SD.tellsInProgress, table_items[SD.tellsInProgress]["tells"][selection][1], table_items[SD.tellsInProgress]["tells"][selection][3], cST);
 			
 			-- Announce winner and bid amount to aspects chat
 			local channels, channelNum = {GetChannelList()};
@@ -222,13 +221,13 @@ local function createGUI()
 			end
 			if channelNum then
 				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
-				local link = table_items[tellsInProgress]["itemLink"];
-				local winner = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-				local bid = table_items[tellsInProgress]["tells"][selection][3];
+				local link = table_items[SD.tellsInProgress]["itemLink"];
+				local winner = string.match(table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+				local bid = table_items[SD.tellsInProgress]["tells"][selection][3];
 				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
 			
-			table.remove(table_items[tellsInProgress]["tells"], selection);
+			table.remove(table_items[SD.tellsInProgress]["tells"], selection);
 		end
 	end);
 	
@@ -278,7 +277,7 @@ end
      Item Functions
      ========================================================================== --]]
 
---   === items.takeTells() ====================================================
+-- === items.takeTells() ======================================================
 
 F.items.takeTells = function(itemString)
   -- itemString must be a string!
@@ -288,7 +287,7 @@ F.items.takeTells = function(itemString)
   
   if SD.table_items[itemString] and not SD.table_items[itemString]["status"] then
     SD.table_items[itemString]["tells"] = {};
-    tellsInProgress = itemString;
+    SD.tellsInProgress = itemString;
     UI.tellsWindow.title:SetText(SD.table_items[itemString]["displayName"]);
     UI.tellsWindow.titleBg:SetWidth((UI.tellsWindow.title:GetWidth() or 0) + 10);
     E.Trigger("TELLS_UPDATE");
@@ -299,7 +298,7 @@ F.items.takeTells = function(itemString)
   end
 end
 
---   === items.requestTakeTells() =============================================
+-- === items.requestTakeTells() ===============================================
 
 F.items.requestTakeTells = function(itemString)
   -- Make sure that this is an item we can actually take tells on before trying to submit a request
@@ -327,7 +326,7 @@ F.items.requestTakeTells = function(itemString)
     error("Raid leader was found, but returned name Unknown.");
   elseif raidLeader then
     -- Set itemString to become the active tells item
-    tellsInProgress = itemString;
+    SD.tellsInProgress = itemString;
     if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and PD.debugOn > 0) then
       -- Ask raid leader for permission to start item
       U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
@@ -336,8 +335,8 @@ F.items.requestTakeTells = function(itemString)
       requestPending = true;
       C_Timer.After(PD.postRequestMaxWait, function()
         if requestPending then
-          U.debug(PD.postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. tellsInProgress .. ") anyway.", 1);
-          F.items.takeTells(tellsInProgress);
+          U.debug(PD.postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. SD.tellsInProgress .. ") anyway.", 1);
+          F.items.takeTells(SD.tellsInProgress);
 	  requestPending = nil;
 	end
       end);
@@ -350,12 +349,241 @@ F.items.requestTakeTells = function(itemString)
     error("Could not find Raid leader.");
   end
 end
-     
-     
 
 --[[ ==========================================================================
      FALoot Events
      ========================================================================== --]]
+     
+-- === Tells Window update =====================================================
+
+E.Register("TELLSWINDOW_UPDATE", function()
+  if not (SD.tellsInProgress and SD.table_items[SD.tellsInProgress]) then
+    return;
+  elseif SD.table_items[SD.tellsInProgress]["status"] == "Ended" then
+    SD.tellsInProgress = nil;
+    UI.tellsWindow.frame:Hide();
+    return;
+  end
+    
+	-- Set rank data
+	GuildRoster()
+	local showOffline = GetGuildRosterShowOffline();
+	SetGuildRosterShowOffline(true);
+
+	for i=1,#SD.table_items[SD.tellsInProgress]["tells"] do
+		local name, rank = SD.table_items[SD.tellsInProgress]["tells"][i][1], SD.table_items[SD.tellsInProgress]["tells"][i][2];
+		
+		if not rank then
+			SD.table_items[SD.tellsInProgress]["tells"][i][2] = "";
+			for j=1,GetNumGuildMembers() do
+				local currentName, rankName = GetGuildRosterInfo(j)
+				if currentName == name then
+					if rankName == "Aspect" or rankName == "Aspects" or rankName == "Dragon" or rankName == "Drake" then
+						SD.table_items[SD.tellsInProgress]["tells"][i][2] = "Drake";
+					elseif rankName == "Whelp" then
+						SD.table_items[SD.tellsInProgress]["tells"][i][2] = "Whelp";
+					else
+						SD.table_items[SD.tellsInProgress]["tells"][i][2] = "Wyrm";
+					end
+					break;
+				end
+			end
+		end
+	end
+
+	SetGuildRosterShowOffline(showOffline);
+
+	-- Count flags
+	local currentServerTime = U.GetCurrentServerTime();
+	for i=1,#SD.table_items[SD.tellsInProgress].tells do
+		local flags = 0;
+		for j=#SD.table_itemHistory,1,-1 do
+			if currentServerTime-SD.table_itemHistory[j].time <= 60*60*12 then
+				if SD.table_itemHistory[j].winner == SD.table_items[SD.tellsInProgress].tells[i][1] and SD.table_itemHistory[j].bid ~= 20 then
+					flags = flags + 1;
+				end
+			else
+				break;
+			end
+		end
+		SD.table_items[SD.tellsInProgress].tells[i][5] = flags;
+	end
+
+	-- Sort table
+	table.sort(SD.table_items[SD.tellsInProgress]["tells"], function(a, b)
+		if a[2] ~= b[2] then
+			if a[2] == "Drake" then
+				return true;
+			elseif b[2] == "Drake" then
+				return false;
+			else
+				if a[2] == "Whelp" then
+					return true;
+				else
+					return false;
+				end
+			end
+		elseif (tonumber(a[4]) or 0) ~= (tonumber(b[4]) or 0) then
+			return (tonumber(a[4]) or 0) > (tonumber(b[4]) or 0);
+		else				
+			return a[3] > b[3];
+		end
+	end)
+
+	-- Make a copy of the item entry so we can make our modifications without affecting the original
+	local t = U.deepCopy(SD.table_items[SD.tellsInProgress]);
+
+	--[[-- Purge any entries that are lower than what we want to display right now
+	local limit = #t["tells"];
+	for i=0,limit-1 do
+		if t["tells"][limit-i][3] < t["currentValue"] then
+			table.remove(t["tells"], limit-i);
+		end
+	end--]]
+
+	-- Set name color
+	for i=1,#t["tells"] do
+		if not string.match(t["tells"][i][1], "|c%x+.|r") then
+			local groupType = (IsInRaid() and "raid") or "party";
+			for j=1,GetNumGroupMembers() do
+				if t["tells"][i][1] == U.UnitName(groupType..j, true) then
+					local _, class = UnitClass(groupType..j);
+					t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. U.UnitName(groupType..j, false) .. "|r";
+					break;
+				end
+			end
+		end
+	end
+
+	local isCompetition;
+	local numWinners = 0;
+	for i, v in pairs(SD.table_items[SD.tellsInProgress]["winners"]) do
+		numWinners = numWinners + #v;
+	end
+
+	-- Colorize bid values
+	if #t["tells"] <= t["quantity"] - numWinners then -- If there's enough items for everyone then just set everything to green
+		for i=1,#t["tells"] do
+			t["tells"][i][3] = "|cFF00FF00" .. t["tells"][i][3] .. "|r";
+		end
+	else
+		local tellsByRank, currentRank, j = {}, nil, 0;
+		if t["currentValue"] > 10 then
+			for i=1,#t["tells"] do
+				if not currentRank or currentRank ~= t["tells"][i][2] then
+					currentRank = t["tells"][i][2];
+					j = j + 1;
+					tellsByRank[j] = {};
+				end
+				table.insert(tellsByRank[j], t["tells"][i][1]);
+			end
+		else
+			tellsByRank[1] = {}
+			for i=1,#t["tells"] do
+				table.insert(tellsByRank[1], t["tells"][i][1]);
+			end
+		end
+		
+		local itemsLeft = t["quantity"] - numWinners;
+		for i=1,#tellsByRank do
+			if #tellsByRank[i] <= itemsLeft then
+				for j=1,#tellsByRank[i] do
+					for k=1,#t["tells"] do
+						if t["tells"][k][1] == tellsByRank[i][j] then
+							t["tells"][k][3] = "|cFF00FF00" .. t["tells"][k][3] .. "|r"
+							break;
+						end
+					end
+				end
+				
+				itemsLeft = itemsLeft - #tellsByRank[i];
+			elseif itemsLeft == 0 then
+				for j=1,#tellsByRank[i] do
+					for k=1,#t["tells"] do
+						if t["tells"][k][1] == tellsByRank[i][j] then
+							t["tells"][k][3] = "|cFFFF0000" .. t["tells"][k][3] .. "|r"
+							break;
+						end
+					end
+				end
+			else
+				-- Find the green threshold
+				for j=1,#t["tells"] do
+					if t["tells"][j][1] == tellsByRank[i][itemsLeft+1] then
+						tellsGreenThreshold = t["tells"][j][3] + 60;
+						break;
+					end
+				end
+				
+				-- Find the yellow threshold
+				for j=1,#t["tells"] do
+					if t["tells"][j][1] == tellsByRank[i][itemsLeft] then
+						tellsYellowThreshold = max(t["tells"][j][3] - 58, t["currentValue"]);
+						break;
+					end
+				end
+				
+				-- Colorize items based on green and yellow thresholds
+				for j=1,#tellsByRank[i] do
+					for k=1,#t["tells"] do
+						if t["tells"][k][1] == tellsByRank[i][j] then
+							tellsRankThreshold = t["tells"][k][2];
+							if t["tells"][k][3] >= tellsGreenThreshold then
+								t["tells"][k][3] = "|cFF00FF00" .. t["tells"][k][3] .. "|r";
+							elseif t["tells"][k][3] >= tellsYellowThreshold then
+								t["tells"][k][3] = "|cFFFFFF00" .. t["tells"][k][3] .. "|r";
+								isCompetition = true;
+							else
+								t["tells"][k][3] = "|cFFFF0000" .. t["tells"][k][3] .. "|r";
+							end
+							break;
+						end
+					end
+				end
+				
+				itemsLeft = 0;
+			end
+		end
+	end
+
+	UI.tellsWindow.scrollingTable:SetData(t["tells"], true);
+
+	-- Set button text and script
+	if isCompetition and SD.table_items[SD.tellsInProgress]["tells"][1][3] >= t["currentValue"] then
+		if UI.tellsWindow.actionButton:GetButtonState() ~= "DISABLED" then
+			UI.tellsWindow.actionButton:Enable();
+			UI.tellsWindow.actionButton:SetText("Roll!");
+			UI.tellsWindow.actionButton:SetScript("OnClick", function(self)
+				SendChatMessage(SD.table_items[SD.tellsInProgress]["itemLink"].." roll", "RAID");
+				self:SetText("Waiting for rolls...");
+				self:Disable();
+			end)
+		end
+	elseif SD.table_items[SD.tellsInProgress]["currentValue"] > 10 then
+		UI.tellsWindow.actionButton:Enable();
+		UI.tellsWindow.actionButton:SetText("Lower to "..SD.table_items[SD.tellsInProgress]["currentValue"]-10);
+		UI.tellsWindow.actionButton:SetScript("OnClick", function()
+			SendChatMessage(SD.table_items[SD.tellsInProgress]["itemLink"].." "..SD.table_items[SD.tellsInProgress]["currentValue"]-10, "RAID");
+		end)
+	else
+		UI.tellsWindow.actionButton:Enable();
+		UI.tellsWindow.actionButton:SetText("Disenchant");
+		UI.tellsWindow.actionButton:SetScript("OnClick", function()
+			local channels, channelNum = {GetChannelList()};
+			for i=1,#channels do
+				if string.lower(channels[i]) == "aspects" then
+					channelNum = channels[i-1];
+					break;
+				end
+			end
+			if channelNum then
+				SendChatMessage(SD.table_items[SD.tellsInProgress]["itemLink"].." disenchant", "CHANNEL", nil, channelNum);
+			end
+		end)
+	end
+
+	UI.tellsWindow.frame:Show();
+end);
 
 -- === Tells Button visibility handler ========================================
 
@@ -365,19 +593,13 @@ E.Register("TELLSBUTTON_UPDATE", function()
 	else
 		UI.itemWindow.tellsButton:Hide();
 	end
-end)
+end);
 
 -- === GUI Initiator ==========================================================
 
 E.Register("PLAYER_LOGIN", function()
 	createGUI();
 	E.Trigger("TELLSBUTTON_UPDATE");
-	
-	-- Horrible kludge to fix tellsButton not anchoring correctly.
-	C_Timer.After(1, function()
-		UI.itemWindow.tellsButton:ClearAllPoints();
-		UI.itemWindow.tellsButton:SetPoint("BOTTOM", UI.itemWindow.bidButton, "TOP");
-	end);
 end);
 
 -- postRequest message handler ================================================
@@ -410,14 +632,14 @@ end);
 -- postReply message handler ==================================================
 
 AM.Register("postReply", function(_, _, allowed)
-  if tellsInProgress and requestPending then
+  if SD.tellsInProgress and requestPending then
     if allowed then
-      U.debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);
-      F.items.takeTells(tellsInProgress);
+      U.debug('Request to post item "' .. SD.tellsInProgress .. '" has been granted. Posting...', 1);
+      F.items.takeTells(SD.tellsInProgress);
     else
-      U.debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
+      U.debug('Request to post item "' .. SD.tellsInProgress .. '" has been denied. Item abandoned.', 1);
       -- cancel the item in progress
-      tellsInProgress = nil;
+      SD.tellsInProgress = nil;
       -- force a button state update
       E.Trigger("TELLSBUTTON_UPDATE");
     end
