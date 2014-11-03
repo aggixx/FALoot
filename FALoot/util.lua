@@ -266,7 +266,7 @@ A.isEnabled = function(overrideDebug)
   
   local _, instanceType = IsInInstance()
   
-  if not isGuildGroup(0.60) then
+  if not U.isGuildGroup(0.60) then
     return nil, "not guild group"
   elseif not U.isMainRaid() then
     return nil, "not enough officers"
