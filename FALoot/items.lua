@@ -9,6 +9,8 @@ local CM = A.chatMessages;
 local F = A.functions;
 local UI = A.UI;
 
+--[[ need to write handler for loot info--]]
+
 -- Call Libraries
 local ScrollingTable = LibStub("ScrollingTable");
 
@@ -600,7 +602,7 @@ F.items.finish = function(itemString)
   end
   
   C_Timer.After(PD.expTime, function()
-    if SD.table_items[itemString]["status"] == "Ended" then
+    if SD.table_items[itemString] and SD.table_items[itemString]["status"] == "Ended" then
       SD.table_items[itemString] = nil;
       E.Trigger("ITEM_UPDATE");
     end
