@@ -12,7 +12,7 @@ function events:ADDON_LOADED(name)
     local s = FALoot_pData or {};
     
     -- Saved Variables
-    PD.debugOn = s.debugOn or 5;    -- Debug threshold
+    PD.debugOn = s.debugOn or 0;    -- Debug threshold
     PD.expTime = s.expTime or 15;   -- Amount of time before an ended item is removed from the window, in seconds.
     PD.autolootToggle = s.autolootToggle;
     PD.autolootKey = s.autolootKey;
