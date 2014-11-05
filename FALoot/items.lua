@@ -390,7 +390,7 @@ local function generateIcons()
             endPrompt = coroutine.create( function()
               U.debug("Ending item "..v["itemLink"]..".", 1);
               if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
-                F.sendMessage("RAID", nil, true, "itemEnd", i);
+                F.sendMessage("RAID", nil, true, "end", i);
               end
               F.items.finish(i);
             end)
