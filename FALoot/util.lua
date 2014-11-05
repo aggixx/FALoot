@@ -209,7 +209,7 @@ U.isGuildGroup = function(threshold)
   local numguildies = 0
   local numOffline = 0
   for i=1,GetNumGroupMembers() do
-    local iname = GetRaidRosterInfo(i)
+    local iname = U.GetRaidRosterInfo(i)
     if iname then
       if U.isNameInGuild(iname) then
         numguildies = numguildies + 1
@@ -264,7 +264,7 @@ A.isEnabled = function(overrideDebug)
     return 1
   end
   
-  local _, instanceType = IsInInstance()
+  local _, instanceType = IsInInstance();
   
   if not U.isGuildGroup(0.60) then
     return nil, "not guild group"
@@ -272,7 +272,7 @@ A.isEnabled = function(overrideDebug)
     return nil, "not enough officers"
   elseif instanceType ~= "raid" then
     return nil, "wrong instance type"
-  elseif not (GetRaidDifficultyID() == 4 or GetRaidDifficultyID() == 6) then
+  elseif not (GetRaidDifficultyID() == 15 or GetRaidDifficultyID() == 16) then
     return nil, "wrong instance difficulty"
   elseif GetNumGroupMembers() < 20 then
     return nil, "not enough group members"
