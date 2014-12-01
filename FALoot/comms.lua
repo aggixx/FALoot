@@ -12,11 +12,14 @@ local libSerialize = LibStub:GetLibrary("AceSerializer-3.0");
 local libCompress = LibStub:GetLibrary("LibCompress");
 local libEncode = libCompress:GetAddonEncodeTable();
 
-local bulkMessages = {};
+local messagePriority = {
+  ["newestVersion"] = "BULK",
+};
 
 local selfBlacklist = {
   ["loot"] = true,
   ["end"] = true,
+  ["newestVersion"] = true,
 };
 
 --[[ ==========================================================================
@@ -25,13 +28,7 @@ local selfBlacklist = {
      
 F.sendMessage = function(dist, target, reqSameVersion, mType, ...)
   -- Determine priority
-  local priority = "NORMAL";
-  for i=1,#bulkMessages do
-    if mType == bulkMessages[i] then
-      priority = "BULK";
-      break;
-    end
-  end
+  local priority = messagePriority[mType] or "NORMAL";
   
   -- Prep data in table form
   local data = {...};
