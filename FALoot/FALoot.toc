@@ -16,5 +16,6 @@ options.lua
 items.lua
 tells.lua
 comms.lua
+version.lua
 
 debug.lua
