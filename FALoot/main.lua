@@ -30,8 +30,8 @@ local ADDON_NAME = "FALoot";
 	Versioning
      ======================================================= --]]
 
-local ADDON_MVERSION = 7; -- Addons only communicate with users of the same major version.
-local ADDON_REVISION = 0; -- Specific code revision for identification purposes.
+local ADDON_MVERSION = 6; -- Addons only communicate with users of the same major version.
+local ADDON_REVISION = 2; -- Specific code revision for identification purposes.
 
 --[[ =======================================================
 	Libraries
@@ -55,11 +55,14 @@ local ADDON_CHAT_HEADER  = "|c" .. ADDON_COLOR .. "FA Loot:|r ";
 local ADDON_MSG_PREFIX = "FALoot";
 local ADDON_DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
-local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*:?%-?%d*\124h.-\124h\124r";
-
+local HYPERLINK_PATTERN = "\124c%x+\124Hitem:%d+:%d+:%d+:%d+:%d+:%d+:%-?%d+:%-?%d+:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*:?%d*\124h.-\124h\124r";
+-- |c COLOR    |H linkType : itemId : enchantId : gemId1 : gemId2 : gemId3 : gemId4 : suffixId : uniqueId  : linkLevel : reforgeId :      :      :      :      :      |h itemName            |h|r
+-- |c %x+      |H item     : %d+    : %d+       : %d+    : %d+    : %d+    : %d+    : %-?%d+   : %-?%d+    : ?%d*      : ?%d*      : ?%d* : ?%d* : ?%d* : ?%d* : ?%d* |h .-                  |h|r"
+-- |c ffa335ee |H item     : 94775  : 4875      : 4609   : 0      : 0      : 0      : 65197    : 904070771 : 89        : 166       : 465                              |h [Beady-Eye Bracers] |h|r"
+-- |c ffa335ee |H item     : 96740  : 0         : 0      : 0      : 0      : 0      : 0        : 0         : 90        : 0         : 0                                |h[ Sign of the Bloodied God] |h|r 30
 local THUNDERFORGED_COLOR = "FFFF8000";
 local PLAYER_REALM = GetRealmName();
-local PLAYER_NAME = UnitName("player") .. "-" .. PLAYER_REALM;
+local PLAYER_NAME = U.UnitName("player") .. "-" .. PLAYER_REALM;
 
 --[[ =======================================================
 	Option Variables
@@ -201,9 +204,9 @@ local function deepcopy(orig)
     if orig_type == 'table' then
         copy = {}
         for orig_key, orig_value in next, orig, nil do
-            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+            copy[U.deepCopy(orig_key)] = U.deepCopy(orig_value)
         end
-        setmetatable(copy, deepcopy(getmetatable(orig)))
+        setmetatable(copy, U.deepCopy(getmetatable(orig)))
     else -- number, string, boolean, etc
         copy = orig
     end
@@ -221,11 +224,11 @@ function deepCompare(t1, t2, ignore_mt)
 	if not ignore_mt and mt and mt.__eq then return t1 == t2 end
 	for k1,v1 in pairs(t1) do
 		local v2 = t2[k1]
-		if v2 == nil or not deepCompare(v1,v2) then return false end
+		if v2 == nil or not U.deepCompare(v1,v2) then return false end
 	end
 	for k2,v2 in pairs(t2) do
 		local v1 = t1[k2]
-		if v1 == nil or not deepCompare(v1,v2) then return false end
+		if v1 == nil or not U.deepCompare(v1,v2) then return false end
 	end
 	return true
 end
@@ -244,7 +247,7 @@ end
 local GetRaidRosterInfo_orig = GetRaidRosterInfo;
 local function GetRaidRosterInfo(index)
 	local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo_orig(index);
-	return (UnitName("raid"..index, true) or name), rank, subgroup, level, class, fileName, zone, online, isDead, role, isML;
+	return (U.UnitName("raid"..index, true) or name), rank, subgroup, level, class, fileName, zone, online, isDead, role, isML;
 end
 
 -- Get current server timestamp
@@ -262,71 +265,36 @@ local function GetCurrentServerTime()
 end
 
 local function ItemLinkStrip(itemLink)
-  if not itemLink then
-    debug("ItemLinkStrip was passed a nil value!", 1);
-    return;
-  elseif type(itemLink) ~= "string" then
-    debug("ItemLinkStrip was passed a non-string value!", 1);
-    return;
-  end
-  
-  local itemString = string.match(itemLink, "|c%x+|Hitem:(.-)|h%[.-]|h|r");
-  local out = "";
-  local i = 1;
-  
-  for id in string.gmatch(itemString, "(%-?%d+):?") do
-    id = tonumber(id);
-    
-    if i == 1 -- itemID
-    or i == 7 -- suffixID
-    or i > 12 -- bonusIDs
-    then
-      if i ~= 1 then
-        out = out .. ":";
-      end
-      if i == 7 and id > 60000 then -- ugly hack to account for suffix system
-        id = id - 65536;
-      end
-      out = out .. id;
-    end
-    
-    i = i + 1;
-  end
-  
-  return out;
+	if itemLink then
+		local _, _, linkColor, linkType, itemId, enchantId, gemId1, gemId2, gemId3, gemId4, suffixId, uniqueId, linkLevel, reforgeId, itemName =
+		string.find(itemLink, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*):%d+|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+		if itemId and suffixId then
+			suffixId = tonumber(suffixId);
+			-- super hacky workaround for blizzard's weird suffixId system
+			if suffixId > 60000 then
+				suffixId = suffixId - 65536;
+			end
+			local s = itemId..":"..suffixId;
+			-- U.debug(s, 3);
+			return s;
+		end
+	else
+		U.debug("ItemLinkStrip was passed a nil value!", 1);
+		return;
+	end
 end
 
 local function ItemLinkAssemble(itemString)
-  local i = 1;
-  local j = 0;
-  local s = "item:";
-  local bonusIDs = "";
-  for id in string.gmatch(itemString, "(%-?%d+):?") do
-    if i == 1 then
-      s = s .. id;
-    elseif i == 2 then
-      s = s .. ":0:0:0:0:0:" .. id;
-    else
-      if i == 3 then
-        s = s .. ":0:0:0:0";
-      end
-      j = j + 1;
-      bonusIDs = bonusIDs .. ":".. id;
-    end
-    
-    i = i + 1;
-  end
-  
-  if j > 0 then
-    s = s .. ":" .. j .. bonusIDs;
-  end
-      
-  local _, link = GetItemInfo(s);
-  if not link then
-    return;
-  end
-    
-  return link;
+	if string.match(itemString, "^%d+:%-?%d+") then
+		local itemId, suffixId, srcGUID = string.match(itemString, "^(%d+):(%-?%d+)");
+		local fullItemString = "item:"..itemId..":0:0:0:0:0:"..suffixId;
+		local _, link = GetItemInfo(fullItemString);
+		if not link then
+			return;
+		end
+		U.debug(link, 3);
+		return link;
+	end
 end
 
 local function isNameInGuild(name)
@@ -353,9 +321,9 @@ local function isGuildGroup(threshold)
 	local numguildies = 0
 	local numOffline = 0
 	for i=1,GetNumGroupMembers() do
-		local iname = GetRaidRosterInfo(i)
+		local iname = U.GetRaidRosterInfo(i)
 		if iname then
-			if isNameInGuild(iname) then
+			if U.isNameInGuild(iname) then
 				numguildies = numguildies + 1
 			end
 			if not UnitIsConnected(groupType..i) then
@@ -363,100 +331,80 @@ local function isGuildGroup(threshold)
 			end
 		end
 	end
-	local ratio = numguildies / ( GetNumGroupMembers() - numOffline );
-	
-	if threshold then
-  	return ratio >= threshold;
-  else
-    return ratio;
-  end
+	if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
+		return true
+	else
+		return false
+	end
 end
 
 local function isMainRaid()
-	-- Refresh guild roster
 	GuildRoster()
-	
-	-- Set some variables
-	local groupType = (IsInRaid() and "raid") or "party";
-	local officers, drakes = 0, 0;
-	
-	-- Filter to only online players & save current setting for later restoration
-	local showOffline = GetGuildRosterShowOffline(); 
-	
-	-- Loop through the raid and count the number of drakes and aspects
+	local groupType
+	if IsInRaid() then
+		groupType = "raid"
+	else
+		groupType = "party"
+	end
+	local aspects, drakes = 0, 0;
+	local showOffline = GetGuildRosterShowOffline();
+	SetGuildRosterShowOffline(false);
 	for i=1,40 do
 		if UnitExists(groupType..i) then
-			local uName = GetRaidRosterInfo(i)
-			
-			-- Set Show Offline bool appropriately
-			local numOnline;
-			if UnitIsConnected(groupType..i) then
-				SetGuildRosterShowOffline(false);
-				numOnline = select(2, GetNumGuildMembers());
-			else
-				SetGuildRosterShowOffline(true);
-				numOnline = GetNumGuildMembers();
-			end
-			
-			for j=1,numOnline do
-				local gName, rank = GetGuildRosterInfo(j)
-				if uName == gName then
-					-- Increment appropriate counter
-					if rank == "Aspect" or rank == "Aspects" or rank == "Dragon" then
-						officers = officers + 1;
-					elseif rank == "Drake" then
-						drakes = drakes + 1;
-					end
-					
-					-- Move on to the next unit
-					break;
+			local name = U.GetRaidRosterInfo(i)
+			local _, onlineguildies = GetNumGuildMembers()
+			for j=1,onlineguildies do
+				local _, rankName, rankIndex = GetGuildRosterInfo(j)
+				if string.match(rankName, "Aspect") then
+					aspects = aspects + 1
+				elseif  string.match(rankName, "Drake") then
+					drakes = drakes + 1
 				end
 			end
 		end
 	end
-
-	-- Restore show offline setting
 	SetGuildRosterShowOffline(showOffline);
-	
-	return officers >= 2 and drakes >= 4;
+	if aspects >= 2 and drakes >= 5 then
+		return true
+	else
+		return false
+	end
 end
 
 function FALoot:addonEnabled(overrideDebug)
 	if not overrideDebug and debugOn > 0 then
-		return 1;
+		return 1
 	end
+	
+	local _, instanceType = IsInInstance()
 	
 	if not isGuildGroup(0.60) then
-		return nil, "not guild group";
-	elseif not isMainRaid() then
-		return nil, "not enough officers";
+		return nil, "not guild group"
+	elseif not U.isMainRaid() then
+		return nil, "not enough officers"
+	elseif instanceType ~= "raid" then
+		return nil, "wrong instance type"
+	elseif not (GetRaidDifficultyID() == 4 or GetRaidDifficultyID() == 6) then
+		return nil, "wrong instance difficulty"
+	elseif GetNumGroupMembers() < 20 then
+		return nil, "not enough group members"
+	else
+		return 1
 	end
-	
-	local _, iType, iDifficulty = GetInstanceInfo()
-	
-	if iType ~= "raid" then
-		return nil, "wrong instance type";
-	elseif not ( iDifficulty == 15 or iDifficulty == 16 ) then -- Heroic or Mythic
-		return nil, "wrong instance difficulty";
-	elseif GetNumGroupMembers() < 15 then
-		return nil, "not enough group members";
-	end
-	
-	return 1;
 end
 
 function FALoot:checkFilters(itemString, checkItemLevel)
 	-- itemString must be a string!
 	if type(itemString) ~= "string" then
-		debug("checkFilters was passed a non-string value!", 1);
+		U.debug("checkFilters was passed a non-string value!", 1);
 		return;
 	end
 
 	--this is the function that determines if an item should or shouldn't be added to the window and/or announced
-	local itemLink = ItemLinkAssemble(itemString);
+	local itemLink = U.ItemLinkAssemble(itemString);
 	
 	if not itemLink then
-		debug("checkFilters: Unable to retrieve itemLink! itemString = "..itemString..", itemLink = "..(itemLink or ""), 1);
+		U.debug("checkFilters: Unable to retrieve itemLink! itemString = "..itemString..", itemLink = "..(itemLink or ""), 1);
 		return false;
 	end
 	
@@ -469,13 +417,13 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	
 	-- check if the quality of the item is high enough
 	if quality ~= 4 then -- TODO: Add customizable quality filters
-		debug("Quality of "..itemLink.." is too low.", 1);
+		U.debug("Quality of "..itemLink.." is too low.", 1);
 		return false
 	end
 		
 	-- check if the class of the item is appropriate
 	if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
-		debug("Class of "..itemLink.." is incorrect.", 1)
+		U.debug("Class of "..itemLink.." is incorrect.", 1)
 		return false
 	end
 	
@@ -483,7 +431,7 @@ function FALoot:checkFilters(itemString, checkItemLevel)
 	if checkItemLevel then
 		local playerTotal = GetAverageItemLevel()
 		if playerTotal - ilevel > 60 then -- if the item is more than 60 levels below the player
-			debug("Item Level of "..itemLink.." is too low.", 1);
+			U.debug("Item Level of "..itemLink.." is too low.", 1);
 			return false
 		end
 	end
@@ -500,18 +448,18 @@ end
      ======================================================= --]]
 
 local function itemAdd(itemString, checkCache)
-	debug("itemAdd(), itemString = "..itemString, 1);
+	U.debug("itemAdd(), itemString = "..itemString, 1);
 	-- itemString must be a string!
 	if type(itemString) ~= "string" then
-		debug("itemAdd was passed a non-string value!", 1);
+		U.debug("itemAdd was passed a non-string value!", 1);
 		return;
 	end
 	
-	local itemLink = ItemLinkAssemble(itemString);
+	local itemLink = U.ItemLinkAssemble(itemString);
 	
 	-- caching stuff
 	if itemLink then
-		debug("Item is cached, continuing.", 1);
+		U.debug("Item is cached, continuing.", 1);
 		for i=1,#table_itemQuery do
 			if table_itemQuery[i] == itemString then
 				table.remove(table_itemQuery, i)
@@ -520,24 +468,24 @@ local function itemAdd(itemString, checkCache)
 		end
 	else
 		if not checkCache then
-			debug("Item is not cached, requesting item info from server.", 1);
+			U.debug("Item is not cached, requesting item info from server.", 1);
 			table.insert(table_itemQuery, itemString);
 		else
-			debug("Item is not cached, aborting.", 1);
+			U.debug("Item is not cached, aborting.", 1);
 		end
 		return;
 	end
 	
 	-- check if item passes the filter
-	if not FALoot:checkFilters(itemString, true) then
-		debug(itemString.." did not pass the item filter.", 2);
+	if not U.checkFilters(itemString, true) then
+		U.debug(itemString.." did not pass the item filter.", 2);
 		return;
 	end
 	
 	-- Workaround for random suffix items with broken item links
 	local tooltipItemLink = itemLink;
 	itemString = string.gsub(itemString, "%-?%d+$", "0");
-	itemLink = ItemLinkAssemble(itemString);
+	itemLink = U.ItemLinkAssemble(itemString);
 	
 	if table_items[itemString] then
 		table_items[itemString]["quantity"] = table_items[itemString]["quantity"] + 1;
@@ -570,7 +518,7 @@ local function itemAdd(itemString, checkCache)
 	if not frame:IsShown() then
 		if UnitAffectingCombat("PLAYER") then
 			showAfterCombat = true
-			debug(itemLink.." was found but the player is in combat.");
+			U.debug(itemLink.." was found but the player is in combat.");
 		else
 			frame:Show()
 		end
@@ -585,10 +533,10 @@ function FALoot:itemAdd(itemString, checkCache)
 end
 
 function FALoot:itemTakeTells(itemString)
-	debug("itemTakeTells(), itemString = "..itemString, 1);
+	U.debug("itemTakeTells(), itemString = "..itemString, 1);
 	-- itemString must be a string!
 	if type(itemString) ~= "string" then
-		debug("itemTakeTells was passed a non-string value!", 1);
+		U.debug("itemTakeTells was passed a non-string value!", 1);
 		return;
 	end
 	
@@ -601,16 +549,16 @@ function FALoot:itemTakeTells(itemString)
 		SendChatMessage(table_items[itemString]["itemLink"].." 30", "RAID");
 		tellsButton:Disable();
 	else
-		debug("Item does not exist or is already in progress!", 1);
+		U.debug("Item does not exist or is already in progress!", 1);
 	end
 end
 
 function FALoot:itemRequestTakeTells(itemString)
-	debug("itemRequestTakeTells("..itemString..")", 1);
+	U.debug("itemRequestTakeTells("..itemString..")", 1);
 
 	-- Make sure that this is an item we can actually take tells on before trying to submit a request
 	if not table_items[itemString] or table_items[itemString]["status"] or table_items[itemString]["host"] then
-		debug("Invalid itemString, aborting.", 1);
+		U.debug("Invalid itemString, aborting.", 1);
 		return;
 	end
 	-- Acquire name of raid leader
@@ -618,7 +566,7 @@ function FALoot:itemRequestTakeTells(itemString)
 	if IsInRaid() then
 		for i=1,GetNumGroupMembers() do
 			if UnitIsGroupLeader("raid"..i) and UnitIsConnected("raid"..i) then
-				raidLeader = UnitName("raid"..i, true);
+				raidLeader = U.UnitName("raid"..i, true);
 				raidLeaderUnitID = "raid"..i;
 				break;
 			end
@@ -630,14 +578,14 @@ function FALoot:itemRequestTakeTells(itemString)
 		return;
 	end
 	if raidLeader and raidLeader == "Unknown" then
-		debug("Raid leader was found, but returned name Unknown. Aborting.", 1);
+		U.debug("Raid leader was found, but returned name Unknown. Aborting.", 1);
 		return;
 	elseif raidLeader then
 		-- Set itemString to become the active tells item
 		tellsInProgress = itemString;
 		if (raidLeaderUnitID and UnitIsConnected(raidLeaderUnitID)) or (not IsInRaid() and debugOn > 0) then
 			-- Ask raid leader for permission to start item
-			debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
+			U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postRequest"] = itemString,
 			}, "WHISPER", raidLeader);
@@ -645,11 +593,11 @@ function FALoot:itemRequestTakeTells(itemString)
 			postRequestTimer = GetTime();
 		else
 			-- Leader is offline, so let's just go ahead post the item.
-			debug('Raid leader "' .. raidLeader .. '" is offline, skipping redundancy check.', 1);
+			U.debug('Raid leader "' .. raidLeader .. '" is offline, skipping redundancy check.', 1);
 			FALoot:itemTakeTells(itemString);
 		end
 	else
-		debug("Raid leader not found. Aborting.", 1);
+		U.debug("Raid leader not found. Aborting.", 1);
 		return;
 	end
 end
@@ -660,7 +608,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	if serialized then
 		text = serialized
 	else
-		debug("Serialization of data failed!");
+		U.debug("Serialization of data failed!");
 		return false, "serialization of data failed";
 	end
 	
@@ -670,7 +618,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	if compressed then
 		text = compressed
 	else
-		debug("Compression of data failed!");
+		U.debug("Compression of data failed!");
 		return false, "compression of data failed";
 	end
 	--]]
@@ -680,7 +628,7 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	if encoded then
 		text = encoded
 	else
-		debug("Encoding of data failed!");
+		U.debug("Encoding of data failed!");
 		return false, "encoding of data failed";
 	end
 	
@@ -688,14 +636,14 @@ function FALoot:sendMessage(prefix, text, distribution, target, prio, validateTa
 	if validateTarget and string.lower(distribution) == "WHISPER" then
 		local groupType = ("raid" and IsInRaid()) or "party";
 		for i=1,GetNumGroupMembers() do
-			if UnitName(groupType..i, true) == target then
+			if U.UnitName(groupType..i, true) == target then
 				if not UnitIsConnected(groupType..i) then
 					local mType;
 					for i,v in pairs(text) do
 						mType = i;
 						break;
 					end
-					debug("The target of message type "..(mType or "unknown")..' "'..target..'" is offline.', 2);
+					U.debug("The target of message type "..(mType or "unknown")..' "'..target..'" is offline.', 2);
 					return false, "target of message is offline";
 				end
 				break;
@@ -777,7 +725,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	if prefix ~= ADDON_MSG_PREFIX or not text then
 		return;
 	end
-	debug("Recieved addon message from "..(sender or "Unknown")..".", 1);
+	U.debug("Recieved addon message from "..(sender or "Unknown")..".", 1);
 	
 	-- Decode the data
 	local t = libEncode:Decode(text)
@@ -787,7 +735,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	if success then
 		t = deserialized
 	else
-		debug("Deserialization of data failed.");
+		U.debug("Deserialization of data failed.");
 		return
 	end
 	
@@ -819,12 +767,12 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			end
 		end
 		if not allow then
-			debug("Message from self and not of a whitelisted type, discarding.", 1);
+			U.debug("Message from self and not of a whitelisted type, discarding.", 1);
 			return;
 		end
 	end
 	
-	debug(t, 2);
+	U.debug(t, 2);
 	
 	-- If the message is version-specific and from a different version then block it.
 	if t["reqVersion"] and t["reqVersion"] ~= ADDON_MVERSION then
@@ -832,32 +780,32 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	end
 	
 	if t["loot"] then
-		if FALoot:addonEnabled() then
+		if A.isEnabled() then
 			local loot = t["loot"]
 			
 			-- check data integrity
 			for i, v in pairs(loot) do
 				if not (v["checkSum"] and v["checkSum"] == #v) then
-					debug("Loot data recieved via an addon message failed the integrity check.");
+					U.debug("Loot data recieved via an addon message failed the integrity check.");
 					return;
 				end
 			end
 			
-			debug("Loot data is valid.", 2);
+			U.debug("Loot data is valid.", 2);
 			
 			for i, v in pairs(loot) do
 				if not hasBeenLooted[i] then
 					for j=1,#v do
-						debug("Added "..v[j].." to the loot window via addon message.", 2);
+						U.debug("Added "..v[j].." to the loot window via addon message.", 2);
 						itemAdd(v[j]);
 					end
 					hasBeenLooted[i] = true;
 				else
-					debug(i.." has already been looted.", 2);
+					U.debug(i.." has already been looted.", 2);
 				end
 			end
 			
-			FALoot:itemTableUpdate();
+			E.Trigger("ITEM_UPDATE");
 		end
 	elseif t["end"] then
 		FALoot:itemEnd(t["end"])
@@ -869,7 +817,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			if senderRev then
 				-- Remove realm suffix
 				sender = string.match(sender, "^(.-)%-.+");
-				debug("Who response recieved from "..sender..".", 1);
+				U.debug("Who response recieved from "..sender..".", 1);
 				if not table_who[senderRev] then
 					table_who[senderRev] = {}
 					table.insert(table_who, senderRev)
@@ -885,7 +833,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 	elseif t["update"] then
 		if distribution == "WHISPER" then
 			if not updateMsg then
-				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
+				U.debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
 		elseif distribution == "RAID" or distribution == "GUILD" then
@@ -895,7 +843,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 					["update"] = true,
 				}, "WHISPER", sender, nil, distribution == "RAID");
 			elseif not updateMsg and ADDON_REVISION < senderRev then
-				debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
+				U.debug("Your current version of "..ADDON_NAME.." is not up to date! Please go to "..ADDON_DOWNLOAD_URL.." to update.");
 				updateMsg = true
 			end
 		end
@@ -913,42 +861,42 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			}, "WHISPER", sender, nil, true)
 		end
 		foodUpdateTo[sender] = true;
-		debug("foodTrackOn recieved from "..sender, 1);
+		U.debug("foodTrackOn recieved from "..sender, 1);
 	elseif t["foodTrackOff"] then
 		foodUpdateTo[sender] = nil;
-		debug("foodTrackOff recieved from "..sender, 1);
+		U.debug("foodTrackOff recieved from "..sender, 1);
 	elseif t["foodCount"] and type(t["foodCount"]) == "number" then
 		raidFoodCount[sender] = t["foodCount"];
-		debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
+		U.debug("foodCount recieved from "..sender..": "..t["foodCount"], 1);
 		
 		updatePieChart();
 	elseif t["postRequest"] then
 		local requestedItem = t["postRequest"];
 		-- validate input
 		if requestedItem then
-			debug('Received postRequest from "' .. sender .. '" on item "' .. requestedItem .. '".', 1);
+			U.debug('Received postRequest from "' .. sender .. '" on item "' .. requestedItem .. '".', 1);
 		else
-			debug("Received postRequest with no itemString, aborting.", 1);
+			U.debug("Received postRequest with no itemString, aborting.", 1);
 			return;
 		end
 		
 		if not table_items[requestedItem] then
-			debug("Item does not exist, denying request.", 1);
+			U.debug("Item does not exist, denying request.", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
 			}, "WHISPER", sender, nil, true);
 		elseif table_items[requestedItem]["status"] then
-			debug("Item is already in progress, denying request.", 1);
+			U.debug("Item is already in progress, denying request.", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
 			}, "WHISPER", sender, nil, true);
 		elseif table_items[requestedItem]["host"] then
-			debug('Item has already been claimed for posting by "' .. table_items[requestedItem]["host"] .. '", denying request.', 1);
+			U.debug('Item has already been claimed for posting by "' .. table_items[requestedItem]["host"] .. '", denying request.', 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = false,
 			}, "WHISPER", sender, nil, true);
 		else
-			debug('Request granted.', 1);
+			U.debug('Request granted.', 1);
 			table_items[requestedItem]["host"] = sender;
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["postReply"] = true,
@@ -956,10 +904,10 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		end
 	elseif t["postReply"] ~= nil and tellsInProgress and postRequestTimer then
 		if t["postReply"] == true then
-			debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);
+			U.debug('Request to post item "' .. tellsInProgress .. '" has been granted. Posting...', 1);
 			FALoot:itemTakeTells(tellsInProgress);
 		elseif t["postReply"] == false then
-			debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
+			U.debug('Request to post item "' .. tellsInProgress .. '" has been denied. Item abandoned.', 1);
 			-- cancel the item in progress
 			tellsInProgress = nil;
 			-- force a button state update
@@ -981,7 +929,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			count = #table_itemHistory;
 		else
 			for i=#table_itemHistory,1,-1 do
-				if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+				if U.GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
 					count = count + 1;
 				else
 					break;
@@ -990,24 +938,24 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		end
 		
 		if count > t[mType] then
-			debug("Recieved "..mType..", replying with count "..count..".", 1);
+			U.debug("Recieved "..mType..", replying with count "..count..".", 1);
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["historySyncCount"] = count,
 			}, "WHISPER", sender, nil, true);
 		else
-			debug("Recieved "..mType.." but count is equal or lower.", 2);
+			U.debug("Recieved "..mType.." but count is equal or lower.", 2);
 		end
 	elseif t["historySyncCount"] and itemHistorySync.p1 and not itemHistorySync.p2 then
-		debug("Recieved historySyncCount of "..t["historySyncCount"].." from "..sender..".", 2);
+		U.debug("Recieved historySyncCount of "..t["historySyncCount"].." from "..sender..".", 2);
 		table.insert(itemHistorySync.p1, {sender, t["historySyncCount"]});
 	elseif t["historySyncStart"] ~= nil then
-		debug("Recieved historySyncStart from "..sender..", commencing info dump!", 1);
+		U.debug("Recieved historySyncStart from "..sender..", commencing info dump!", 1);
 		local items = {};
 		if t["historySyncStart"] then
-			items = deepcopy(table_itemHistory);
+			items = U.deepCopy(table_itemHistory);
 		else
 			for i=#table_itemHistory,1,-1 do
-				if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+				if U.GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
 					table.insert(items, 1, table_itemHistory[i]);
 				else
 					break;
@@ -1018,7 +966,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 			["historySyncData"] = items,
 		}, "WHISPER", sender, "BULK", true);
 	elseif t["historySyncData"] and itemHistorySync.p2 then
-		debug("Received historySyncData from "..sender..", parsing...", 1);
+		U.debug("Received historySyncData from "..sender..", parsing...", 1);
 		
 		-- Shorten things up a tad
 		local t = t["historySyncData"];
@@ -1032,7 +980,7 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 				end
 			end
 			if not foundMatch then
-				debug('Sending historySyncVerifyRequest for item "'..t[i].itemString..'".', 2);
+				U.debug('Sending historySyncVerifyRequest for item "'..t[i].itemString..'".', 2);
 				FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerifyRequest"] = t[i],
 				}, "RAID", nil, "BULK");
@@ -1043,34 +991,34 @@ function FALoot:OnCommReceived(prefix, text, distribution, sender)
 		
 		itemHistorySync.p2.time = GetTime();
 	elseif t["historySyncVerifyRequest"] then
-		debug("Recieved historySyncVerifyRequest from "..sender..".", 1);
-		debug(t["historySyncVerifyRequest"], 3);
+		U.debug("Recieved historySyncVerifyRequest from "..sender..".", 1);
+		U.debug(t["historySyncVerifyRequest"], 3);
 
 		for i=#table_itemHistory,1,-1 do
-			if deepCompare(t["historySyncVerifyRequest"], table_itemHistory[i]) then
+			if U.deepCompare(t["historySyncVerifyRequest"], table_itemHistory[i]) then
 				local success, reason = FALoot:sendMessage(ADDON_MSG_PREFIX, {
 					["historySyncVerify"] = t["historySyncVerifyRequest"],
 				}, "WHISPER", sender, nil, true);
 				if success then
-					debug("Verified request.", 1);
+					U.debug("Verified request.", 1);
 				else
-					debug("Attempted to verify request, but "..reason..".", 1);
+					U.debug("Attempted to verify request, but "..reason..".", 1);
 				end
 				break;
 			end
 		end
 	elseif t["historySyncVerify"] and itemHistorySync.p2 then
-		debug("Received historySyncVerify from "..sender..".", 1);
+		U.debug("Received historySyncVerify from "..sender..".", 1);
 		for i=1,#itemHistorySync.p2 do
-			local compare = deepcopy(itemHistorySync.p2[i]);
+			local compare = U.deepCopy(itemHistorySync.p2[i]);
 			compare.verifies = nil;
 		
-			if deepCompare(t["historySyncVerify"], compare) then
+			if U.deepCompare(t["historySyncVerify"], compare) then
 				itemHistorySync.p2[i].verifies = itemHistorySync.p2[i].verifies + 1;
 				
 				-- if we have enough verifies, let's go ahead and insert it now
 				if itemHistorySync.p2[i].verifies >= 5 or (debugOn > 0 and itemHistorySync.p2[i].verifies >= 1) then
-					debug("Entry has received enough verifies, adding to itemHistory.", 1);
+					U.debug("Entry has received enough verifies, adding to itemHistory.", 1);
 					for j=#table_itemHistory,1,-1 do
 						if table_itemHistory[j].time < compare.time then
 							table.insert(table_itemHistory, j+1, compare);
@@ -1174,10 +1122,10 @@ function FALoot:createGUI()
 			end
 		end
 		bidPrompt = coroutine.create(function(self)
-			debug("Bid recieved, resuming coroutine.", 1)
+			U.debug("Bid recieved, resuming coroutine.", 1)
 			local bid = tonumber(promptBidValue)
 			if bid < 30 and bid ~= 10 and bid ~= 20 then
-				debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
+				U.debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
 				return
 			end
 			if bid % 2 ~= 0 then
@@ -1185,14 +1133,14 @@ function FALoot:createGUI()
 				if bid % 2 == 1 then
 					bid = bid - 1
 				end
-				debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
+				U.debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
 			end
-			debug("Passed info onto FALoot:itemBid().", 1);
+			U.debug("Passed info onto FALoot:itemBid().", 1);
 			FALoot:itemBid(itemString, bid)
 		end)
 		StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
 		StaticPopup_Show("FALOOT_BID");
-		debug("Querying for bid, coroutine paused.", 1);
+		U.debug("Querying for bid, coroutine paused.", 1);
 	end);
 	bidButton:Disable();
 
@@ -1376,7 +1324,7 @@ function FALoot:createGUI()
 			if tellsInProgress and table_items[tellsInProgress].tells[num] and (table_items[tellsInProgress].tells[num][5] or 0) > 0 then
 				GameTooltip:SetOwner(self, "ANCHOR_CURSOR");
 				local player = table_items[tellsInProgress]["tells"][num][1];
-				local currentServerTime = GetCurrentServerTime();
+				local currentServerTime = U.GetCurrentServerTime();
 				
 				GameTooltip:AddLine("Possible MS items won this raid: \n");
 				
@@ -1394,10 +1342,10 @@ function FALoot:createGUI()
 							end
 							eStr = "~" .. eStr;
 							
-							GameTooltip:AddDoubleLine(ItemLinkAssemble(table_itemHistory[j].itemString), eStr);
+							GameTooltip:AddDoubleLine(U.ItemLinkAssemble(table_itemHistory[j].itemString), eStr);
 							GameTooltip:AddLine("  - Cost: " .. table_itemHistory[j].bid .. " DKP");
 						else
-							debug("Entry is not from the appropriate player.", 1);
+							U.debug("Entry is not from the appropriate player.", 1);
 						end
 					else
 						break;
@@ -1426,9 +1374,13 @@ function FALoot:createGUI()
 	tellsFrameAwardButton:SetText("Award Item")
 	tellsFrameAwardButton:SetScript("OnClick", function(frame)
 		local selection = tellsTable:GetSelection();
-		if selection and tellsInProgress then
+		if selection then
+			-- Send a chat message with the winner for those that don't have the addon
+			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
+			
 			-- Send an addon message for those with the addon
-			local cST = GetCurrentServerTime();
+			local cST = U.GetCurrentServerTime();
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["itemWinner"] = {
 					["itemString"] = tellsInProgress,
@@ -1437,14 +1389,7 @@ function FALoot:createGUI()
 					["time"] = cST,
 				},
 			}, "RAID");
-			
-			-- Calling the next function fucks up the value for some reason I don't understand so lets save a copy here
-			local tellsInProgressCopy = tellsInProgress;
-			
 			FALoot:itemAddWinner(tellsInProgress, table_items[tellsInProgress]["tells"][selection][1], table_items[tellsInProgress]["tells"][selection][3], cST);
-			
-			-- Restore the copy
-			tellsInProgress = tellsInProgressCopy;
 			
 			-- Announce winner and bid amount to aspects chat
 			local channels, channelNum = {GetChannelList()};
@@ -1454,17 +1399,13 @@ function FALoot:createGUI()
 					break;
 				end
 			end
-			
 			if channelNum then
+				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
 				local link = table_items[tellsInProgress]["itemLink"];
 				local winner = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
 				local bid = table_items[tellsInProgress]["tells"][selection][3];
 				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
-			
-			-- Send a chat message with the winner for those that don't have the addon
-			local winnerNoRealm = string.match(table_items[tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-			SendChatMessage(table_items[tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
 			
 			table.remove(table_items[tellsInProgress]["tells"], selection);
 		end
@@ -1518,7 +1459,7 @@ function FALoot:createGUI()
 			FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["foodTrackOn"] = true,
 			}, "RAID");
-			debug("Food tracking enabled.", 1);
+			U.debug("Food tracking enabled.", 1);
 		end
 	end);
 	foodFrame:SetScript("OnHide", function()
@@ -1527,7 +1468,7 @@ function FALoot:createGUI()
 				["foodTrackOff"] = true,
 			}, "RAID");
 		end
-		debug("Food tracking disabled.", 1);
+		U.debug("Food tracking disabled.", 1);
 	end);
 	foodFrame:SetWidth(280);
 	foodFrame:SetHeight(200);
@@ -1612,7 +1553,7 @@ function FALoot:createGUI()
 				end
 			end
 		else
-			debug("You must have raid assist to do that!");
+			U.debug("You must have raid assist to do that!");
 		end
 	end);
 	-- Fix edges of parent clipping over button
@@ -1760,7 +1701,7 @@ function FALoot:createGUI()
 	debugEditBox:SetHeight(debugScroll:GetHeight());
 	debugEditBox:SetTextInsets(4, 4, 4, 4);
 	debugEditBox:SetScript("OnTextChanged", function(self)
-		self:SetText(formatDebugData());
+		self:SetText(U.formatDebugData());
 	end);
 	debugEditBox:SetScript("OnEscapePressed", function(self)
 		debugFrame:Hide();
@@ -1773,11 +1714,11 @@ function FALoot:createGUI()
 	debugScroll:SetScrollChild(debugEditBox);
 	
 	debugFrameRefresh:SetScript("OnClick", function(self)
-		debugEditBox:SetText(formatDebugData());
+		debugEditBox:SetText(U.formatDebugData());
 	end);
 	
 	debugFrame:SetScript("OnShow", function()
-		debugEditBox:SetText(formatDebugData());
+		debugEditBox:SetText(U.formatDebugData());
 	end);
 end
 
@@ -1853,7 +1794,7 @@ function FALoot:generateIcons()
 						end
 					elseif button == "RightButton" then -- right click: Ends the item, for everyone in raid if you have assist, otherwise only locally.
 						endPrompt = coroutine.create( function()
-							debug("Ending item "..v["itemLink"]..".", 1);
+							U.debug("Ending item "..v["itemLink"]..".", 1);
 							if UnitIsGroupAssistant("PLAYER") or UnitIsGroupLeader("PLAYER") then
 								FALoot:sendMessage(ADDON_MSG_PREFIX, {
 									["reqVersion"] = ADDON_MVERSION, 
@@ -1896,30 +1837,30 @@ local function slashparse(msg, editbox)
 	elseif string.match(msg, "^dump .+") then
 		msg = string.match(msg, "^dump (.+)");
 		if msg == "table_items" then
-			debug(table_items);
+			U.debug(table_items);
 		elseif msg == "table_itemQuery" then
-			debug(table_itemQuery);
+			U.debug(table_itemQuery);
 		elseif msg == "table_itemHistory" then
-			debug(table_itemHistory);
+			U.debug(table_itemHistory);
 		elseif msg == "hasBeenLooted" then
-			debug(hasBeenLooted);
+			U.debug(hasBeenLooted);
 		elseif msg == "tellsTable" and tellsInProgress then
-			debug(table_items[tellsInProgress].tells);
+			U.debug(table_items[tellsInProgress].tells);
 		end
 		return;
 	elseif string.match(msg, "^debug %d") then
 		debugOn = tonumber(string.match(msg, "^debug (%d+)"));
 		if debugOn > 0 then
-			debug("Debug is now ON ("..debugOn..").");
+			U.debug("Debug is now ON ("..debugOn..").");
 		else
-			debug("Debug is now OFF.");
+			U.debug("Debug is now OFF.");
 		end
 		
 		FALoot:setLeaderUIVisibility();
 		return;
 	elseif msgLower == "debuginfo" then
 		debugFrame:Show();
-		debugEditBox:SetText(formatDebugData());
+		debugEditBox:SetText(U.formatDebugData());
 	elseif msgLower == "who" or msgLower == "vc" or msgLower == "versioncheck" then
 		FALoot:sendMessage(ADDON_MSG_PREFIX, {
 			["who"] = "query",
@@ -1928,26 +1869,26 @@ local function slashparse(msg, editbox)
 	elseif msgLower == "food" then
 		if IsInRaid() or debugOn > 0 then
 			if foodFrame:IsShown() then
-				debug("Food frame is already shown, doing nothing", 1);
+				U.debug("Food frame is already shown, doing nothing", 1);
 				foodFrame:Hide();
 			else
-				debug("Showing food frame...", 1);
+				U.debug("Showing food frame...", 1);
 				foodFrame:Show();
 			end
 		else
-			debug("You must be in a raid group to do that!");
+			U.debug("You must be in a raid group to do that!");
 		end
 	elseif msgLower == "history sync" or msgLower == "history synchronize" then
 		if IsInRaid() then
 			FALoot:itemHistorySync(true);
 		else
-			debug("You must be in a raid group to do that!");
+			U.debug("You must be in a raid group to do that!");
 		end
 	elseif msgLower == "history clear" then
 		table_itemHistory = {};
-		debug("Your item history has been cleared.");
+		U.debug("Your item history has been cleared.");
 	else
-		debug("The following are valid slash commands:");
+		U.debug("The following are valid slash commands:");
 		print("/fa debug <threshold> -- set debugging threshold");
 		print("/fa who -- see who is running the addon and what version");
 		print("/fa -- shows the loot window");
@@ -1963,7 +1904,7 @@ SLASH_FAROLL1 = "/faroll"
 local function FARoll(value)
 	value = tonumber(value)
 	if value % 2 ~= 0 then
-		debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
+		U.debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
 		value = math.floor(value)
 		if value % 2 == 1 then
 			value = value - 1
@@ -1974,7 +1915,7 @@ local function FARoll(value)
 	elseif value == 30 or value == 20 or value == 10 then
 		RandomRoll(1, value)
 	else
-		debug("Invalid roll value!")
+		U.debug("Invalid roll value!")
 	end
 end
 SlashCmdList["FAROLL"] = FARoll
@@ -1996,8 +1937,8 @@ StaticPopupDialogs["FALOOT_BID"] = {
 	OnShow = function(self)
 		self.editBox:SetText("")
 		self.editBox:SetScript("OnEnterPressed", function(self)
-			StaticDataSave(self:GetText())
-			coroutine.resume(bidPrompt)
+			StaticDataSave(self:GetText());
+			coroutine.resume(bidPrompt);
 			StaticPopup_Hide("FALOOT_BID");
 		end);
 		self.editBox:SetScript("OnEscapePressed", function(self)
@@ -2057,7 +1998,12 @@ function FALoot:itemTableUpdate()
 				if subString ~= "" then
 					subString = subString .. " & ";
 				end
-				subString = subString .. w[k];
+				local shortName = w[k];
+				-- Remove realm suffix for display
+				if string.match(shortName, "^(.-)%-.+") then
+					shortName = string.match(shortName, "^(.-)%-.+");
+				end
+				subString = subString .. shortName;
 			end
 			winnerString = winnerString .. subString .. " (" .. j .. ")";
 		end
@@ -2123,7 +2069,7 @@ function FALoot:tellsTableUpdate()
 		SetGuildRosterShowOffline(showOffline);
 		
 		-- Count flags
-		local currentServerTime = GetCurrentServerTime();
+		local currentServerTime = U.GetCurrentServerTime();
 		for i=1,#table_items[tellsInProgress].tells do
 			local flags = 0;
 			for j=#table_itemHistory,1,-1 do
@@ -2160,7 +2106,7 @@ function FALoot:tellsTableUpdate()
 		end)
 		
 		-- Make a copy of the item entry so we can make our modifications without affecting the original
-		local t = deepcopy(table_items[tellsInProgress]);
+		local t = U.deepCopy(table_items[tellsInProgress]);
 		
 		--[[-- Purge any entries that are lower than what we want to display right now
 		local limit = #t["tells"];
@@ -2180,9 +2126,9 @@ function FALoot:tellsTableUpdate()
 					groupType = "party";
 				end
 				for j=1,GetNumGroupMembers() do
-					if t["tells"][i][1] == UnitName(groupType..j, true) then
+					if t["tells"][i][1] == U.UnitName(groupType..j, true) then
 						local _, class = UnitClass(groupType..j);
-						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. UnitName(groupType..j, false) .. "|r";
+						t["tells"][i][1] = "|c" .. RAID_CLASS_COLORS[class]["colorStr"] .. U.UnitName(groupType..j, false) .. "|r";
 						break;
 					end
 				end
@@ -2325,43 +2271,43 @@ end
 
 function FALoot:itemBid(itemString, bid)
 	bid = tonumber(bid)
-	debug("FALoot:itemBid("..itemString..", "..bid..")", 1)
+	U.debug("FALoot:itemBid("..itemString..", "..bid..")", 1)
 	if not table_items[itemString] then
-		debug("Item not found! Aborting.", 1);
+		U.debug("Item not found! Aborting.", 1);
 		return;
 	end
 	
 	table_items[itemString]["bid"] = bid;
 	table_items[itemString]["bidStatus"] = "Bid";
-	debug("FALoot:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
+	U.debug("FALoot:itemBid(): Queued bid for "..table_items[itemString]["itemLink"]..".", 1);
 	
 	FALoot:checkBids();
 end
 
 function FALoot:itemAddWinner(itemString, winner, bid, time)
-	debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
+	U.debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
 	if not itemString or not winner or not bid or not time then
-		debug("Input not valid, aborting.", 1);
+		U.debug("Input not valid, aborting.", 1);
 		return;
 	end
 	if not table_items[itemString] then
-		debug(itemString.." is not a valid active item!", 1);
+		U.debug(itemString.." is not a valid active item!", 1);
 		return;
 	end
-	
-	local entry = table_items[itemString];
 		
 	-- check if the player was the winner of the item
 	if winner == PLAYER_NAME then
-		debug("The player won an item!", 1);
-		LootWonAlertFrame_ShowAlert(entry["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
+		U.debug("The player won an item!", 1);
+		LootWonAlertFrame_ShowAlert(table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
 	
 	-- create a table entry for that pricepoint
-	entry["winners"][bid] = entry["winners"][bid] or {};
+	if not table_items[itemString]["winners"][bid] then
+		table_items[itemString]["winners"][bid] = {};
+	end
 	
 	-- insert this event into the winners table
-	table.insert(entry["winners"][bid], winner);
+	table.insert(table_items[itemString]["winners"][bid], winner);
 	
 	-- insert into item history
 	table.insert(table_itemHistory, {
@@ -2373,11 +2319,11 @@ function FALoot:itemAddWinner(itemString, winner, bid, time)
 	
 	-- if # of winners >= item quantity then auto end the item
 	local numWinners = 0;
-	for j, v in pairs(entry["winners"]) do
+	for j, v in pairs(table_items[itemString]["winners"]) do
 		numWinners = numWinners + #v;
 	end
-	debug("numWinners = "..numWinners, 3);
-	if numWinners >= entry["quantity"] then
+	U.debug("numWinners = "..numWinners, 3);
+	if numWinners >= table_items[itemString]["quantity"] then
 		FALoot:itemEnd(itemString);
 	end
 end
@@ -2405,11 +2351,11 @@ function FALoot:checkBids()
 			if v["bidStatus"] == "Bid" and v["status"] == "Tells" then
 				SendChatMessage(tostring(v["bid"]), "WHISPER", nil, v["host"]);
 				table_items[itemString]["bidStatus"] = "Roll";
-				debug("FALoot:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
+				U.debug("FALoot:itemBid(): Bid and queued roll for "..table_items[itemString]["itemLink"]..".", 1);
 			elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
 				FARoll(v["bid"]);
 				table_items[itemString]["bidStatus"] = nil;
-				debug("FALoot:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
+				U.debug("FALoot:itemBid(): Rolled for "..table_items[itemString]["itemLink"]..".", 1);
 			end
 		end
 	end
@@ -2474,7 +2420,7 @@ function FALoot:onTableSelect(id)
 		j = j + 1;
 		if j == id then
 			if (not v["status"] or v["status"] == "") and not tellsInProgress then
-				--debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
+				--U.debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
 				tellsButton:Enable();
 			else
 				tellsButton:Disable();
@@ -2499,7 +2445,7 @@ local function onUpdate(self,elapsed)
 	--check if it's time to remove any expired items
 	for i, v in pairs(table_items) do
 		if v["expirationTime"] and v["expirationTime"] + expTime <= currentTime then
-			debug(v["itemLink"].." has expired, removing.", 1);
+			U.debug(v["itemLink"].." has expired, removing.", 1);
 			FALoot:itemRemove(i);
 			oldSelectStatus = nil; -- clear stored select status to force button state refresh
 		end
@@ -2518,7 +2464,7 @@ local function onUpdate(self,elapsed)
 		end
 	end
 	if selectStatus ~= oldSelectStatus then
-		--debug("New selectStatus value is "..(selectStatus or "nil")..".", 1);
+		--U.debug("New selectStatus value is "..(selectStatus or "nil")..".", 1);
 		if selectStatus then
 			FALoot:onTableSelect(selectStatus);
 		else
@@ -2546,7 +2492,7 @@ local function onUpdate(self,elapsed)
 				end
 				s = s..table_who[table_who[i]][j]
 			end
-			debug(s)
+			U.debug(s)
 		end
 		table_who = {}
 	end
@@ -2554,7 +2500,7 @@ local function onUpdate(self,elapsed)
 	-- Post request timer
 	-- If we've been waiting more than postRequestMaxWait seconds for a response from the raid leader, then go ahead and post the item anyway.
 	if postRequestTimer and currentTime - postRequestTimer >= postRequestMaxWait then
-		debug(postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. tellsInProgress .. ") anyway.", 1);
+		U.debug(postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. tellsInProgress .. ") anyway.", 1);
 		FALoot:itemTakeTells(tellsInProgress);
 		postRequestTimer = nil;
 	end
@@ -2563,24 +2509,24 @@ local function onUpdate(self,elapsed)
 	if itemHistorySync.p1 and not itemHistorySync.p2 and currentTime-itemHistorySync.p1.time >= 3 then
 		if itemHistorySync.p1[1] then
 			table.sort(itemHistorySync.p1, function(a,b) return a[2]>b[2] end);
-			debug("Sending historySyncStart command to "..itemHistorySync.p1[1][1]..".", 1);
+			U.debug("Sending historySyncStart command to "..itemHistorySync.p1[1][1]..".", 1);
 			local success, reason = FALoot:sendMessage(ADDON_MSG_PREFIX, {
 				["historySyncStart"] = itemHistorySync.full,
 			}, "WHISPER", itemHistorySync.p1[1][1], nil, true);
 			if success then
 				itemHistorySync.p2 = {};
 			else
-				debug("Attempted to send historySyncStart, but "..reason.."! Aborting synchronization.", 1);
+				U.debug("Attempted to send historySyncStart, but "..reason.."! Aborting synchronization.", 1);
 				itemHistorySync = {};
 			end
 		else
-			debug("Synchronization complete: no more complete data is available.", 1);
+			U.debug("Synchronization complete: no more complete data is available.", 1);
 			itemHistorySync = {};
 		end
 	elseif itemHistorySync.p2 and itemHistorySync.p2.time and currentTime-itemHistorySync.p2.time >= 5 then
-		debug("Sync verifies have been open for 5 seconds, ending synchronization.", 1);
+		U.debug("Sync verifies have been open for 5 seconds, ending synchronization.", 1);
 		if #itemHistorySync.p2 > 0 then
-			debug("Deleted "..#itemHistorySync.p2.." unverified sync entries.", 1);
+			U.debug("Deleted "..#itemHistorySync.p2.." unverified sync entries.", 1);
 		end
 		itemHistorySync = {};
 	end
@@ -2590,12 +2536,12 @@ local ouframe = CreateFrame("frame")
 ouframe:SetScript("OnUpdate", onUpdate)
 
 function FALoot:parseChat(msg, author)
-	debug("Parsing a chat message.", 2);
-	debug("Msg: "..msg, 3);
+	U.debug("Parsing a chat message.", 2);
+	U.debug("Msg: "..msg, 3);
 	local rank;
 	if debugOn == 0 then
 		for i=1,40 do
-			local name, currentRank = GetRaidRosterInfo(i)
+			local name, currentRank = U.GetRaidRosterInfo(i)
 			if name == author then
 				rank = currentRank
 				break
@@ -2606,7 +2552,7 @@ function FALoot:parseChat(msg, author)
 		local linkless, replaces = string.gsub(msg, HYPERLINK_PATTERN, "")
 		if replaces == 1 then -- if the number of item links in the message is exactly 1 then we should process it
 			local itemLink = string.match(msg, HYPERLINK_PATTERN); -- retrieve itemLink from the message
-			local itemString = ItemLinkStrip(itemLink);
+			local itemString = U.ItemLinkStrip(itemLink);
 			msg = string.gsub(msg, "x%d+", ""); -- remove any "x2" or "x3"s from the string
 			if not msg then
 				return;
@@ -2639,22 +2585,22 @@ function FALoot:parseChat(msg, author)
 					FALoot:tellsTableUpdate();
 				end
 			else
-				debug("Hyperlink is not in item table.", 2);
+				U.debug("Hyperlink is not in item table.", 2);
 			end
 		else
-			debug("Message does not have exactly 1 hyperlink.", 2);
-			debug("linkless = "..linkless, 3);
-			debug("replaces = "..replaces, 3);
+			U.debug("Message does not have exactly 1 hyperlink.", 2);
+			U.debug("linkless = "..linkless, 3);
+			U.debug("replaces = "..replaces, 3);
 		end
 	else
-		debug("Author is not of sufficient rank.", 1);
+		U.debug("Author is not of sufficient rank.", 1);
 	end
 end
 
 function FALoot:parseWhisper(msg, author)
-	debug("Parsing a whisper.", 2);
+	U.debug("Parsing a whisper.", 2);
 	if not table_items[tellsInProgress] then
-		debug("Item in progress does not exist.", 1);
+		U.debug("Item in progress does not exist.", 1);
 		tellsInProgress = nil;
 		return;
 	end
@@ -2688,7 +2634,7 @@ function FALoot:parseWhisper(msg, author)
 		groupType = "party";
 	end
 	for i=1,GetNumGroupMembers() do
-		if UnitName(groupType..i, true) == author then
+		if U.UnitName(groupType..i, true) == author then
 			inGroup = true;
 			break;
 		end
@@ -2719,7 +2665,7 @@ function FALoot:parseRoll(msg, author)
 	end
 	local author, rollResult, rollMin, rollMax = string.match(msg, "(.+) rolls (%d+) %((%d+)-(%d+)%)");
 	
-	-- Constrain name to Player-Realm format
+	-- Constrain name to Name-Realm format
 	if not string.match(author, "-") then
 		author = author .. "-" .. PLAYER_REALM;
 	end
@@ -2744,18 +2690,18 @@ end
 
 function FALoot:setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
-	debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 3);
-	debug({FALoot:addonEnabled(true)}, 3);
+	U.debug("toggle = "..(toggle or "nil")..", key = "..(key or "nil"), 3);
+	U.debug({A.isEnabled(true)}, 3);
 	if autolootToggle and autolootKey then
-		if FALoot:addonEnabled(true) then
+		if A.isEnabled(true) then
 			if not (toggle == "0" and key == "NONE") and not (autolootToggle == "0" and autolootKey == "NONE") then
 				SetCVar("autoLootDefault", 0);
 				SetModifiedClick("AUTOLOOTTOGGLE", "NONE");
-				debug("Your autoloot has been disabled.");
+				U.debug("Your autoloot has been disabled.");
 			end
 		else
 			if key == "NONE" then
-				debug("Your loot settings have been restored.");
+				U.debug("Your loot settings have been restored.");
 				SetModifiedClick("AUTOLOOTTOGGLE", autolootKey);
 				if toggle == "0" then
 					SetCVar("autoLootDefault", autolootToggle);
@@ -2774,9 +2720,9 @@ function FALoot:itemHistorySync(full)
 	local syncType = "historySyncRequest";
 	if full then
 		syncType = "historySyncRequestFull";
-		debug("Initiating FULL item history sync...");
+		U.debug("Initiating FULL item history sync...");
 	else
-		debug("Initiating item history sync...");
+		U.debug("Initiating item history sync...");
 	end
 	
 	-- Count our current number of applicable entries
@@ -2785,14 +2731,14 @@ function FALoot:itemHistorySync(full)
 		count = #table_itemHistory;
 	else
 		for i=#table_itemHistory,1,-1 do
-			if GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
+			if U.GetCurrentServerTime()-table_itemHistory[i].time <= 60*60*12 then
 				count = count + 1;
 			else
 				break;
 			end
 		end
 	end
-	debug("Self count is "..count..".", 1);
+	U.debug("Self count is "..count..".", 1);
 	
 	-- Send a sync request with our count
 	-- We'll recieve replies back from people who have more entries than us.
@@ -2835,12 +2781,13 @@ function events:PLAYER_LOGIN()
 	FALoot:setLeaderUIVisibility();
 
 	if debugOn > 0 then
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"));
-		itemAdd(ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"));
-
-		itemAdd("113939:0:450:565:40");
-		itemAdd("113985:0:450:448");
-		itemAdd("113971:0:450:565");
+		itemAdd("96379:0")
+		itemAdd("96740:0")
+		itemAdd("96740:0")
+		itemAdd("96373:0")
+		itemAdd(U.ItemLinkStrip("|cffa335ee|Hitem:94775:4875:4609:0:0:0:65197:904070771:89:166:465|h[Beady-Eye Bracers]|h|r"))
+		itemAdd(U.ItemLinkStrip("|cffa335ee|Hitem:98177:0:0:0:0:0:-356:1744046834:90:0:465|h[Tidesplitter Britches of the Windstorm]|h|r"))
+		itemAdd("96384:0")
 		--FALoot:parseChat("|cffa335ee|Hitem:96740:0:0:0:0:0:0:0:0:0:445|h[Sign of the Bloodied God]|h|r 30", PLAYER_NAME)
 		--FALoot:itemRequestTakeTells("96740:0");
 		--[[
@@ -2917,7 +2864,7 @@ function events:VARIABLES_LOADED()
 	end
 end
 function events:LOOT_OPENED(...)
-	if not FALoot:addonEnabled() then
+	if not A.isEnabled() then
 		return;
 	end
 	local loot = {} -- create a temporary table to organize the loot on the mob
@@ -2930,8 +2877,8 @@ function events:LOOT_OPENED(...)
 					loot[mobID] = {};
 				end
 				
-				local itemString = ItemLinkStrip(GetLootSlotLink(i));
-				if itemString and FALoot:checkFilters(itemString) then
+				local itemString = U.ItemLinkStrip(GetLootSlotLink(i));
+				if itemString and U.checkFilters(itemString) then
 					for l=1,max(sourceInfo[j*2], 1) do -- repeat the insert if there is multiple of the item in that slot.
 						-- max() is there to remedy the bug with GetLootSourceInfo returning incorrect (0) values.
 						-- GetLootSourceInfo may also return multiple quantity when there is actually only
@@ -2952,7 +2899,7 @@ function events:LOOT_OPENED(...)
 	
 	-- stop now if there's no loot
 	if loot == {} then
-		debug("There is no loot on this mob!", 1);
+		U.debug("There is no loot on this mob!", 1);
 		return;
 	end
 	
@@ -2961,12 +2908,12 @@ function events:LOOT_OPENED(...)
 		loot[i]["checkSum"] = #v;
 	end
 	
-	debug(loot, 2);
+	U.debug(loot, 2);
 	
 	-- check data integrity
 	for i, v in pairs(loot) do
 		if not (v["checkSum"] and v["checkSum"] == #v) then
-			debug("Self assembled loot data failed the integrity check.");
+			U.debug("Self assembled loot data failed the integrity check.");
 			return;
 		end
 		if #v == 0 then
@@ -3005,7 +2952,7 @@ function events:CHAT_MSG_CHANNEL(msg, author, _, _, _, _, _, _, channelName)
 		if not itemLink then
 			return;
 		end
-		local itemString = ItemLinkStrip(itemLink);
+		local itemString = U.ItemLinkStrip(itemLink);
 		local msg = string.match(msg, HYPERLINK_PATTERN.."(.+)"); -- now remove the link
 		if not msg or msg == "" then
 			return;
@@ -3047,7 +2994,7 @@ function events:GROUP_ROSTER_UPDATE()
 	if not IsInRaid() then
 		foodFrame:Hide();
 	end
-	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
+	if A.isEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
 		FALoot:itemHistorySync();
 	elseif GetNumGroupMembers() == 0 then
 		hasItemHistorySynced = false;
@@ -3060,7 +3007,7 @@ function events:RAID_ROSTER_UPDATE()
 	if not IsInRaid() then
 		foodFrame:Hide();
 	end
-	if FALoot:addonEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
+	if A.isEnabled() and GetNumGroupMembers() >= 25 and not hasItemHistorySynced then
 		FALoot:itemHistorySync();
 	elseif GetNumGroupMembers() == 0 then
 		hasItemHistorySynced = false;
@@ -3097,7 +3044,7 @@ end
 function events:BAG_UPDATE()
 	-- Registered on PLAYER_ENTERING WORLD to avoid
 	-- processing the event a zillion times when the UI loads.
-	debug("BAG_UPDATE triggered.", 2);
+	U.debug("BAG_UPDATE triggered.", 2);
 	local count = GetItemCount(foodItemId) or 0;
 	if foodCount ~= count then
 		local groupType, members = "raid", GetNumGroupMembers();
@@ -3108,7 +3055,7 @@ function events:BAG_UPDATE()
 		for name,v in pairs(foodUpdateTo) do
 			local sent;
 			for i=1,members do
-				if UnitName(groupType..i, true) == name then
+				if U.UnitName(groupType..i, true) == name then
 					if UnitIsConnected(groupType..i) then
 						FALoot:sendMessage(ADDON_MSG_PREFIX, {
 							["foodCount"] = count,
