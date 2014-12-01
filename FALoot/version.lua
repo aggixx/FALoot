@@ -40,7 +40,7 @@ do
     
     ticker = C_Timer.NewTicker(1, function()
       if responseCount == 0 then
-        local s = "Your guild members are using the following version:";
+        local s = "Your guild members are using the following version(s):";
         for i,v in pairs(responses) do
 	  s = s .. "\n";
 	  s = s .. i .. ": ";
