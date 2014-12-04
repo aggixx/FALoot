@@ -5,6 +5,7 @@ local PD = A.pData;
 local O = A.options;
 local E = A.events;
 local AM = A.addonMessages;
+local CM = A.chatMessages;
 local F = A.functions;
 local UI = A.UI;
 
@@ -196,20 +197,18 @@ local function createGUI()
 		local selection = tellsTable:GetSelection();
 		if selection then
 			-- Send a chat message with the winner for those that don't have the addon
-			local winnerNoRealm = string.match(table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-			SendChatMessage(table_items[SD.tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
+			local winnerNoRealm = string.match(SD.table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+			SendChatMessage(SD.table_items[SD.tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
 			
 			-- Send an addon message for those with the addon
 			local cST = U.GetCurrentServerTime();
-			FALoot:sendMessage(ADDON_MSG_PREFIX, {
-				["itemWinner"] = {
-					["itemString"] = SD.tellsInProgress,
-					["winner"] = table_items[SD.tellsInProgress]["tells"][selection][1],
-					["bid"] = table_items[SD.tellsInProgress]["tells"][selection][3],
-					["time"] = cST,
-				},
-			}, "RAID");
-			FALoot:itemAddWinner(SD.tellsInProgress, table_items[SD.tellsInProgress]["tells"][selection][1], table_items[SD.tellsInProgress]["tells"][selection][3], cST);
+			F.sendMessage("RAID", nil, true, "itemWinner", {
+				["itemString"] = SD.tellsInProgress,
+				["winner"] = SD.table_items[SD.tellsInProgress]["tells"][selection][1],
+				["bid"] = SD.table_items[SD.tellsInProgress]["tells"][selection][3],
+				["time"] = cST,
+			});
+			F.items.addWinner(SD.tellsInProgress, SD.table_items[SD.tellsInProgress]["tells"][selection][1], SD.table_items[SD.tellsInProgress]["tells"][selection][3], cST);
 			
 			-- Announce winner and bid amount to aspects chat
 			local channels, channelNum = {GetChannelList()};
@@ -221,13 +220,13 @@ local function createGUI()
 			end
 			if channelNum then
 				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
-				local link = table_items[SD.tellsInProgress]["itemLink"];
-				local winner = string.match(table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-				local bid = table_items[SD.tellsInProgress]["tells"][selection][3];
+				local link = SD.table_items[SD.tellsInProgress]["itemLink"];
+				local winner = string.match(SD.table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
+				local bid = SD.table_items[SD.tellsInProgress]["tells"][selection][3];
 				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
 			end
 			
-			table.remove(table_items[SD.tellsInProgress]["tells"], selection);
+			table.remove(SD.table_items[SD.tellsInProgress]["tells"], selection);
 		end
 	end);
 	
@@ -397,13 +396,15 @@ E.Register("TELLSWINDOW_UPDATE", function()
 	local currentServerTime = U.GetCurrentServerTime();
 	for i=1,#SD.table_items[SD.tellsInProgress].tells do
 		local flags = 0;
-		for j=#SD.table_itemHistory,1,-1 do
-			if currentServerTime-SD.table_itemHistory[j].time <= 60*60*12 then
-				if SD.table_itemHistory[j].winner == SD.table_items[SD.tellsInProgress].tells[i][1] and SD.table_itemHistory[j].bid ~= 20 then
-					flags = flags + 1;
+		if SD.table_itemHistory then
+			for j=#SD.table_itemHistory,1,-1 do
+				if currentServerTime-SD.table_itemHistory[j].time <= 60*60*12 then
+					if SD.table_itemHistory[j].winner == SD.table_items[SD.tellsInProgress].tells[i][1] and SD.table_itemHistory[j].bid ~= 20 then
+						flags = flags + 1;
+					end
+				else
+					break;
 				end
-			else
-				break;
 			end
 		end
 		SD.table_items[SD.tellsInProgress].tells[i][5] = flags;
@@ -646,6 +647,74 @@ AM.Register("postReply", function(_, _, allowed)
     
     requestPending = nil;
   end
+end);
+
+-- Bid message handler ========================================================
+
+CM.Register("WHISPER", function(sender, msg)
+  	U.debug("Parsing a whisper.", 2);
+	if not SD.tellsInProgress then
+		return;
+	end
+	if not SD.table_items[SD.tellsInProgress] then
+		U.debug("Item in progress does not exist.", 1);
+		SD.tellsInProgress = nil;
+		return;
+	end
+	local bid, spec;
+	if string.match(msg, "^%s*%d+%s*$") then
+		bid = string.match(msg, "^%s*(%d+)%s*$");
+	elseif string.match(msg, "^%s*%d+%s[MmOo][Ss]%s*$") then
+		bid, spec = string.match(msg, "^%s*(%d+)%s([MmOo][Ss])%s*$");
+	elseif string.match(msg, "^%s*"..SD.HYPERLINK_PATTERN.."%s?%d+$") then
+		bid = string.match(msg, "^%s*"..SD.HYPERLINK_PATTERN.."%s?(%d+)$");
+	elseif string.match(msg, "^%d+%s?"..SD.HYPERLINK_PATTERN.."$") then
+		bid = string.match(msg, "^(%d+)%s?"..SD.HYPERLINK_PATTERN.."$");
+	elseif string.lower(msg) == "pass" then
+		for i=1,#SD.table_items[SD.tellsInProgress]["tells"] do
+			if SD.table_items[SD.tellsInProgress]["tells"][i][1] == author then
+				table.remove(SD.table_items[SD.tellsInProgress]["tells"], i);
+				E.Trigger("TELLSWINDOW_UPDATE");
+				break;
+			end
+		end
+		return;
+	else
+		return;
+	end
+	bid = tonumber(bid);
+	
+	local groupType, inGroup;
+	if IsInRaid() then
+		groupType = "raid";
+	else
+		groupType = "party";
+	end
+	for i=1,GetNumGroupMembers() do
+		if U.UnitName(groupType..i, true) == sender then
+			inGroup = true;
+			break;
+		end
+	end
+	if not inGroup then
+		return;
+	end
+	
+	local bidUpdated;
+	for i=1,#SD.table_items[SD.tellsInProgress]["tells"] do
+		if SD.table_items[SD.tellsInProgress]["tells"][i][1] == sender then
+			SD.table_items[SD.tellsInProgress]["tells"][i][3] = bid;
+			SendChatMessage("<FA Loot> Updated your bid for "..SD.table_items[SD.tellsInProgress]["itemLink"]..".", "WHISPER", nil, sender);
+			bidUpdated = true;
+			break;
+		end
+	end
+	if not bidUpdated then
+		table.insert(SD.table_items[SD.tellsInProgress]["tells"], {sender, nil, bid, ""});
+		SendChatMessage("<FA Loot> Bid for "..SD.table_items[SD.tellsInProgress]["itemLink"].." accepted.", "WHISPER", nil, sender);
+	end
+	E.Trigger("ITEM_UPDATE");
+	E.Trigger("TELLSWINDOW_UPDATE");
 end);
      
 --[[ ==========================================================================
