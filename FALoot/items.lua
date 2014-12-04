@@ -9,8 +9,6 @@ local CM = A.chatMessages;
 local F = A.functions;
 local UI = A.UI;
 
---[[ need to write handler for loot info--]]
-
 -- Call Libraries
 local ScrollingTable = LibStub("ScrollingTable");
 
@@ -610,6 +608,51 @@ F.items.finish = function(itemString)
   
   E.Trigger("ITEM_UPDATE");
   E.Trigger("ITEMWINDOW_STATUS_UPDATE");
+end
+
+-- === items.addWinner() ======================================================
+F.items.addWinner = function(itemString, winner, bid, time)
+	U.debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
+	if not itemString or not winner or not bid or not time then
+		U.debug("Input not valid, aborting.", 1);
+		return;
+	end
+	if not SD.table_items[itemString] then
+		U.debug(itemString.." is not a valid active item!", 1);
+		return;
+	end
+		
+	-- check if the player was the winner of the item
+	if winner == PLAYER_NAME then
+		U.debug("The player won an item!", 1);
+		LootWonAlertFrame_ShowAlert(SD.table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
+	end
+	
+	-- create a table entry for that pricepoint
+	if not SD.table_items[itemString]["winners"][bid] then
+		SD.table_items[itemString]["winners"][bid] = {};
+	end
+	
+	-- insert this event into the winners table
+	table.insert(SD.table_items[itemString]["winners"][bid], winner);
+	
+	-- insert into item history
+	table.insert(SD.table_itemHistory, {
+		["itemString"] = itemString,
+		["winner"] = winner,
+		["bid"] = bid,
+		["time"] = time,
+	});
+	
+	-- if # of winners >= item quantity then auto end the item
+	local numWinners = 0;
+	for j, v in pairs(SD.table_items[itemString]["winners"]) do
+		numWinners = numWinners + #v;
+	end
+	U.debug("numWinners = "..numWinners, 3);
+	if numWinners >= SD.table_items[itemString]["quantity"] then
+		FALoot:itemEnd(itemString);
+	end
 end
 
 --[[ ==========================================================================
