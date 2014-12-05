@@ -913,8 +913,7 @@ function events:LOOT_READY(...)
     local sourceInfo = {GetLootSourceInfo(i)}
     for j=1,#sourceInfo/2 do
       local mobID = sourceInfo[j*2-1] -- retrieve GUID of the mob that holds the item
-      U.debug(mobID, 1);
-      if mobID and not hasBeenLooted[mobID] and not string.match(mobID, "Item") then -- ignore items from sources that have already been looted or from item-based sources
+      if mobID and not hasBeenLooted[mobID] and not string.match(mobID, "^Item") then -- ignore items from sources that have already been looted or from item-based sources
         if not loot[mobID] then
           loot[mobID] = {};
         end

@@ -17,5 +17,6 @@ items.lua
 tells.lua
 comms.lua
 version.lua
+autoloot.lua
 
 debug.lua

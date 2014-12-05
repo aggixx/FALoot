@@ -4,8 +4,9 @@ local A = FALoot;
 
 --[[ TODO
      Bidding
-     Autoloot
      Tells
+     Fix Item Caching
+     BonusID GUI indicator
 --]]
 
 --[[ =======================================================
