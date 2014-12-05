@@ -11,7 +11,7 @@ local function setAutoLoot()
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
 	
 	if A.isEnabled(true) then
-		if toggle ~= PD.autolootToggle or key ~= PD.autolootKey then
+		if toggle ~= "0" or key ~= "NONE" then
 			-- Save current settings to be restored later
 			PD.autolootToggle, PD.autolootKey = toggle, key;
 		
