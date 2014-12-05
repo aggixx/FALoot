@@ -302,10 +302,6 @@ end
 --[[ ==========================================================================
      Helper Functions
      ========================================================================== --]]
-     
-local function isThunderforged(iLevel)
-  return iLevel == 572 or iLevel == 559 or iLevel == 541 or iLevel == 528;
-end
 
 local function generateIcons()
   local lasticon = nil -- reference value for anchoring to the most recently constructed icon
@@ -507,9 +503,6 @@ F.items.add = function(itemString, checkCache)
     SD.table_items[itemString]["quantity"] = SD.table_items[itemString]["quantity"] + 1;
     local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
     local displayName = itemLink
-    if isThunderforged(iLevel) then
-      displayName = string.gsub(displayName, "|c%x+|", "|c"..SD.THUNDERFORGED_COLOR.."|");
-    end
     if SD.table_items[itemString]["quantity"] > 1 then
       displayName = displayName .. " x" .. SD.table_items[itemString]["quantity"];
     end
@@ -517,9 +510,6 @@ F.items.add = function(itemString, checkCache)
   else
     local _, _, _, iLevel, _, _, _, _, _, texture = GetItemInfo(itemLink);
     local displayName = itemLink
-    if isThunderforged(iLevel) then
-      displayName = string.gsub(displayName, "|c%x+|", "|c"..SD.THUNDERFORGED_COLOR.."|");
-    end
     SD.table_items[itemString] = {
       ["quantity"] = 1,
       ["displayName"] = displayName,
