@@ -870,7 +870,7 @@ CM.Register("CHANNEL", function(sender, msg, channel)
 	end
 	
 	local itemString = U.ItemLinkStrip(itemLink);
-	local msg = string.match(msg, SD.HYPERLINK_PATTERN.."(.+)"); -- now remove the link
+	local msg = string.gsub(msg, SD.HYPERLINK_PATTERN, ""); -- now remove the link
 	if not msg or msg == "" then
 		return;
 	end
