@@ -1,8 +1,5 @@
 local A = FALoot;
 local U = A.util;
-local C = A.commands;
-local AM = A.addonMessages;
-local F = A.functions;
 local PD = A.pData;
 
 local function setAutoLoot()
@@ -13,7 +10,7 @@ local function setAutoLoot()
 	U.debug("Checking auto loot settings...", 2);
 	local toggle, key = GetCVar("autoLootDefault"), GetModifiedClick("AUTOLOOTTOGGLE");
 	
-	if A.isEnabled(--[[true--]]) then
+	if A.isEnabled(true) then
 		if toggle ~= PD.autolootToggle or key ~= PD.autolootKey then
 			-- Save current settings to be restored later
 			PD.autolootToggle, PD.autolootKey = toggle, key;
@@ -36,8 +33,6 @@ local function setAutoLoot()
 		end
 	end
 end
-
-F.setAutoLoot = setAutoLoot;
 
 local frame = CreateFrame("frame");
 frame:SetScript("OnEvent", setAutoLoot);
