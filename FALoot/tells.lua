@@ -254,9 +254,6 @@ local function createGUI()
 			if j == id then
 				-- We've figured out the item string of the corresponding item (i), so now let's ask for permission to post it.
 				F.items.requestTakeTells(i);
-				-- While we're waiting for a request to our response, let's make sure the user can't take tells on any more items.
-				-- FIXME
-				self:Disable();
 				break;
 			end
 		end
@@ -301,9 +298,21 @@ end
 
 F.items.requestTakeTells = function(itemString)
   -- Make sure that this is an item we can actually take tells on before trying to submit a request
-  if type(itemString) ~= "string" or not SD.table_items[itemString] or SD.table_items[itemString]["status"] or SD.table_items[itemString]["host"] then
+  if type(itemString) ~= "string" then
     error('Usage: items.requestTakeTells("itemString")');
+  elseif not SD.table_items[itemString] then
+    error('items.requestTakeTells() was passed an itemString that does not index a real item.');
+  elseif not (SD.table_items[itemString]["status"] and SD.table_items[itemString]["host"]) then
+    error('items.requestTakeTells() was passed an itemString that indexes an item that is already in progress.');
+  elseif not IsInRaid() then
+    U.debug("You must be in a raid group to do that.");
+    return;
   end
+  
+  --[[ While we're waiting for a request to our response, let's
+       make sure the user can't take tells on any more items. --]]
+  UI.itemWindow.tellsButton:Disable();
+  
   -- Acquire name of raid leader
   local raidLeader, raidLeaderUnitID;
   if IsInRaid() then
