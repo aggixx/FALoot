@@ -151,11 +151,9 @@ C.list = {};
 -- Define slash command register function
 C.Register = function(command, handler, desc)
 	if type(command) ~= "string" then
-		A.util.debug('commands.Register passed a bad value for parameter "command".');
-		return;
+		error('commands.Register passed a bad value for parameter "command".');
 	elseif type(handler) ~= "function" then
-		A.util.debug('commands.Register passed a bad value for parameter "handler".');
-		return;
+		error('commands.Register passed a bad value for parameter "handler".');
 	end
 	
 	command = string.lower(command);
