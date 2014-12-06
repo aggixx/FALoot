@@ -40,6 +40,7 @@ do
     
     ticker = C_Timer.NewTicker(1, function()
       if responseCount == 0 then
+        U.debug(responses);
         local s = "Your guild members are using the following version(s):";
         for i=#responses,1,-1 do
 	  for j=#responses[i],1,-1 do
@@ -78,7 +79,9 @@ do
     for i=1,m do
       responses[i] = responses[i] or {};
     end
-    responses[m][r] = responses[m][r] or {};
+    for i=1,r do
+      responses[m][i] = responses[m][i] or {};
+    end
     
     sender = string.match(sender, "^[^-]+");
     table.insert(responses[m][r], sender);
