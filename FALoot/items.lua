@@ -615,18 +615,16 @@ end
 -- === items.addWinner() ======================================================
 
 F.items.addWinner = function(itemString, winner, bid, time)
-	U.debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
-	if not itemString or not winner or not bid or not time then
+	if not (itemString and winner and bid and time) then
 		U.debug("Input not valid, aborting.", 1);
 		return;
-	end
-	if not SD.table_items[itemString] then
+	elseif not SD.table_items[itemString] then
 		U.debug(itemString.." is not a valid active item!", 1);
 		return;
 	end
 		
 	-- check if the player was the winner of the item
-	if winner == PLAYER_NAME then
+	if winner == SD.PLAYER_NAME then
 		U.debug("The player won an item!", 1);
 		LootWonAlertFrame_ShowAlert(SD.table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
