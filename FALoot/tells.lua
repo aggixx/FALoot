@@ -736,6 +736,42 @@ function events:RAID_ROSTER_UPDATE()
   E.Trigger("TELLSBUTTON_UPDATE");
 end
 
+-- === Roll Parser ============================================================
+
+function events:CHAT_MSG_SYSTEM(msg, author)
+  if not (SD.tellsInProgress and string.match(msg, ".+ rolls %d+ %(%d+-%d+%)")) then
+    return;
+  elseif SD.table_items[SD.tellsInProgress]["status"] ~= "Rolls" then
+    return;
+  end
+  
+  local author, rollResult, rollMin, rollMax = string.match(msg, "(.+) rolls (%d+) %((%d+)-(%d+)%)");
+  
+  local item = SD.table_items[SD.tellsInProgress];
+
+  -- Constrain name to Name-Realm format
+  if not string.match(author, "-") then
+    author = author .. "-" .. SD.PLAYER_REALM;
+  end
+
+  -- Convert roll values to integers
+  rollResult = tonumber(rollResult);
+  rollMin = tonumber(rollMin);
+  rollMax = tonumber(rollMax);
+
+  for i=1,#item.tells do
+    if item.tells[i][1] == author then
+      if item.tells[i][4] == "" and item.tells[i][3] >= item.currentValue then
+        if (item.tells[i][3] <= 30 and rollMin == 1 and rollMax == item.tells[i][3]) or (rollMin + rollMax == item.tells[i][3] and rollMax - rollMin == 30) then
+          item.tells[i][4] = rollResult;
+          E.Trigger("TELLSWINDOW_UPDATE");
+        end
+      end
+      break;
+    end
+  end
+end
+
 eventFrame:SetScript("OnEvent", function(self, event, ...)
   events[event](self, ...) -- call one of the functions above
 end);
