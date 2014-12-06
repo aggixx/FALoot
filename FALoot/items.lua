@@ -77,7 +77,14 @@ local function createGUI()
   local scrollingTable = ScrollingTable:CreateST({
     {
       ["name"] = "Item",
-      ["width"] = 207,
+      ["width"] = 200,
+      ["align"] = "LEFT",
+      ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+      ["defaultsort"] = "asc",
+    },
+    {
+      ["name"] = "Prop.",
+      ["width"] = 30,
       ["align"] = "LEFT",
       ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
       ["defaultsort"] = "asc",
@@ -91,7 +98,7 @@ local function createGUI()
     },
     {
       ["name"] = "Winner(s)",
-      ["width"] = 140,
+      ["width"] = 117,
       ["align"] = "LEFT",
       ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
       ["defaultsort"] = "dsc",
@@ -740,12 +747,31 @@ E.Register("ITEM_UPDATE", function(itemString)
       winnerString = winnerString .. subString .. " (" .. j .. ")";
     end
     
+    -- create bonus string
+    local bonusString = "";
+    local numBonuses = select(2, string.gsub(i, "%d+", "")) - 2;
+    for i=1,numBonuses do
+      bonusString = bonusString .. "+";
+    end
+    local bonusColor = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 };
+    if numBonuses == 1 then
+      bonusColor = { ["r"] = 0, ["g"] = 0.502, ["b"] = 1.0, ["a"] = 1.0 };
+    elseif numBonuses == 2 then
+      bonusColor = { ["r"] = 0.69, ["g"] = 0.282, ["b"] = 0.973, ["a"] = 1.0 };
+    elseif numBonuses > 2 then
+      bonusColor = { ["r"] = 1.0, ["g"] = 0.502, ["b"] = 0, ["a"] = 1.0 };
+    end
+    
     -- insert assembled data into table
     table.insert(t, {
       ["cols"] = {
         {
           ["value"] = v["displayName"],
           ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
+        },
+        {
+          ["value"] = bonusString,
+          ["color"] = bonusColor,
         },
         {
           ["value"] = statusString,
