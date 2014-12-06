@@ -196,37 +196,31 @@ local function createGUI()
 	tellsFrameAwardButton:SetScript("OnClick", function(frame)
 		local selection = tellsTable:GetSelection();
 		if selection then
-			-- Send a chat message with the winner for those that don't have the addon
-			local winnerNoRealm = string.match(SD.table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-			SendChatMessage(SD.table_items[SD.tellsInProgress]["itemLink"].." "..winnerNoRealm, "RAID");
+			local item = SD.table_items[SD.tellsInProgress];
 			
-			-- Send an addon message for those with the addon
-			local cST = U.GetCurrentServerTime();
-			F.sendMessage("RAID", nil, true, "itemWinner", {
-				["itemString"] = SD.tellsInProgress,
-				["winner"] = SD.table_items[SD.tellsInProgress]["tells"][selection][1],
-				["bid"] = SD.table_items[SD.tellsInProgress]["tells"][selection][3],
-				["time"] = cST,
-			});
-			F.items.addWinner(SD.tellsInProgress, SD.table_items[SD.tellsInProgress]["tells"][selection][1], SD.table_items[SD.tellsInProgress]["tells"][selection][3], cST);
+			local itemString = SD.tellsInProgress;
+			local winner = item.tells[selection][1];
+			local winnerNoRealm = string.match(winner, "^(.-)%-");
+			local bid = item.tells[selection][3];
 			
 			-- Announce winner and bid amount to aspects chat
-			local channels, channelNum = {GetChannelList()};
-			for i=1,#channels do
-				if string.lower(channels[i]) == "aspects" then
-					channelNum = channels[i-1];
+			local c = {GetChannelList()};
+			for i=1,#c do
+				if string.lower(c[i]) == "aspects" then
+					SendChatMessage(item.itemLink.." "..winnerNoRealm.." "..bid, "CHANNEL", nil, c[i-1]);
 					break;
 				end
 			end
-			if channelNum then
-				-- I have no idea why but apparently if you don't manually define these as variables first it just errors out
-				local link = SD.table_items[SD.tellsInProgress]["itemLink"];
-				local winner = string.match(SD.table_items[SD.tellsInProgress]["tells"][selection][1], "^(.-)%-.+");
-				local bid = SD.table_items[SD.tellsInProgress]["tells"][selection][3];
-				SendChatMessage(link.." "..winner.." "..bid, "CHANNEL", nil, channelNum);
-			end
 			
-			table.remove(SD.table_items[SD.tellsInProgress]["tells"], selection);
+			-- Send an addon message for those with the addon
+			local cST = U.GetCurrentServerTime();
+			F.items.addWinner(itemString, winner, bid, cST);
+			F.sendMessage("RAID", nil, true, "itemWinner", itemString, winner, bid, cST);
+			
+			-- Send a chat message with the winner for those that don't have the addon
+			SendChatMessage(item.itemLink.." "..winnerNoRealm, "RAID");
+			
+			table.remove(item.tells, selection);
 		end
 	end);
 	
@@ -302,7 +296,7 @@ F.items.requestTakeTells = function(itemString)
     error('Usage: items.requestTakeTells("itemString")');
   elseif not SD.table_items[itemString] then
     error('items.requestTakeTells() was passed an itemString that does not index a real item.');
-  elseif not (SD.table_items[itemString]["status"] and SD.table_items[itemString]["host"]) then
+  elseif SD.table_items[itemString]["status"] or SD.table_items[itemString]["host"] then
     error('items.requestTakeTells() was passed an itemString that indexes an item that is already in progress.');
   elseif not IsInRaid() then
     U.debug("You must be in a raid group to do that.");

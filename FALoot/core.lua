@@ -3,10 +3,10 @@ FALoot = {};
 local A = FALoot;
 
 --[[ TODO
-     Bidding
-     Tells
+     Queued Bids
      Fix Item Caching
      BonusID GUI indicator
+     itemWinner msg handler
 --]]
 
 --[[ =======================================================

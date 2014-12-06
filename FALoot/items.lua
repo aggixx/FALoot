@@ -627,7 +627,7 @@ F.items.addWinner = function(itemString, winner, bid, time)
 	table.insert(SD.table_items[itemString]["winners"][bid], winner);
 	
 	-- insert into item history
-	table.insert(SD.table_itemHistory, {
+	table.insert(PD.table_itemHistory, {
 		["itemString"] = itemString,
 		["winner"] = winner,
 		["bid"] = bid,
@@ -641,7 +641,7 @@ F.items.addWinner = function(itemString, winner, bid, time)
 	end
 	U.debug("numWinners = "..numWinners, 3);
 	if numWinners >= SD.table_items[itemString]["quantity"] then
-		FALoot:itemEnd(itemString);
+		F.items.finish(itemString);
 	end
 end
 

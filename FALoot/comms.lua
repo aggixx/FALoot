@@ -20,6 +20,7 @@ local selfBlacklist = {
   ["loot"] = true,
   ["end"] = true,
   ["newestVersion"] = true,
+  ["itemWinner"] = true,
 };
 
 --[[ ==========================================================================
