@@ -8,6 +8,7 @@ local AM = A.addonMessages;
 local CM = A.chatMessages;
 local F = A.functions;
 local UI = A.UI;
+local C = A.commands;
 
 -- Call Libraries
 local ScrollingTable = LibStub("ScrollingTable");
@@ -569,7 +570,7 @@ F.items.processBids = function()
         U.debug("items.processBids(): Bid and queued roll for "..SD.table_items[itemString]["itemLink"]..".", 1);
 	needsRefresh = true;
       elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
-        FARoll(v["bid"]);
+        F.items.roll(v["bid"]);
         SD.table_items[itemString]["bidStatus"] = nil;
         U.debug("items.processBids(): Rolled for "..SD.table_items[itemString]["itemLink"]..".", 1);
 	needsRefresh = true;
@@ -656,6 +657,33 @@ F.items.addWinner = function(itemString, winner, bid, time)
 		F.items.finish(itemString);
 	end
 end
+
+-- === items.roll() ===========================================================
+
+F.items.roll = function(value)
+	value = tonumber(value);
+	
+	if value % 1 ~= 0 then
+		U.debug("You are not allowed to bid non-integers. Your bid has been rounded down to the nearest even integer.");
+		value = math.floor(value);
+		if value % 2 == 1 then
+			value = value - 1;
+		end
+	elseif value % 2 ~= 0 then
+		U.debug("You are not allowed to bid odd numbers. Your bid has been rounded down to the nearest even number.");
+		value = value - (value % 2);
+	end
+	
+	if value > 30 then
+		RandomRoll((value-30)/2, ((value-30)/2)+30)
+	elseif value == 30 or value == 20 or value == 10 then
+		RandomRoll(1, value)
+	else
+		U.debug("Invalid roll value!")
+	end
+end
+
+C.Register("roll", F.items.roll, "x -- rolls on an item for x DKP.");
 
 --[[ ==========================================================================
      FALoot Events
