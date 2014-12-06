@@ -169,7 +169,7 @@ local function createGUI()
     end
     bidPrompt = coroutine.create(function(self)
       U.debug("Bid recieved, resuming coroutine.", 1)
-      local bid = tonumber(bidAmount)
+      local bid = bidAmount;
       if bid < 30 and bid ~= 10 and bid ~= 20 then
         U.debug("You must bid 10, 20, 30, or a value greater than 30. Your bid has been cancelled.")
         return
@@ -181,8 +181,7 @@ local function createGUI()
         end
         U.debug("You are not allowed to bid odd numbers or non-integers. Your bid has been rounded down to the nearest even integer.")
       end
-      U.debug("Passed info onto FALoot:itemBid().", 1);
-      F.items.bid(itemString, bid)
+      F.items.bid(itemString, bid);
     end)
     StaticPopupDialogs["FALOOT_BID"]["text"] = "How much would you like to bid for "..itemLink.."?";
     StaticPopup_Show("FALOOT_BID");
@@ -431,6 +430,7 @@ StaticPopupDialogs["FALOOT_BID"] = {
   end,
   OnShow = function(self)
     self.editBox:SetText("");
+    self.editBox:SetNumeric(true);
     self.editBox:SetScript("OnEnterPressed", function(self)
       bidAmount = tonumber(self:GetText());
       coroutine.resume(bidPrompt);
@@ -548,29 +548,40 @@ F.items.bid = function(itemString, bid)
   
   SD.table_items[itemString]["bid"] = bid;
   SD.table_items[itemString]["bidStatus"] = "Bid";
-  U.debug("FALoot:itemBid(): Queued bid for "..SD.table_items[itemString]["itemLink"]..".", 1);
+  U.debug("items.bid(): Queued bid for "..SD.table_items[itemString]["itemLink"]..".", 1);
   
-  F.items.processBids();
+  -- Process the new bid, triggering a status text refresh if necessary.
+  if not F.items.processBids() then
+    E.Trigger("ITEMWINDOW_STATUS_TEXT_UPDATE");
+  end
 end
 
 -- === items.processBids() ====================================================
 
 F.items.processBids = function()
+  local needsRefresh = false;
+
   for itemString, v in pairs(SD.table_items) do
     if SD.table_items[itemString]["bidStatus"] and SD.table_items[itemString]["host"] and ((v["currentValue"] == 30 and v["bid"] >= 30) or v["currentValue"] == v["bid"]) then
       if v["bidStatus"] == "Bid" and v["status"] == "Tells" then
         SendChatMessage(tostring(v["bid"]), "WHISPER", nil, v["host"]);
         SD.table_items[itemString]["bidStatus"] = "Roll";
-        U.debug("FALoot:itemBid(): Bid and queued roll for "..SD.table_items[itemString]["itemLink"]..".", 1);
+        U.debug("items.processBids(): Bid and queued roll for "..SD.table_items[itemString]["itemLink"]..".", 1);
+	needsRefresh = true;
       elseif v["bidStatus"] == "Roll" and v["status"] == "Rolls" then
         FARoll(v["bid"]);
         SD.table_items[itemString]["bidStatus"] = nil;
-        U.debug("FALoot:itemBid(): Rolled for "..SD.table_items[itemString]["itemLink"]..".", 1);
+        U.debug("items.processBids(): Rolled for "..SD.table_items[itemString]["itemLink"]..".", 1);
+	needsRefresh = true;
       end
     end
   end
   
-  E.Trigger("ITEMWINDOW_STATUS_UPDATE");
+  if needsRefresh then
+    E.Trigger("ITEMWINDOW_STATUS_TEXT_UPDATE");
+  end
+  
+  return needsRefresh;
 end
 
 -- === items.finish() ============================================================
@@ -597,10 +608,11 @@ F.items.finish = function(itemString)
   end);
   
   E.Trigger("ITEM_UPDATE");
-  E.Trigger("ITEMWINDOW_STATUS_UPDATE");
+  E.Trigger("ITEMWINDOW_STATUS_TEXT_UPDATE");
 end
 
 -- === items.addWinner() ======================================================
+
 F.items.addWinner = function(itemString, winner, bid, time)
 	U.debug("itemAddWinner("..(itemString or "")..", "..(winner or "")..", "..(bid or "")..", "..(time or "")..")", 1);
 	if not itemString or not winner or not bid or not time then
@@ -657,7 +669,7 @@ end);
 
 -- === Status Bar Updater =====================================================
 
-E.Register("ITEMWINDOW_STATUS_UPDATE", setStatus);
+E.Register("ITEMWINDOW_STATUS_TEXT_UPDATE", setStatus);
 
 -- === Item Table Updater =====================================================
 
@@ -738,6 +750,7 @@ E.Register("ITEM_UPDATE", function(itemString)
   if SD.tellsInProgress and SD.tellsInProgress == itemString then
     E.Trigger("TELLSWINDOW_UPDATE");
   end
+  F.items.processBids();
 end);
 
 -- === Item Select Reaction ===================================================
