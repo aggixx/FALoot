@@ -837,6 +837,12 @@ AM.Register("loot", function(channel, sender, loot)
   E.Trigger("ITEM_UPDATE");
 end);
 
+-- Item Winner Msg handler ====================================================
+
+AM.Register("itemWinner", function(channel, sender, itemString, winner, bid, cST)
+  F.items.addWinner(itemString, winner, bid, cST);
+end);
+
 -- === Item Status handler ====================================================
 
 CM.Register("RAID", function(sender, msg)

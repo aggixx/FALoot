@@ -5,7 +5,6 @@ local A = FALoot;
 --[[ TODO
      Fix Item Caching
      BonusID GUI indicator
-     itemWinner msg handler
 --]]
 
 --[[ =======================================================
