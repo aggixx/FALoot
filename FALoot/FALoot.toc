@@ -18,5 +18,6 @@ tells.lua
 comms.lua
 version.lua
 autoloot.lua
+history.lua
 
 debug.lua
