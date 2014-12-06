@@ -41,14 +41,18 @@ do
     ticker = C_Timer.NewTicker(1, function()
       if responseCount == 0 then
         local s = "Your guild members are using the following version(s):";
-        for i,v in pairs(responses) do
-	  s = s .. "\n";
-	  s = s .. i .. ": ";
-	  for j=1,#v do
-	    if j > 1 then
-	      s = s .. ", ";
+        for i=#responses,1,-1 do
+	  for j=#responses[i],1,-1 do
+	    if #responses[i][j] > 0 then
+	      s = s .. "\n";
+	      s = s .. "v" .. i .. "r" .. j .. ": ";
+	      for k=1,#responses[i][j] do
+	        if k > 1 then
+	          s = s .. ", ";
+	        end
+	        s = s .. responses[i][j][k];
+	      end
 	    end
-	    s = s .. v[j];
 	  end
 	end
 	
@@ -66,15 +70,19 @@ do
     F.sendMessage("WHISPER", sender, false, "vcResponse", A.MVERSION, A.REVISION);
   end);
   
-  AM.Register("vcResponse", function(channel, sender, major, rev)
+  AM.Register("vcResponse", function(channel, sender, m, r)
     if not ticker then
       return;
     end
     
-    local v = "v" .. major .. "r" .. rev;
-    responses[v] = responses[v] or {};
+    for i=1,m do
+      responses[i] = responses[i] or {};
+    end
+    responses[m][r] = responses[m][r] or {};
+    
     sender = string.match(sender, "^[^-]+");
-    table.insert(responses[v], sender);
+    table.insert(responses[m][r], sender);
+    
     responseCount = responseCount + 1;
   end);
 end
