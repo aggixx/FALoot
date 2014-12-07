@@ -75,10 +75,10 @@ do
       return;
     end
     
-    for i=1,m do
+    for i=0,m do
       responses[i] = responses[i] or {};
     end
-    for i=1,r do
+    for i=0,r do
       responses[m][i] = responses[m][i] or {};
     end
     
