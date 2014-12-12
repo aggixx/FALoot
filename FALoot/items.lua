@@ -59,6 +59,9 @@ local function createGUI()
   frame:SetHeight(270);
   frame:SetPoint("CENTER");
   frame:Hide();
+  frame:SetScript("OnShow", function()
+    E.Trigger("ITEM_UPDATE");
+  end);
   
   UI.itemWindow.frame = frame;
 

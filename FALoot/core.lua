@@ -5,7 +5,6 @@ local A = FALoot;
 --[[ TODO
      Fix Item Caching
      Fix slash cmd validation eg: "/fa roll"
-     Update items on window show
 --]]
 
 --[[ =======================================================
