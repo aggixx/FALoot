@@ -40,6 +40,14 @@ do
     
     ticker = C_Timer.NewTicker(1, function()
       if responseCount == 0 then
+        -- grab raid member state
+	local members = {};
+	if IsInRaid() then
+	  for i=1,GetNumGroupMembers() do
+	    table.insert(members, U.UnitName("raid"..i));
+	  end
+	end
+	
         local s = "Your guild members are using the following version(s):";
         for i=#responses,1,-1 do
 	  for j=#responses[i],1,-1 do
@@ -50,9 +58,29 @@ do
 	        if k > 1 then
 	          s = s .. ", ";
 	        end
+		
+		-- remove this person from raid list
+		for l=1,#members do
+		  if members[l] == responses[i][j][k] then
+		    table.remove(members, l);
+		    break;
+		  end
+		end
+		
 	        s = s .. responses[i][j][k];
 	      end
 	    end
+	  end
+	end
+	
+	-- Add list of raid members without addon
+	if #members > 0 then
+	  s = s .. "\nNo Addon: "
+	  for i=1,#members do
+	    if i > 1 then
+	      s = s .. ", ";
+	    end
+	    s = s .. members[i];
 	  end
 	end
 	
