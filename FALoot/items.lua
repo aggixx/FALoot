@@ -28,6 +28,12 @@ local bidAmount = nil;
 -- Init mob loot blacklist
 local hasBeenLooted = {};
 
+local difficultyBonusIDs = {
+  [566] = true, -- heroic
+  [567] = true, -- mythic
+  [450] = true, -- mythic 2???
+};
+
 --[[ ==========================================================================
      GUI Creation
      ========================================================================== --]]
@@ -749,10 +755,17 @@ E.Register("ITEM_UPDATE", function(itemString)
     
     -- create bonus string
     local bonusString = "";
-    local numBonuses = select(2, string.gsub(i, "%d+", "")) - 2;
-    for i=1,numBonuses do
-      bonusString = bonusString .. "+";
+    local numBonuses = 0;
+    local bonuses = string.match(i, "%d+:%d+:([0-9:]+)");
+    if bonuses then
+      for bonus in string.gmatch(bonuses, "%d+") do
+	if not difficultyBonusIDs[tonumber(bonus)] then
+	  numBonuses = numBonuses + 1;
+	  bonusString = bonusString .. "+";
+	end
+      end
     end
+    
     local bonusColor = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 };
     if numBonuses == 1 then
       bonusColor = { ["r"] = 0, ["g"] = 0.502, ["b"] = 1.0, ["a"] = 1.0 };
