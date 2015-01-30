@@ -198,34 +198,6 @@ U.isNameInGuild = function(name)
   SetGuildRosterShowOffline(showOffline);
 end
 
-U.isGuildGroup = function(threshold)
-  GuildRoster()
-  local groupType
-  if IsInRaid() then
-    groupType = "raid"
-  else
-    groupType = "party"
-  end
-  local numguildies = 0
-  local numOffline = 0
-  for i=1,GetNumGroupMembers() do
-    local iname = U.GetRaidRosterInfo(i)
-    if iname then
-      if U.isNameInGuild(iname) then
-        numguildies = numguildies + 1
-      end
-      if not UnitIsConnected(groupType..i) then
-        numOffline = numOffline + 1
-      end
-    end
-  end
-  if (numguildies/(GetNumGroupMembers()-numOffline) > threshold) then
-    return true
-  else
-    return false
-  end
-end
-
 U.isMainRaid = function()
   GuildRoster()
   local groupType
@@ -264,21 +236,28 @@ A.isEnabled = function(overrideDebug)
     return 1
   end
   
-  local _, instanceType = IsInInstance();
+  -- do efficient methods first
+  if select(2, IsInInstance()) ~= "raid" then
+    return nil, "wrong instance type";
+  end
   
-  if not U.isGuildGroup(0.60) then
+  local n = GetNumGroupMembers();
+  
+  if n < 18 then
+    return nil, "not enough group members";
+  end
+  
+  local d = GetRaidDifficultyID();
+  
+  if not (d == 15 or d == 16) then
+    return nil, "wrong instance difficulty";
+  elseif select(2, InGuildParty())/n < 0.6 then
     return nil, "not guild group"
   elseif not U.isMainRaid() then
     return nil, "not enough officers"
-  elseif instanceType ~= "raid" then
-    return nil, "wrong instance type"
-  elseif not (GetRaidDifficultyID() == 15 or GetRaidDifficultyID() == 16) then
-    return nil, "wrong instance difficulty"
-  elseif GetNumGroupMembers() < 20 then
-    return nil, "not enough group members"
-  else
-    return 1
   end
+  
+  return 1
 end
 
 U.checkFilters = function(itemString, checkItemLevel)
