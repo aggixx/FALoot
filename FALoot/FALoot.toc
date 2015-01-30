@@ -1,7 +1,6 @@
-## Interface: 50400
+## Interface: 60300
 ## Title: FA Loot
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
-## Version: v7.1
 ## Author: Pawkets
 ## SavedVariables: FALoot_pData
 ## OptionalDeps: ElvUI, TukUI
