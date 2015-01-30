@@ -296,8 +296,6 @@ F.items.requestTakeTells = function(itemString)
     error('Usage: items.requestTakeTells("itemString")');
   elseif not SD.table_items[itemString] then
     error('items.requestTakeTells() was passed an itemString that does not index a real item.');
-  elseif SD.table_items[itemString]["host"] then
-    error('items.requestTakeTells() was passed an itemString that indexes an item that is already in progress.');
   elseif not IsInRaid() then
     U.debug("You must be in a raid group to do that.");
     return;
