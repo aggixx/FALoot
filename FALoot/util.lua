@@ -3,6 +3,7 @@ A.util = {};
 local U = A.util;
 local SD = A.sData;
 local PD = A.pData;
+local E = A.events;
 
 SD.debugData = {};
 PD.debugOn = 0;
@@ -231,33 +232,62 @@ U.isMainRaid = function()
   end
 end
 
-A.isEnabled = function(overrideDebug)
-  if not overrideDebug and PD.debugOn > 0 then
-    return 1
+do
+  local cache;
+  
+  -- Create function to be called when isEnabled's result may have changed.
+  local function wipeCache()
+    cache = nil;
+    U.debug("Addon enabled state wiped.", 2);
   end
   
-  -- do efficient methods first
-  if select(2, IsInInstance()) ~= "raid" then
-    return nil, "wrong instance type";
+  -- Only get a new result if we don't have a cached one (or the old cached value has been cleared).
+  A.isEnabled = function(overrideDebug)
+    if not overrideDebug and PD.debugOn > 0 then
+      return true;
+    end
+    
+    if cache then
+      return cache;
+    end
+    
+    -- do efficient methods first
+    if select(2, IsInInstance()) ~= "raid" then
+      cache = false;
+      return cache, "wrong instance type";
+    end
+    
+    local n = GetNumGroupMembers();
+  
+    if n < 18 then
+      cache = false;
+      return cache, "not enough group members";
+    end
+  
+    local d = GetRaidDifficultyID();
+  
+    if not (d == 15 or d == 16) then
+      cache = false;
+      return cache, "wrong instance difficulty";
+    elseif select(2, InGuildParty())/n < 0.6 then
+      cache = false;
+      return cache, "not guild group";
+    elseif not U.isMainRaid() then
+      cache = false;
+      return cache, "not enough officers";
+    end
+  
+    return cache;
   end
   
-  local n = GetNumGroupMembers();
+  -- Set events for cache to be cleared
   
-  if n < 18 then
-    return nil, "not enough group members";
-  end
+  local eventFrame = CreateFrame("Frame");
+  eventFrame:SetScript("OnEvent", wipeCache);
+  eventFrame:RegisterEvent("PLAYER_DIFFICULTY_CHANGED");
   
-  local d = GetRaidDifficultyID();
-  
-  if not (d == 15 or d == 16) then
-    return nil, "wrong instance difficulty";
-  elseif select(2, InGuildParty())/n < 0.6 then
-    return nil, "not guild group"
-  elseif not U.isMainRaid() then
-    return nil, "not enough officers"
-  end
-  
-  return 1
+  E.Register("GROUP_ROSTER_UPDATE", wipeCache);
+  E.Register("ZONE_CHANGED_NEW_AREA", wipeCache);
 end
 
 U.checkFilters = function(itemString, checkItemLevel)

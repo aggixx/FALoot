@@ -1,6 +1,7 @@
 local A = FALoot;
 local U = A.util;
 local PD = A.pData;
+local E = A.events;
 
 local function setAutoLoot()
 	if not (PD.autolootToggle and PD.autolootKey) then
@@ -37,5 +38,6 @@ end
 local frame = CreateFrame("frame");
 frame:SetScript("OnEvent", setAutoLoot);
 frame:RegisterEvent("VARIABLES_LOADED");
-frame:RegisterEvent("GROUP_ROSTER_UPDATE");
-frame:RegisterEvent("RAID_ROSTER_UPDATE");
+
+E.Register("ZONE_CHANGED_NEW_AREA", setAutoLoot);
+E.Register("GROUP_ROSTER_UPDATE", setAutoLoot);

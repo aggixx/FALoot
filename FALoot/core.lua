@@ -230,10 +230,29 @@ A.DOWNLOAD_URL = "https://github.com/aggixx/FALoot";
 
 local eventFrame, events = CreateFrame("Frame"), {}
 
+--[[ Here I convert select WoW API events to be managed by the addon's event system,
+     so that I can assure that they are triggered in the order I want them to. --]]
+
 -- === PLAYER_LOGIN Event =================================================
 
 function events:PLAYER_LOGIN()
-	E.Trigger("PLAYER_LOGIN");
+  E.Trigger("PLAYER_LOGIN");
+end
+
+-- === GROUP_ROSTER_UPDATE Event ==========================================
+
+function events:GROUP_ROSTER_UPDATE()
+  E.Trigger("GROUP_ROSTER_UPDATE");
+end
+
+function events:RAID_ROSTER_UPDATE()
+  E.Trigger("GROUP_ROSTER_UPDATE");
+end
+
+-- === ZONE_CHANGED_NEW_AREA Event ========================================
+
+function events:ZONE_CHANGED_NEW_AREA()
+  E.Trigger("ZONE_CHANGED_NEW_AREA");
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)

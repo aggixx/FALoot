@@ -717,22 +717,18 @@ CM.Register("WHISPER", function(sender, msg)
 	E.Trigger("ITEM_UPDATE");
 	E.Trigger("TELLSWINDOW_UPDATE");
 end);
+
+-- === Tells Button visibility triggers =======================================
+
+E.Register("GROUP_ROSTER_UPDATE", function()
+  E.Trigger("TELLSBUTTON_UPDATE");
+end);
      
 --[[ ==========================================================================
      API Events
      ========================================================================== --]]
 
 local eventFrame, events = CreateFrame("Frame"), {}
-
--- === Tells Button visibility triggers =======================================
-
-function events:GROUP_ROSTER_UPDATE()
-  E.Trigger("TELLSBUTTON_UPDATE");
-end
-
-function events:RAID_ROSTER_UPDATE()
-  E.Trigger("TELLSBUTTON_UPDATE");
-end
 
 -- === Roll Parser ============================================================
 
