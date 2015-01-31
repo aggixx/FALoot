@@ -14,6 +14,8 @@ local libEncode = libCompress:GetAddonEncodeTable();
 
 local messagePriority = {
   ["newestVersion"] = "BULK",
+  ["newHist"] = "BULK",
+  ["histSyncF"] = "BULK",
 };
 
 local selfBlacklist = {

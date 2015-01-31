@@ -630,8 +630,8 @@ end
 
 -- === items.addWinner() ======================================================
 
-F.items.addWinner = function(itemString, winner, bid, time)
-	if not (itemString and winner and bid and time) then
+F.items.addWinner = function(itemString, winner, bid)
+	if not (itemString and winner and bid) then
 		U.debug("Input not valid, aborting.", 1);
 		return;
 	elseif not SD.table_items[itemString] then
@@ -652,14 +652,6 @@ F.items.addWinner = function(itemString, winner, bid, time)
 	
 	-- insert this event into the winners table
 	table.insert(SD.table_items[itemString]["winners"][bid], winner);
-	
-	-- insert into item history
-	table.insert(PD.table_itemHistory, {
-		["itemString"] = itemString,
-		["winner"] = winner,
-		["bid"] = bid,
-		["time"] = time,
-	});
 	
 	-- if # of winners >= item quantity then auto end the item
 	local numWinners = 0;

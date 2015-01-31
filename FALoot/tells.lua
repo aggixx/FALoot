@@ -213,9 +213,10 @@ local function createGUI()
 			end
 			
 			-- Send an addon message for those with the addon
-			local cST = U.GetCurrentServerTime();
-			F.items.addWinner(itemString, winner, bid, cST);
-			F.sendMessage("RAID", nil, true, "itemWinner", itemString, winner, bid, cST);
+			F.items.addWinner(itemString, winner, bid);
+			F.sendMessage("RAID", nil, true, "itemWinner", itemString, winner, bid);
+			
+			F.history.createEntry(itemString, winner, bid);
 			
 			-- Send a chat message with the winner for those that don't have the addon
 			SendChatMessage(item.itemLink.." "..winnerNoRealm, "RAID");
