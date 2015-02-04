@@ -277,6 +277,7 @@ do
       return cache, "not enough officers";
     end
   
+    cache = true;
     return cache;
   end
   
