@@ -38,6 +38,10 @@ F.history.createEntry = function(itemString, winner, bid)
   F.sendMessage("GUILD", nil, true, "newHist", id, PD.table_itemHistory[id]);
   
   PD.table_itemHistory[id].date = time();
+  
+  local baseId = string.match(itemString, "^%d+");
+  PD.tooltip_cache[baseId] = PD.tooltip_cache[baseId] or {};
+  table.insert(PD.tooltip_cache[baseId], id);
 end
 
 AM.Register("newHist", function(channel, sender, id, data)
@@ -48,6 +52,10 @@ AM.Register("newHist", function(channel, sender, id, data)
   
   PD.table_itemHistory[id] = data;
   PD.table_itemHistory[id].date = time();
+  
+  local baseId = string.match(data.itemString, "^%d+");
+  PD.tooltip_cache[baseId] = PD.tooltip_cache[baseId] or {};
+  table.insert(PD.tooltip_cache[baseId], id);
   
   if syncing then
     syncCount = syncCount + 1;

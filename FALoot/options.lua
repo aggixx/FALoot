@@ -17,6 +17,7 @@ function events:ADDON_LOADED(name)
     PD.autolootToggle = s.autolootToggle or GetCVar("autoLootDefault");
     PD.autolootKey = s.autolootKey or GetModifiedClick("AUTOLOOTTOGGLE");
     PD.table_itemHistory = s.table_itemHistory or {};
+    PD.tooltip_cache = s.tooltip_cache or {};
     
     -- Hard-coded options
     PD.maxIcons = s.maxIcons or 11;
