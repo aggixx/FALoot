@@ -691,7 +691,13 @@ F.items.roll = function(value)
 	end
 end
 
-C.Register("roll", F.items.roll, "x -- rolls on an item for x DKP.");
+C.Register("roll", function(value)
+	if not (value and type(tonumber(value)) == "number") then
+		U.debug('Invalid arguments for "roll" command, the correct format is "/fa roll x", eg: "/fa roll 90".');
+		return;
+	end
+	F.items.roll(value);
+end, "x -- rolls on an item for x DKP.");
 
 --[[ ==========================================================================
      FALoot Events
