@@ -320,13 +320,17 @@ U.checkFilters = function(itemString, checkItemLevel)
   end
     
   -- check if the class of the item is appropriate
-  if not (class == "Armor" or class == "Weapon" or (class == "Miscellaneous" and subClass == "Junk")) then
+  if class == "Miscellaneous" and subClass == "Junk" then
+    return true;
+  end
+  
+  if not (class == "Armor" or class == "Weapon") then
     U.debug("Class of "..itemLink.." is incorrect.", 1)
     return false
   end
   
   -- check if the item level of the item is high enough
-  if checkItemLevel then
+  if checkItemLevel or class then
     local playerTotal = GetAverageItemLevel()
     if playerTotal - ilevel > 60 then -- if the item is more than 60 levels below the player
       U.debug("Item Level of "..itemLink.." is too low.", 1);
