@@ -23,6 +23,8 @@ local selfBlacklist = {
   ["end"] = true,
   ["newestVersion"] = true,
   ["itemWinner"] = true,
+  ["newHist"] = true,
+  ["histSyncF"] = true,
 };
 
 --[[ ==========================================================================
