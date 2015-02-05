@@ -16,6 +16,7 @@ function events:ADDON_LOADED(name)
     PD.expTime = s.expTime or 15;   -- Amount of time before an ended item is removed from the window, in seconds.
     PD.autolootToggle = s.autolootToggle or GetCVar("autoLootDefault");
     PD.autolootKey = s.autolootKey or GetModifiedClick("AUTOLOOTTOGGLE");
+    PD.table_itemHistory = s.table_itemHistory or {};
     
     -- Hard-coded options
     PD.maxIcons = s.maxIcons or 11;

@@ -36,6 +36,8 @@ F.history.createEntry = function(itemString, winner, bid)
   };
   
   F.sendMessage("GUILD", nil, true, "newHist", id, PD.table_itemHistory[id]);
+  
+  PD.table_itemHistory[id].date = time();
 end
 
 AM.Register("newHist", function(channel, sender, id, data)
@@ -45,6 +47,7 @@ AM.Register("newHist", function(channel, sender, id, data)
   end
   
   PD.table_itemHistory[id] = data;
+  PD.table_itemHistory[id].date = time();
   
   if syncing then
     syncCount = syncCount + 1;
@@ -56,11 +59,14 @@ local syncCount = 0;
 
 C.Register("history", function(arg)
   if string.lower(arg) == "sync" then
+    if syncing then
+      U.debug("Synchronization is already in progress! Please wait for the current sync to complete.")
+      return;
+    end
     local s = "";
     for i,v in pairs(PD.table_itemHistory) do
       s = s..i;
     end
-    
     F.sendMessage("RAID", nil, true, "histSyncF", s);
     syncing = true;
     syncCount = 0;
@@ -74,23 +80,28 @@ C.Register("history", function(arg)
 end, "sync -- Perform a full synchronization of item history with others in the raid group.");
 
 AM.Register("histSyncF", function(channel, sender, data)
+  data = data or "";
+
   -- deconstruct
   local t = {}
   for i=1,string.len(data)-2,3 do
     table.insert(t, string.sub(data, i, i+2));
   end
   
+  U.debug(t, 4);
+  
   -- look for entries sender doesn't have
   for i,v in pairs(PD.table_itemHistory) do
     local found = false;
-    for j,w in pairs(t) do
-      if j == i then
+    for j=1,#t do
+      if t[j] == i then
         found = true;
 	break
       end
     end
     
     if not found then
+      U.debug('Sending entry "'..i..'" to '..sender..".", 2)
       F.sendMessage("WHISPER", sender, true, "newHist", i, v);
     end
   end
