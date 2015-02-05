@@ -28,19 +28,11 @@ local bidAmount = nil;
 -- Init mob loot blacklist
 local hasBeenLooted = {};
 
-local difficultyBonusIDs = {
+SD.difficultyBonusIDs = {
   [566] = true, -- heroic
   [567] = true, -- mythic
   [450] = true, -- mythic 2???
 };
-
-local bonusIDDescriptors = {
-  [566] = "Heroic",
-  [567] = "Mythic",
-  [450] = "Mythic",
-  [565] = "Soc",
-  [562] = "WF",
-}
 
 --[[ ==========================================================================
      GUI Creation
@@ -375,55 +367,7 @@ local function generateIcons()
           --tooltip stuff
           GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
           GameTooltip:SetHyperlink(v["tooltipItemLink"])
-	  
-	  
-	  -- custom item history tooltip section
-	  local baseId = string.match(i, "^%d+");
-	  if PD.tooltip_cache[baseId] then
-	    local entries = {};
-	    for i=1,#PD.tooltip_cache[baseId] do
-	      local e = PD.table_itemHistory[PD.tooltip_cache[baseId][i]];
-	      if not e then
-	        error("Tooltip cache points to nil history entry.");
-	      end
-	      
-	      local bonusStr = string.match(e.itemString, "^%d-:(.+)");
-	      local bonusT = {};
-	      while bonusStr and string.match(bonusStr, "%d") do
-                table.insert(bonusT, tonumber(string.match(bonusStr, "%d+")));
-		bonusStr = string.gsub(bonusStr, "%d+:?", "", 1);
-	      end
-	      
-	      local dLabel = "Normal";
-	      local tooltipBonusStr = "";
-	      for j=1,#bonusT do
-	        if bonusIDDescriptors[bonusT[j]] then
-		  local l = bonusIDDescriptors[bonusT[j]];
-		  if difficultyBonusIDs[bonusT[j]] then
-		    dLabel = l;
-		  else
-		    if tooltipBonusStr ~= "" then
-		      tooltipBonusStr = tooltipBonusStr .. ", ";
-		    end
-		    tooltipBonusStr = tooltipBonusStr .. l;
-		  end
-		end
-	      end
-	      entries[dLabel] = entries[dLabel] or {};
-	      table.insert(entries[dLabel], {PD.tooltip_cache[baseId][i], tooltipBonusStr});
-	    end
-	    
-	    for i,v in pairs(entries) do
-	      GameTooltip:AddLine(string.format("\n|c%s%s|r Item History (%s):", A.COLOR, A.NAME, i));
-	      for j=1,#v do
-	        local e = PD.table_itemHistory[v[j][1]];
-		
-	        local w = string.match(e.winner, "^[^-]+");
-	        local d = date("%x", e.date);
-	        GameTooltip:AddDoubleLine(string.format("%s - %s |cFFFF0000%s|r", d, w, v[j][2]), string.format("%d DKP", e.value));
-	      end
-	    end
-	  end
+	  F.history.setTooltip(i);
 	  
           GameTooltip:Show()
         end)
@@ -812,7 +756,7 @@ E.Register("ITEM_UPDATE", function(itemString)
     local bonuses = string.match(i, "%d+:%d+:([0-9:]+)");
     if bonuses then
       for bonus in string.gmatch(bonuses, "%d+") do
-	if not difficultyBonusIDs[tonumber(bonus)] then
+	if not SD.difficultyBonusIDs[tonumber(bonus)] then
 	  numBonuses = numBonuses + 1;
 	  bonusString = bonusString .. "+";
 	end
