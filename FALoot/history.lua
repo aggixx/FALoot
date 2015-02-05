@@ -125,50 +125,50 @@ AM.Register("histSyncF", function(channel, sender, data)
 end);
 
 F.history.setTooltip = function(itemString)
-        local baseId = string.match(itemString, "^%d+");
-	  if PD.tooltip_cache[baseId] then
-	    local entries = {};
-	    for i=1,#PD.tooltip_cache[baseId] do
-	      local e = PD.table_itemHistory[PD.tooltip_cache[baseId][i]];
-	      if not e then
-	        error("Tooltip cache points to nil history entry.");
-	      end
-	      
-	      local bonusStr = string.match(e.itemString, "^%d-:(.+)");
-	      local bonusT = {};
-	      while bonusStr and string.match(bonusStr, "%d") do
-                table.insert(bonusT, tonumber(string.match(bonusStr, "%d+")));
-		bonusStr = string.gsub(bonusStr, "%d+:?", "", 1);
-	      end
-	      
-	      local dLabel = "Normal";
-	      local tooltipBonusStr = "";
-	      for j=1,#bonusT do
-	        if SD.bonusIDDescriptors[bonusT[j]] then
-		  local l = SD.bonusIDDescriptors[bonusT[j]];
-		  if SD.difficultyBonusIDs[bonusT[j]] then
-		    dLabel = l;
-		  else
-		    if tooltipBonusStr ~= "" then
-		      tooltipBonusStr = tooltipBonusStr .. ", ";
-		    end
-		    tooltipBonusStr = tooltipBonusStr .. l;
-		  end
-		end
-	      end
-	      entries[dLabel] = entries[dLabel] or {};
-	      table.insert(entries[dLabel], {PD.tooltip_cache[baseId][i], tooltipBonusStr});
+  local baseId = string.match(itemString, "^%d+");
+  if PD.tooltip_cache[baseId] then
+    local entries = {};
+    for i=1,#PD.tooltip_cache[baseId] do
+      local e = PD.table_itemHistory[PD.tooltip_cache[baseId][i]];
+      if not e then
+        error("Tooltip cache points to nil history entry.");
+      end
+      
+      local bonusStr = string.match(e.itemString, "^%d-:(.+)");
+      local bonusT = {};
+      while bonusStr and string.match(bonusStr, "%d") do
+            table.insert(bonusT, tonumber(string.match(bonusStr, "%d+")));
+	bonusStr = string.gsub(bonusStr, "%d+:?", "", 1);
+      end
+      
+      local dLabel = "Normal";
+      local tooltipBonusStr = "";
+      for j=1,#bonusT do
+        if SD.bonusIDDescriptors[bonusT[j]] then
+	  local l = SD.bonusIDDescriptors[bonusT[j]];
+	  if SD.difficultyBonusIDs[bonusT[j]] then
+	    dLabel = l;
+	  else
+	    if tooltipBonusStr ~= "" then
+	      tooltipBonusStr = tooltipBonusStr .. ", ";
 	    end
-	    
-	    for i,v in pairs(entries) do
-	      GameTooltip:AddLine(string.format("\n|c%s%s|r Item History (%s):", A.COLOR, A.NAME, i));
-	      for j=1,#v do
-	        local e = PD.table_itemHistory[v[j][1]];
-		
-	        local w = string.match(e.winner, "^[^-]+");
-	        local d = date("%x", e.date);
-	        GameTooltip:AddDoubleLine(string.format("%s - %s |cFFFF0000%s|r", d, w, v[j][2]), string.format("%d DKP", e.value));
-	      end
-	    end
+	    tooltipBonusStr = tooltipBonusStr .. l;
 	  end
+	end
+      end
+      entries[dLabel] = entries[dLabel] or {};
+      table.insert(entries[dLabel], {PD.tooltip_cache[baseId][i], tooltipBonusStr});
+    end
+    
+    for i,v in pairs(entries) do
+      GameTooltip:AddLine(string.format("\n|c%s%s|r Item History (%s):", A.COLOR, A.NAME, i));
+      for j=1,#v do
+        local e = PD.table_itemHistory[v[j][1]];
+	
+        local w = string.match(e.winner, "^[^-]+");
+        local d = date("%x", e.date);
+        GameTooltip:AddDoubleLine(string.format("%s - %s |cFFFF0000%s|r", d, w, v[j][2]), string.format("%d DKP", e.value));
+      end
+    end
+  end
 end
