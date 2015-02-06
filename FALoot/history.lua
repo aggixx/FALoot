@@ -60,7 +60,7 @@ AM.Register("newHist", function(channel, sender, id, data)
   end
   
   PD.table_itemHistory[id] = data;
-  PD.table_itemHistory[id].date = time();
+  PD.table_itemHistory[id].date = PD.table_itemHistory[id].date or time();
   
   local baseId = string.match(data.itemString, "^%d+");
   PD.tooltip_cache[baseId] = PD.tooltip_cache[baseId] or {};
