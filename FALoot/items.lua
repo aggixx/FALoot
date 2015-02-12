@@ -1074,6 +1074,13 @@ function events:GET_ITEM_INFO_RECEIVED()
   end
 end
 
+function events:PLAYER_REGEN_ENABLED()
+  if showAfterCombat then
+    UI.itemWindow.frame:Show();
+    showAfterCombat = nil;
+  end
+end
+
 eventFrame:SetScript("OnEvent", function(self, event, ...)
   events[event](self, ...) -- call one of the functions above
 end)
