@@ -77,16 +77,26 @@ local syncing = false;
 local syncCount = 0;
 
 C.Register("history", function(arg)
-  if string.lower(arg) == "sync" then
+  arg = string.lower(arg);
+  if arg == "sync" or arg == "syncf" then
     if syncing then
       U.debug("Synchronization is already in progress! Please wait for the current sync to complete.")
       return;
     end
     local s = "";
+    local t = time();
     for i,v in pairs(PD.table_itemHistory) do
-      s = s..i;
+      if arg == "syncf" or t-v.date < 30 * 24 * 60* 60 then
+        s = s..i;
+      end
     end
-    F.sendMessage("RAID", nil, true, "histSyncF", s);
+    
+    if arg == "syncf" then
+      F.sendMessage("RAID", nil, true, "histSyncF", s);
+    else
+      F.sendMessage("RAID", nil, true, "histSync", s);
+    end
+    
     syncing = true;
     syncCount = 0;
     
@@ -95,10 +105,12 @@ C.Register("history", function(arg)
       syncing = false;
       U.debug("Finished adding "..syncCount.." new item records.");
     end)
+  else
+    U.debug("Bad argument for /fa history, allowed arguments are:\n  /fa history sync\n  /fa history syncF");
   end
-end, "sync -- Perform a full synchronization of item history with others in the raid group.");
+end, "sync -- Perform a synchronization of item history with others in the raid group.");
 
-AM.Register("histSyncF", function(channel, sender, data)
+local function syncRespond(full, sender, data)
   data = data or "";
 
   -- deconstruct
@@ -109,21 +121,35 @@ AM.Register("histSyncF", function(channel, sender, data)
   
   U.debug(t, 4);
   
+  local t = time();
+  
   -- look for entries sender doesn't have
   for i,v in pairs(PD.table_itemHistory) do
-    local found = false;
-    for j=1,#t do
-      if t[j] == i then
-        found = true;
-	break
+    local found;
+    
+    if full or t-v.date < 30 * 24 * 60 * 60 then
+      local found = false;
+      for j=1,#t do
+        if t[j] == i then
+          found = true;
+	  break
+        end
       end
     end
     
-    if not found then
+    if found == false then
       U.debug('Sending entry "'..i..'" to '..sender..".", 2)
       F.sendMessage("WHISPER", sender, true, "newHist", i, v);
     end
   end
+end
+
+AM.Register("histSyncF", function(_, sender, data)
+  syncRespond(true, sender, data);
+end);
+
+AM.Register("histSync", function(_, sender, data)
+  syncRespond(false, sender, data);
 end);
 
 F.history.setTooltip = function(itemString)
