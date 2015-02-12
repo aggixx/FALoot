@@ -6,7 +6,6 @@ local A = FALoot;
      Fix Item Caching
      Implement flag counting
      long loot lists cause deserialization errors
-     fix socket/WF in item history?
 --]]
 
 --[[ =======================================================

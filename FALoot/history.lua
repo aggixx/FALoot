@@ -11,11 +11,13 @@ F.history = {};
 PD.table_itemHistory = {};
 
 SD.bonusIDDescriptors = {
+  [450] = "Mythic",
+  [561] = "WF",
+  [562] = "WF",
+  [564] = "Soc",
+  [565] = "Soc",
   [566] = "Heroic",
   [567] = "Mythic",
-  [450] = "Mythic",
-  [565] = "Soc",
-  [562] = "WF",
 }
 
 local function makeId()
