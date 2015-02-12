@@ -835,7 +835,7 @@ end);
 E.Register("ITEMWINDOW_SELECT_UPDATE", function(item)
   if item then
     if UI.itemWindow.tellsButton then
-      if (not SD.table_items[item]["status"] or SD.table_items[item]["status"] == "") and not SD.tellsInProgress then
+      if (not SD.table_items[item]["status"] or SD.table_items[item]["status"] == "") and not SD.tellsInProgress and not SD.pendingPostRequest then
         --U.debug("Status of entry #"..id..' is "'..(v["status"] or "")..'".', 1);
         UI.itemWindow.tellsButton:Enable();
       else

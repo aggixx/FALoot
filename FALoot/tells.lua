@@ -17,7 +17,7 @@ SD.table_tells = {};
 SD.authedMissingItems = {};
 
 -- Local variables
-local requestPending;
+SD.pendingPostRequest = false;
 
 --[[ ==========================================================================
      GUI Creation
@@ -303,10 +303,6 @@ F.items.requestTakeTells = function(itemString)
     return;
   end
   
-  --[[ While we're waiting for a request to our response, let's
-       make sure the user can't take tells on any more items. --]]
-  UI.itemWindow.tellsButton:Disable();
-  
   -- Acquire name of raid leader
   local raidLeader, raidLeaderUnitID;
   if IsInRaid() then
@@ -334,12 +330,17 @@ F.items.requestTakeTells = function(itemString)
       U.debug('Asking Raid leader "' .. raidLeader .. '" for permission to post item (' .. itemString .. ').', 1);
       F.sendMessage("WHISPER", raidLeader, false, "postRequest", itemString);
       -- Set request timer
-      requestPending = true;
+      SD.pendingPostRequest = true;
+      
+      --[[ While we're waiting for a request to our response, let's
+           make sure the user can't take tells on any more items. --]]
+      UI.itemWindow.tellsButton:Disable();
+      
       C_Timer.After(PD.postRequestMaxWait, function()
-        if requestPending then
+        if SD.pendingPostRequest then
           U.debug(PD.postRequestMaxWait .. " seconds have elapsed with no response from raid leader, posting item (" .. SD.tellsInProgress .. ") anyway.", 1);
           F.items.takeTells(SD.tellsInProgress);
-	  requestPending = nil;
+	  SD.pendingPostRequest = false;
 	end
       end);
     else
@@ -642,7 +643,7 @@ end);
 -- postReply message handler ==================================================
 
 AM.Register("postReply", function(_, _, allowed)
-  if SD.tellsInProgress and requestPending then
+  if SD.tellsInProgress and SD.pendingPostRequest then
     if allowed then
       U.debug('Request to post item "' .. SD.tellsInProgress .. '" has been granted. Posting...', 1);
       F.items.takeTells(SD.tellsInProgress);
@@ -654,7 +655,7 @@ AM.Register("postReply", function(_, _, allowed)
       E.Trigger("TELLSBUTTON_UPDATE");
     end
     
-    requestPending = nil;
+    SD.pendingPostRequest = nil;
   end
 end);
 
