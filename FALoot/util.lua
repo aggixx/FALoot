@@ -208,27 +208,45 @@ U.isMainRaid = function()
     groupType = "party"
   end
   local aspects, drakes = 0, 0;
+  
+  -- save show offline state to restore later
   local showOffline = GetGuildRosterShowOffline();
   SetGuildRosterShowOffline(false);
+  
+  --[[ create table of guild member data so we don't have to
+       call GetGuildRosterInfo a zillion times. --]]
+  local guild = {};
+  for i=1,select(2, GetNumGuildMembers()) do
+    local name, rank = GetGuildRosterInfo(i);
+    guild[i] = {};
+    guild[i].name = string.match(name, "^[^-]+");
+    guild[i].rank = rank;
+  end
+  
+  -- compare our table of data with the people in the raid
   for i=1,40 do
     if UnitExists(groupType..i) then
-      local name = GetRaidRosterInfo(i)
-      local _, onlineguildies = GetNumGuildMembers()
-      for j=1,onlineguildies do
-        local _, rankName, rankIndex = GetGuildRosterInfo(j)
-        if string.match(rankName, "Aspect") then
-          aspects = aspects + 1
-        elseif  string.match(rankName, "Drake") then
-          drakes = drakes + 1
-        end
+      local rName = GetRaidRosterInfo(i), "^[^-]+";
+      for j=1,#guild do
+	if rName == guild[j].name then
+          if string.match(guild[j].rank, "Aspect") then
+            aspects = aspects + 1
+          elseif guild[j].rank == "Drake" then
+            drakes = drakes + 1
+          end
+	  break;
+	end
       end
     end
   end
+  
+  -- restore show offline state
   SetGuildRosterShowOffline(showOffline);
+  
   if aspects >= 2 and drakes >= 5 then
     return true
   else
-    return false
+    return false, aspects, drakes
   end
 end
 
@@ -269,7 +287,7 @@ do
     if not (d == 15 or d == 16) then
       cache = false;
       return cache, "wrong instance difficulty";
-    elseif select(2, InGuildParty())/n < 0.6 then
+    elseif select(2, InGuildParty())/n < 0.75 then
       cache = false;
       return cache, "not guild group";
     elseif not U.isMainRaid() then
