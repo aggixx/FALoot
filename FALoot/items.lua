@@ -538,6 +538,11 @@ F.items.add = function(itemString, checkCache)
       ["winners"] = {},
       ["tooltipItemLink"] = itemLink,
     }
+    
+    if SD.authedMissingItems and SD.authedMissingItems[itemString] then
+      SD.table_items[itemString].host = SD.authedMissingItems[itemString];
+      SD.authedMissingItems[itemString] = nil;
+    end
   end
   
   if not UI.itemWindow.frame:IsShown() then
@@ -617,6 +622,10 @@ F.items.finish = function(itemString)
   if SD.tellsInProgress and SD.tellsInProgress == itemString then
     SD.tellsInProgress = nil;
     UI.tellsWindow.frame:Hide();
+  end
+  
+  if SD.authedMissingItems then
+    SD.authedMissingItems[itemString] = nil;
   end
   
   C_Timer.After(PD.expTime, function()

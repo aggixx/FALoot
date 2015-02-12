@@ -4,6 +4,12 @@ local A = FALoot;
 
 --[[ TODO
      Fix Item Caching
+     Implement flag counting
+     long loot lists cause deserialization errors
+     raid leader should decline take tells on absent items
+     loot window doesn't show after combat ends
+     tighten requirements on isEnabled
+     fix socket/WF in item history?
 --]]
 
 --[[ =======================================================

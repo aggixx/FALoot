@@ -14,6 +14,7 @@ local ScrollingTable = LibStub("ScrollingTable");
 
 -- Init some tables
 SD.table_tells = {};
+SD.authedMissingItems = {};
 
 -- Local variables
 local requestPending;
@@ -618,7 +619,13 @@ AM.Register("postRequest", function(channel, sender, requestedItem)
   local okay = false;
   
   if not SD.table_items[requestedItem] then
-    U.debug("Item does not exist, denying request.", 1);
+    if not SD.authedMissingItems[requestedItem] then
+      U.debug("Unknown item granted.", 1);
+      SD.authedMissingItems[requestedItem] = sender;
+      okay = true;
+    else
+      U.debug('Unknown item has already been claimed for posting by "' .. SD.authedMissingItems[requestedItem] .. '", denying request.', 1);
+    end
   elseif SD.table_items[requestedItem]["status"] then
     U.debug("Item is already in progress, denying request.", 1);
   elseif SD.table_items[requestedItem]["host"] then
