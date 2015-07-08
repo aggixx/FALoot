@@ -277,7 +277,7 @@ do
     
     local n = GetNumGroupMembers();
   
-    if n < 18 then
+    if n < 10 then
       cache = false;
       return cache, "not enough group members";
     end
@@ -290,9 +290,9 @@ do
     elseif select(2, InGuildParty())/n < 0.75 then
       cache = false;
       return cache, "not guild group";
-    elseif not U.isMainRaid() then
+    --[[elseif not U.isMainRaid() then
       cache = false;
-      return cache, "not enough officers";
+      return cache, "not enough officers";]]
     end
   
     cache = true;
