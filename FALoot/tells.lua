@@ -282,7 +282,7 @@ F.items.takeTells = function(itemString)
     SD.tellsInProgress = itemString;
     UI.tellsWindow.title:SetText(SD.table_items[itemString]["displayName"]);
     UI.tellsWindow.titleBg:SetWidth((UI.tellsWindow.title:GetWidth() or 0) + 10);
-    E.Trigger("TELLS_UPDATE");
+    --E.Trigger("TELLSWINDOW_UPDATE");
     SendChatMessage(SD.table_items[itemString]["itemLink"].." 30", "RAID");
     UI.itemWindow.tellsButton:Disable();
   else

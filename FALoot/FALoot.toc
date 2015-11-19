@@ -1,4 +1,4 @@
-## Interface: 60300
+## Interface: 60200
 ## Title: FA Loot
 ## Notes: Loot mod for <Forgotten Aspects> on Hyjal-US.
 ## Author: Pawkets

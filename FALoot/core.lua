@@ -7,6 +7,7 @@ local A = FALoot;
      Implement flag counting
      long loot lists cause deserialization errors
      Fix sync counter text
+     Disable take tells when the item you have selected starts
 --]]
 
 --[[ =======================================================
@@ -215,8 +216,8 @@ SlashCmdList["FA"] = commandHandler;
      ========================================================================== --]]
  
 A.NAME = "FALoot";
-A.MVERSION = 2; -- Addons only communicate with users of the same major version.
-A.REVISION = 8; -- Specific code revision for identification purposes.
+A.MVERSION = 3; -- Addons only communicate with users of the same major version.
+A.REVISION = 0; -- Specific code revision for identification purposes.
 
 A.stub = LibStub("AceAddon-3.0"):NewAddon(A.NAME);
 LibStub("AceComm-3.0"):Embed(A.stub);

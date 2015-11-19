@@ -136,7 +136,7 @@ U.ItemLinkStrip = function(itemLink)
     
     if i == 1 -- itemID
     or i == 7 -- suffixID
-    or i > 12 -- bonusIDs
+    or i > 13 -- bonusIDs
     then
       if i ~= 1 then
         out = out .. ":";
@@ -165,7 +165,7 @@ U.ItemLinkAssemble = function(itemString)
       s = s .. ":0:0:0:0:0:" .. id;
     else
       if i == 3 then
-        s = s .. ":0:0:0:0";
+        s = s .. ":0:0:0:0:0";
       end
       j = j + 1;
       bonusIDs = bonusIDs .. ":".. id;
