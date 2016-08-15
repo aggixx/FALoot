@@ -785,7 +785,7 @@ E.Register("ITEM_UPDATE", function(itemString)
 			netLevels = netLevels + tostring(bonus-1472);
 		elseif bonus == 565 then -- Socket
 			socketStr = "!";
-			score = score + 10;
+			score = score + 5;
 		elseif bonus >= 40 and bonus <= 43 then -- Tertiary
 			tertiaryStr = "*";
 			score = score + 1;
@@ -799,17 +799,18 @@ E.Register("ITEM_UPDATE", function(itemString)
 		upgradeStr = "+" .. netLevels;
 		score = score + netLevels;
 	end
-	
+
+	-- Color values obtained from http://wow.gamepedia.com/Quality
 	local bonusString = upgradeStr .. socketStr .. tertiaryStr;
     local bonusColor;
 	if score >= 15 then
-      bonusColor = { ["r"] = 1.0, ["g"] = 0.502, ["b"] = 0, ["a"] = 1.0 };
+      bonusColor = { ["r"] = 1.0, ["g"] = 0.5, ["b"] = 0, ["a"] = 1.0 }; --Legendary
 	elseif score >= 10 then
-      bonusColor = { ["r"] = 0.69, ["g"] = 0.282, ["b"] = 0.973, ["a"] = 1.0 };
+      bonusColor = { ["r"] = 0.64, ["g"] = 0.21, ["b"] = 0.93, ["a"] = 1.0 }; --Epic
     elseif score >= 5 then
-      bonusColor = { ["r"] = 0, ["g"] = 0.502, ["b"] = 1.0, ["a"] = 1.0 };
+      bonusColor = { ["r"] = 0, ["g"] = 0.44, ["b"] = 0.87, ["a"] = 1.0 }; --Rare
     else
-      bonusColor = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 };
+      bonusColor = { ["r"] = 0.12, ["g"] = 1.0, ["b"] = 0, ["a"] = 1.0 }; --Uncommon
     end
     
     -- insert assembled data into table
@@ -1115,17 +1116,17 @@ end
 
 -- === Expiration option ======================================================
 
-C.Register("delay", function(s)
-	if type(s) ~= "string" then
+C.Register("delay", function(timeDelay)
+	if type(timeDelay) ~= "string" then
 		return;
 	end
 	
-	s = tonumber(s);
+	timeDelay = tonumber(timeDelay);
 	
-	if type(s) ~= "number" then
+	if type(timeDelay) ~= "number" then
 		return;
 	end
 	
-	PD.expTime = s;
-	U.debug("expTime is now set to "..tostring(s).."s.");
+	PD.expTime = timeDelay;
+	U.debug("expTime is now set to "..tostring(timeDelay).."seconds.");
 end, "delay -- sets the delay before finished items are removed from the window, in seconds..");
