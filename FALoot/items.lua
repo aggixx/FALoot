@@ -76,10 +76,16 @@ local function createGUI()
   
   -- Populate the iconFrame with icons
   for i=1,PD.maxIcons do
-    SD.table_icons[i] = CreateFrame("frame", iconFrame:GetName().."Icon"..tostring(i), iconFrame)
-    SD.table_icons[i]:SetWidth(40)
-    SD.table_icons[i]:SetHeight(40)
-    SD.table_icons[i]:Hide()
+	local f = CreateFrame("frame", iconFrame:GetName().."Icon"..tostring(i), iconFrame);
+    f:SetWidth(40);
+    f:SetHeight(40);
+	f:Hide();
+	f.texture = f:CreateTexture(f:GetName().."Texture");
+    f.texture:SetWidth(40);
+    f.texture:SetHeight(40);
+	f.texture:SetAllPoints(f);
+	
+	SD.table_icons[i] = f;
   end
 
   -- Create the scrollingTable
@@ -328,9 +334,6 @@ local function generateIcons()
   for i=1,PD.maxIcons do
     SD.table_icons[i]:Hide()
     SD.table_icons[i]:ClearAllPoints()
-    SD.table_icons[i]:SetBackdrop({
-        bgFile = nil,
-    })
     SD.table_icons[i]:SetScript("OnEnter", nil)
     SD.table_icons[i]:SetScript("OnLeave", nil)
   end
@@ -341,12 +344,10 @@ local function generateIcons()
       -- if we're constructing an icon number that's higher than what we're setup to display then just skip it
       if k < #SD.table_icons then
         -- increment k by 1 before starting to construct
-        k = k + 1
+        k = k + 1;
         
         -- set the texture of the icon
-        SD.table_icons[k]:SetBackdrop({ 
-          bgFile = v["texture"],
-        })
+        SD.table_icons[k].texture:SetTexture(v.textureId);
         
         -- set the icon's scripts
         SD.table_icons[k]:SetScript("OnEnter", function(self, button)
@@ -367,7 +368,7 @@ local function generateIcons()
           --tooltip stuff
           GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
           GameTooltip:SetHyperlink(v["tooltipItemLink"])
-	  F.history.setTooltip(i);
+		  F.history.setTooltip(i);
 	  
           GameTooltip:Show()
         end)
@@ -533,7 +534,7 @@ F.items.add = function(itemString, checkCache)
       ["quantity"] = 1,
       ["displayName"] = displayName,
       ["itemLink"] = itemLink,
-      ["texture"] = texture,
+      ["textureId"] = GetItemIcon(itemLink),
       ["currentValue"] = 30,
       ["winners"] = {},
       ["tooltipItemLink"] = itemLink,

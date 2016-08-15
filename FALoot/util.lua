@@ -116,7 +116,7 @@ U.GetCurrentServerTime = function()
 end
 
 -- As of 6.0.2:
--- itemID:enchant:gem1:gem2:gem3:gem4:suffixID:uniqueID:level:upgradeId:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...
+-- itemID:enchant:gem1:gem2:gem3:gem4:suffixID:uniqueID:level:specId:upgradeId:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...:upgradeValue
 
 U.ItemLinkStrip = function(itemLink)
   if not itemLink then
@@ -128,24 +128,34 @@ U.ItemLinkStrip = function(itemLink)
   end
   
   local itemString = string.match(itemLink, "|c%x+|Hitem:(.-)|h%[.-]|h|r");
+  
+  if not itemString then
+	U.debug("util.ItemLinkStrip was passed a string that does not eval to an itemString.", 1);
+	return;
+  end
+  
   local out = "";
   local i = 1;
+  local numBonuses;
   
-  for id in string.gmatch(itemString, "(%-?%d+):?") do
+  for id in string.gmatch(itemString, "(%-?%d*):?") do
     id = tonumber(id);
     
-    if i == 1 -- itemID
-    or i == 7 -- suffixID
-    or i > 13 -- bonusIDs
-    then
-      if i ~= 1 then
-        out = out .. ":";
-      end
-      if i == 7 and id > 60000 then -- ugly hack to account for suffix system
-        id = id - 65536;
-      end
-      out = out .. id;
-    end
+	if i == 13 then
+		numBonuses = id or 0;
+	elseif i == 1 -- itemID
+	or i == 7 -- suffixID
+	or i == 11 -- upgradeID
+	or i > 13 and i <= 13 + numBonuses -- bonusIDs
+	then
+	  if i ~= 1 then
+		out = out .. ":";
+	  end
+	  if i == 7 and id and id > 60000 then -- ugly hack to account for suffix system
+		id = id - 65536;
+	  end
+	  out = out .. ( id or 0 );
+	end
     
     i = i + 1;
   end
@@ -159,14 +169,13 @@ U.ItemLinkAssemble = function(itemString)
   local s = "item:";
   local bonusIDs = "";
   for id in string.gmatch(itemString, "(%-?%d+):?") do
-    if i == 1 then
+    if i == 1 then -- itemID
       s = s .. id;
-    elseif i == 2 then
-      s = s .. ":0:0:0:0:0:" .. id;
-    else
-      if i == 3 then
-        s = s .. ":0:0:0:0:0";
-      end
+    elseif i == 2 then -- suffixID
+      s = s .. "::::::" .. id;
+	elseif i == 3 then -- upgradeID
+	  s = s .. "::::" .. id;
+    else -- bonusIDs
       j = j + 1;
       bonusIDs = bonusIDs .. ":".. id;
     end
@@ -175,7 +184,7 @@ U.ItemLinkAssemble = function(itemString)
   end
   
   if j > 0 then
-    s = s .. ":" .. j .. bonusIDs;
+    s = s .. "::" .. j .. bonusIDs;
   end
       
   local _, link = GetItemInfo(s);
