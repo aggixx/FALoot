@@ -12,6 +12,8 @@ E.Register("PLAYER_LOGIN", function()
   if PD.debugOn > 0 then
     F.items.add(U.ItemLinkStrip("|cff0070dd|Hitem:141600::::::::100:259::9:3:3447:1815:1820:::|h[Wyrmtongue Spiteblade]|h|r"));
     F.items.add(U.ItemLinkStrip("|cff0070dd|Hitem:138450::::::::100:259:512:11:1:3387:100:::|h[Signet of Stormwind]|h|r"));
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139626::::::::100:581:4:6:3:1799:1512:3441:530:::|h[Ferroleather Gloves]|h|r"));
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:124189:5324:127760::::::100:581:4:6:3:1799:565:1502:531:::|h[Portal Key Signet]|h|r"));
     
     E.Trigger("ITEM_UPDATE");
     

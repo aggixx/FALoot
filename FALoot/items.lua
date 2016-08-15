@@ -34,6 +34,11 @@ SD.difficultyBonusIDs = {
   [450] = true, -- mythic 2???
 };
 
+SD.difficultyLevelDeltas = {
+	[1798] = 15,
+	[1799] = 30,
+};
+
 --[[ ==========================================================================
      GUI Creation
      ========================================================================== --]]
@@ -92,14 +97,14 @@ local function createGUI()
   local scrollingTable = ScrollingTable:CreateST({
     {
       ["name"] = "Item",
-      ["width"] = 200,
+      ["width"] = 187,
       ["align"] = "LEFT",
       ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
       ["defaultsort"] = "asc",
     },
     {
       ["name"] = "Prop.",
-      ["width"] = 30,
+      ["width"] = 40,
       ["align"] = "LEFT",
       ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
       ["defaultsort"] = "asc",
@@ -113,7 +118,7 @@ local function createGUI()
     },
     {
       ["name"] = "Winner(s)",
-      ["width"] = 117,
+      ["width"] = 120,
       ["align"] = "LEFT",
       ["color"] = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 },
       ["defaultsort"] = "dsc",
@@ -767,25 +772,44 @@ E.Register("ITEM_UPDATE", function(itemString)
     end
     
     -- create bonus string
-    local bonusString = "";
-    local numBonuses = 0;
+	local upgradeStr = "";
+	local socketStr = "";
+	local tertiaryStr = "";
+	local score = 0;
+	local netLevels = 0;
     local bonuses = string.match(i, "%d+:%d+:([0-9:]+)");
     if bonuses then
       for bonus in string.gmatch(bonuses, "%d+") do
-	if not SD.difficultyBonusIDs[tonumber(bonus)] then
-	  numBonuses = numBonuses + 1;
-	  bonusString = bonusString .. "+";
-	end
+		bonus = tonumber(bonus);
+		if bonus > 1472 and bonus <= 1672 then -- Upgraded Item Level
+			netLevels = netLevels + tostring(bonus-1472);
+		elseif bonus == 565 then -- Socket
+			socketStr = "!";
+			score = score + 10;
+		elseif bonus >= 40 and bonus <= 43 then -- Tertiary
+			tertiaryStr = "*";
+			score = score + 1;
+		elseif SD.difficultyLevelDeltas[bonus] then -- Difficulty bonus
+			netLevels = netLevels - SD.difficultyLevelDeltas[bonus];
+		end
       end
     end
-    
-    local bonusColor = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 };
-    if numBonuses == 1 then
-      bonusColor = { ["r"] = 0, ["g"] = 0.502, ["b"] = 1.0, ["a"] = 1.0 };
-    elseif numBonuses == 2 then
-      bonusColor = { ["r"] = 0.69, ["g"] = 0.282, ["b"] = 0.973, ["a"] = 1.0 };
-    elseif numBonuses > 2 then
+	
+	if netLevels > 0 then
+		upgradeStr = "+" .. netLevels;
+		score = score + netLevels;
+	end
+	
+	local bonusString = upgradeStr .. socketStr .. tertiaryStr;
+    local bonusColor;
+	if score >= 15 then
       bonusColor = { ["r"] = 1.0, ["g"] = 0.502, ["b"] = 0, ["a"] = 1.0 };
+	elseif score >= 10 then
+      bonusColor = { ["r"] = 0.69, ["g"] = 0.282, ["b"] = 0.973, ["a"] = 1.0 };
+    elseif score >= 5 then
+      bonusColor = { ["r"] = 0, ["g"] = 0.502, ["b"] = 1.0, ["a"] = 1.0 };
+    else
+      bonusColor = { ["r"] = 1.0, ["g"] = 1.0, ["b"] = 1.0, ["a"] = 1.0 };
     end
     
     -- insert assembled data into table
@@ -1088,3 +1112,20 @@ end)
 for k, v in pairs(events) do
   eventFrame:RegisterEvent(k) -- Register all events for which handlers have been defined
 end
+
+-- === Expiration option ======================================================
+
+C.Register("delay", function(s)
+	if type(s) ~= "string" then
+		return;
+	end
+	
+	s = tonumber(s);
+	
+	if type(s) ~= "number" then
+		return;
+	end
+	
+	PD.expTime = s;
+	U.debug("expTime is now set to "..tostring(s).."s.");
+end, "delay -- sets the delay before finished items are removed from the window, in seconds..");
