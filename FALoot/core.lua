@@ -216,7 +216,7 @@ SlashCmdList["FA"] = commandHandler;
      ========================================================================== --]]
  
 A.NAME = "FALoot";
-A.MVERSION = 3; -- Addons only communicate with users of the same major version.
+A.MVERSION = 4; -- Addons only communicate with users of the same major version.
 A.REVISION = 0; -- Specific code revision for identification purposes.
 
 A.stub = LibStub("AceAddon-3.0"):NewAddon(A.NAME);
