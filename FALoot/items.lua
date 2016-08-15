@@ -971,7 +971,7 @@ CM.Register("RAID", function(sender, msg)
 			E.Trigger("ITEM_UPDATE", itemString);
 			--FALoot:checkBids(); --TODO
 		else
-			U.debug("Hyperlink is not in item table.", 2);
+			U.debug("Hyperlink is not in item table: "..itemString, 2);
 		end
 	end
 end);
