@@ -60,7 +60,7 @@ local function createGUI()
   });
   frame:SetBackdropColor(0, 0, 0, 1);
   frame:SetToplevel(true);
-  frame:SetWidth(500);
+  frame:SetWidth(510);
   frame:SetHeight(270);
   frame:SetPoint("CENTER");
   frame:Hide();
