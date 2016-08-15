@@ -137,55 +137,44 @@ U.ItemLinkStrip = function(itemLink)
   local out = "";
   local i = 1;
   local numBonuses;
+  local itemId = "";
+  local suffixId = "";
+  local upgradeId = "";
+  local bonusIds = "";
   
   for id in string.gmatch(itemString, "(%-?%d*):?") do
     id = tonumber(id);
     
 	if i == 13 then
 		numBonuses = id or 0;
-	elseif i == 1 -- itemID
-	or i == 7 -- suffixID
-	or i == 11 -- upgradeID
-	or i > 13 and i <= 13 + numBonuses -- bonusIDs
-	then
-	  if i ~= 1 then
-		out = out .. ":";
+	elseif i == 1 then -- itemID
+	  itemId = id;
+	elseif i == 7 then -- suffixID
+	  suffixId = id;
+	elseif i > 13 and i <= 13 + numBonuses then -- bonusIDs
+	  if i > 14 then
+	    bonusIds = bonusIds .. ":"
 	  end
 	  if i == 7 and id and id > 60000 then -- ugly hack to account for suffix system
 		id = id - 65536;
 	  end
-	  out = out .. ( id or 0 );
+	  bonusIds = bonusIds .. ( id or 0 );
 	end
     
     i = i + 1;
   end
   
-  return out;
+  return format("%d:%d:%s", itemId, suffixId, bonusIds);
 end
 
 U.ItemLinkAssemble = function(itemString)
-  local i = 1;
-  local j = 0;
-  local s = "item:";
-  local bonusIDs = "";
-  for id in string.gmatch(itemString, "(%-?%d+):?") do
-    if i == 1 then -- itemID
-      s = s .. id;
-    elseif i == 2 then -- suffixID
-      s = s .. "::::::" .. id;
-	elseif i == 3 then -- upgradeID
-	  s = s .. "::::" .. id;
-    else -- bonusIDs
-      j = j + 1;
-      bonusIDs = bonusIDs .. ":".. id;
-    end
-    
-    i = i + 1;
-  end
+  local itemId, suffixId, bonusIds = string.match(itemString, "(%d+):(%d+):([%d:]+)");
+  print(itemId, suffixId, bonusIds);
+  local numBonus = select(2, bonusIds:gsub("%d+", ""));
+  print(numBonus);
   
-  if j > 0 then
-    s = s .. "::" .. j .. bonusIDs;
-  end
+  local s = format("item:%d::::::%s::::::%s:%s", itemId, suffixId, numBonus, bonusIds);
+  print(s);
       
   local _, link = GetItemInfo(s);
   if not link then

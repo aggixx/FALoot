@@ -283,6 +283,11 @@ F.items.takeTells = function(itemString)
     UI.tellsWindow.title:SetText(SD.table_items[itemString]["displayName"]);
     UI.tellsWindow.titleBg:SetWidth((UI.tellsWindow.title:GetWidth() or 0) + 10);
     --E.Trigger("TELLSWINDOW_UPDATE");
+	U.debug("Sending:", 2);
+	if PD.debugOn >= 2 then
+		DevTools_Dump(U.ItemLinkAssemble(itemString).." 30");
+		DevTools_Dump(SD.table_items[itemString].itemLink.." 30");
+	end
     SendChatMessage(SD.table_items[itemString]["itemLink"].." 30", "RAID");
     UI.itemWindow.tellsButton:Disable();
   else
