@@ -10,11 +10,16 @@ local UI = A.UI;
 E.Register("PLAYER_LOGIN", function()
 
   if PD.debugOn > 0 then
-    F.items.add(U.ItemLinkStrip("|cff0070dd|Hitem:141600::::::::100:259::9:3:3447:1815:1820:::|h[Wyrmtongue Spiteblade]|h|r"));
-    F.items.add(U.ItemLinkStrip("|cff0070dd|Hitem:138450::::::::100:259:512:11:1:3387:100:::|h[Signet of Stormwind]|h|r"));
-    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139626::::::::100:581:4:6:3:1799:1512:3441:530:::|h[Ferroleather Gloves]|h|r"));
-    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:124189:5324:127760::::::100:581:4:6:3:1799:565:1502:531:::|h[Portal Key Signet]|h|r"));
-    
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:127001::::::::110:266::13:5:689:1696:3408:600:670:::|h[Imbued Silkweave Cinch of the Fireflash]|h|r"));
+	F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139253::::::::110:266::6:3:1806:1507:3336:::|h[Fel-Bloated Venom Sac]|h|r"));
+	F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139251::::::::110:266::3:2:1807:1472:::|h[Despoiled Dragonscale]|h|r")); --139251:0:1807:1472
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139189::::::::110:266::4:2:3379:1457:::|h[Hood of Darkened Visions]|h|r")); --LFR
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139189::::::::110:266::3:2:1807:1472:::|h[Hood of Darkened Visions]|h|r")); --NORMAL
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139189::::::::110:266::5:2:1805:1487:::|h[Hood of Darkened Visions]|h|r")); --HEROIC 139189:0:1805:1487
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:139189::::::::110:266::6:2:1806:1502:::|h[Hood of Darkened Visions]|h|r")); --MYTHIC
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:134426::::::::110:266::35:3:3416:1522:3336:::|h[Collar of Raking Claws]|h|r"));
+    F.items.add(U.ItemLinkStrip("|cffa335ee|Hitem:133771:5436:::::::110:266::16:4:3418:40:1517:1813:::|h[Seacursed Wrap]|h|r"));
+
     E.Trigger("ITEM_UPDATE");
     
     UI.itemWindow.frame:Show();

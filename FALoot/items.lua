@@ -781,7 +781,11 @@ E.Register("ITEM_UPDATE", function(itemString)
     if bonuses then
       for bonus in string.gmatch(bonuses, "%d+") do
 		bonus = tonumber(bonus);
-		if bonus > 1472 and bonus <= 1672 then -- Upgraded Item Level
+		if bonus >= 1502 and bonus <= 1672 then
+			netLevels = netLevels + tostring(bonus-1502);
+		elseif bonus >= 1487 and bonus <= 1672 then
+			netLevels = netLevels + tostring(bonus-1487);
+		elseif bonus >= 1472 and bonus <= 1672 then -- Upgraded Item Level
 			netLevels = netLevels + tostring(bonus-1472);
 		elseif bonus == 565 then -- Socket
 			socketStr = "!";

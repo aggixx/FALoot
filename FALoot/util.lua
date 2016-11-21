@@ -118,6 +118,10 @@ end
 -- As of 6.0.2:
 -- itemID:enchant:gem1:gem2:gem3:gem4:suffixID:uniqueID:level:specId:upgradeId:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...:upgradeValue
 
+-- As of 7.0.3
+-- system generated itemStrings for links have a minimum of 16 parameters. place holder 0s can be removed or left blank to be assumed 0.
+-- itemID:enchant:gem1:gem2:gem3:gem4:suffixId:uniqueId:linkLevel:specID:upgradeId:instanceDifficultyId:numBonusIds:bonusId1:bonusId2:upgradeValue
+
 U.ItemLinkStrip = function(itemLink)
   if not itemLink then
     U.debug("util.ItemLinkStrip was passed a nil value!", 1);
@@ -169,12 +173,12 @@ end
 
 U.ItemLinkAssemble = function(itemString)
   local itemId, suffixId, bonusIds = string.match(itemString, "(%d+):(%d+):([%d:]+)");
-  print(itemId, suffixId, bonusIds);
+  U.debug(itemId .. ":" .. suffixId .. ":" .. bonusIds, 1);
   local numBonus = select(2, bonusIds:gsub("%d+", ""));
-  print(numBonus);
+  U.debug("Number of bonuses: " .. numBonus, 1);
   
   local s = format("item:%d::::::%s::::::%s:%s", itemId, suffixId, numBonus, bonusIds);
-  print(s);
+  U.debug(s, 1);
       
   local _, link = GetItemInfo(s);
   if not link then
@@ -308,6 +312,8 @@ do
 end
 
 U.checkFilters = function(itemString, checkItemLevel)
+  U.debug("Checking item filters...", 1);
+
   -- itemString must be a string!
   if type(itemString) ~= "string" then
     U.debug("checkFilters was passed a non-string value!", 1);
@@ -322,7 +328,8 @@ U.checkFilters = function(itemString, checkItemLevel)
     return false;
   end
   
-  if PD.debugOn > 0 then
+  if PD.debugOn > 0 and PD.debugOn < 5 then
+    U.debug("Bypassing item filtering due to debug level " .. PD.debugOn .. ". To enable filtering, turn off debug or set the level to 5.", 1);
     return true
   end
   
@@ -331,7 +338,7 @@ U.checkFilters = function(itemString, checkItemLevel)
   
   -- check if the quality of the item is high enough
   if quality ~= 4 then -- TODO: Add customizable quality filters
-    U.debug("Quality of "..itemLink.." is too low.", 1);
+    U.debug("Quality of "..itemLink.." is too low: " .. quality .. ".", 1);
     return false
   end
     
@@ -340,8 +347,8 @@ U.checkFilters = function(itemString, checkItemLevel)
     return true;
   end
   
-  if not (class == "Armor" or class == "Weapon") then
-    U.debug("Class of "..itemLink.." is incorrect.", 1)
+  if not (class == "Armor" or class == "Weapon" or class == "Gem") then
+    U.debug("Class of "..itemLink.." is incorrect: " .. class .. ".", 1)
     return false
   end
   
