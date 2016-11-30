@@ -4,7 +4,7 @@ local PD = A.pData;
 local E = A.events;
 
 local function setAutoLoot()
-	if not (PD.autolootToggle and PD.autolootKey) then
+--[[	if not (PD.autolootToggle and PD.autolootKey) then
 		return;
 	end
 
@@ -32,7 +32,7 @@ local function setAutoLoot()
 			-- Notify user
 			U.debug("Your loot settings have been restored.");
 		end
-	end
+	end--]]
 end
 
 local frame = CreateFrame("frame");
