@@ -172,7 +172,7 @@ U.ItemLinkStrip = function(itemLink)
 end
 
 U.ItemLinkAssemble = function(itemString)
-  local itemId, suffixId, bonusIds = string.match(itemString, "(%d+):(%d+):([%d:]+)");
+  local itemId, suffixId, bonusIds = string.match(itemString, "(%d+):(%d+):([%d:]*)");
   U.debug(itemId .. ":" .. suffixId .. ":" .. bonusIds, 1);
   local numBonus = select(2, bonusIds:gsub("%d+", ""));
   U.debug("Number of bonuses: " .. numBonus, 1);
@@ -286,7 +286,7 @@ do
   
     local d = GetRaidDifficultyID();
   
-    if not (d == 15 or d == 16) then
+    if not (d == 14 or d == 15 or d == 16) then
       cache = false;
       return cache, "wrong instance difficulty";
     elseif select(2, InGuildParty())/n < 0.75 then
