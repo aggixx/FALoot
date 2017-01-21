@@ -1,0 +1,19 @@
+------------------------------------------------------------------------
+r47 | xinhuan | 2010-10-12 22:16:51 +0000 (Tue, 12 Oct 2010) | 1 line
+Changed paths:
+   A /tags/v2.0.2 (from /trunk:46)
+
+Tag v2.0.2. There are no code changes, this is just to update the TOC interface number.
+------------------------------------------------------------------------
+r46 | xinhuan | 2010-10-12 22:15:09 +0000 (Tue, 12 Oct 2010) | 1 line
+Changed paths:
+   M /trunk/LibGraph-2.0.toc
+
+Update Interface number to 40000.
+------------------------------------------------------------------------
+r45 | elsia | 2010-03-28 01:35:09 +0000 (Sun, 28 Mar 2010) | 1 line
+Changed paths:
+   M /trunk/LibGraph-2.0/LibGraph-2.0.lua
+
+- Fix for new texture tiling feature
+------------------------------------------------------------------------

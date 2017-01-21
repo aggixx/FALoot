@@ -659,7 +659,7 @@ F.items.addWinner = function(itemString, winner, bid)
 	-- check if the player was the winner of the item
 	if winner == SD.PLAYER_NAME then
 		U.debug("The player won an item!", 1);
-		LootWonAlertFrame_ShowAlert(SD.table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
+		LootAlertSystem:AddAlert(SD.table_items[itemString]["itemLink"], 1, LOOT_ROLL_TYPE_NEED, bid.." DKP");
 	end
 	
 	-- create a table entry for that pricepoint
